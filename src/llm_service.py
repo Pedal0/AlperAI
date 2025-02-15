@@ -15,7 +15,7 @@ def get_project_structure(prompt):
         completion = client.chat.completions.create(
             model="nvidia/llama-3.1-nemotron-70b-instruct:free",
             messages=[
-                {"role": "system", "content": "Tu es un assistant spécialisé dans la génération de structures de projet. Réponds uniquement avec un JSON valide décrivant les fichiers et dossiers. Tous les dossiers doivent être des dictionnaires, et tous les fichiers doivent être des chaînes vides (''). Tu ne dois repondre que avec le json sans explication ou autre chose."},
+                {"role": "system", "content": "Tu es un assistant spécialisé dans la génération de structures de projet. Réponds uniquement avec un JSON valide décrivant les fichiers et dossiers. Tous les dossiers doivent être des dictionnaires et tous les fichiers doivent être des chaînes vides (\"\"), par exemple: {\"dossier\": {\"SousDossier\": {\"fichier.py\": \"\", \"autre_fichier.txt\": \"\"}}}. Ne renvoie que le JSON, sans explication ni texte supplémentaire."},
                 {"role": "user", "content": prompt}
             ]
         )

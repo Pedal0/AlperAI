@@ -13,7 +13,7 @@ def extract_json(text):
     du contenu autour, notamment dans un bloc markdown formaté en JSON.
     De plus, cette fonction supprime les commentaires éventuels.
     """
-    match = re.search(r'```json\s*({.*?})\s*```', text, re.DOTALL)
+    match = re.search(r'```(?:json)?\s*({[\s\S]*?})\s*```', text, re.DOTALL)
     if match:
         json_str = match.group(1)
     else:
