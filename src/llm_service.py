@@ -25,7 +25,7 @@ def get_project_structure(prompt):
             return normalize_structure(structure) 
         except json.JSONDecodeError:
             print(f"⚠️ Erreur de format JSON. Tentative {attempt + 1} sur 3...")
-            prompt = f"Corrige ce JSON invalide : {response_text}"
+            prompt = f"Corrige ce JSON invalide pour que tous les dossiers doivent être des dictionnaires et tous les fichiers doivent être des chaînes vides (\"\"), par exemple: {{\"dossier\": {{\"SousDossier\": {{\"fichier.py\": \"\", \"autre_fichier.txt\": \"\"}}}}}}. : {response_text}"
             print(prompt)
     
     print("❌ Le LLM n'a pas réussi à fournir un JSON valide après plusieurs tentatives.")
