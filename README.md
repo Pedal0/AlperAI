@@ -23,6 +23,8 @@ Ce projet permet de générer automatiquement l'arborescence d'un projet en fonc
     OPENROUTER_API_KEY=<votre_cle_api>
     ```
 
+    Vous pouvez obtenir votre clé API sur [OpenRouter](https://openrouter.ai/).
+
 ## Utilisation
 
 1. Activez l'environnement Pipenv :
