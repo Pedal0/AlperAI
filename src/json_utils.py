@@ -5,7 +5,7 @@ def remove_json_comments(json_str):
     """
     Supprime les commentaires de style JavaScript (// ...) dans une chaîne JSON.
     """
-    return re.sub(r'//.*?(?=\n)', '', json_str)
+    return re.sub(r'//.*?(?=\r?\n)', '', json_str)
 
 def extract_json(text):
     """
@@ -17,7 +17,7 @@ def extract_json(text):
     if match:
         json_str = match.group(1)
     else:
-        json_str = text
+        json_str = text.strip()
     json_str = remove_json_comments(json_str)
     return json_str
 
@@ -27,12 +27,12 @@ def normalize_structure(structure):
     
     - Si la structure est une liste, elle est convertie en dictionnaire avec chaque élément pour clé et une valeur vide.
     - Si c'est un dictionnaire, on normalise récursivement chaque valeur.
-    - Si c'est une chaîne de caractères, on retourne une chaîne vide.
+    - Si c'est une chaîne de caractères, on retourne la chaîne elle-même.
     """
     if isinstance(structure, list):
         return {item: "" for item in structure}
     elif isinstance(structure, dict):
         return {k: normalize_structure(v) for k, v in structure.items()}
     elif isinstance(structure, str):
-        return ""
+        return structure
     return {}

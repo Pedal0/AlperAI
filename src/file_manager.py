@@ -1,13 +1,20 @@
 import os
 
-def create_project_files(base_path, structure):
-    """Crée les fichiers et dossiers selon la structure générée."""
-    for path, content in structure.items():
-        full_path = os.path.join(base_path, path)
-        if isinstance(content, dict): 
-            os.makedirs(full_path, exist_ok=True)
-            create_project_files(full_path, content)
-        else:  
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            with open(full_path, "w") as f:
-                f.write(content or "# TODO: Implement this file")
+def create_project_files(base_dir, structure):
+    """
+    Crée les dossiers et fichiers spécifiés dans la structure du projet.
+    
+    - Pour chaque dossier (valeur dictionnaire), le dossier est créé et la fonction est appelée récursivement.
+    - Pour chaque fichier (valeur chaîne de caractères), son contenu est écrit tel quel,
+      permettant ainsi d'ajouter un commentaire en tête indiquant ce qu'il faudra coder.
+    """
+    for name, content in structure.items():
+        path = os.path.join(base_dir, name)
+        if isinstance(content, dict):
+            os.makedirs(path, exist_ok=True)
+            create_project_files(path, content)
+        elif isinstance(content, str):
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content)
+        else:
+            print(f"[AVERTISSEMENT] Type non supporté pour {name}: {type(content)}")
