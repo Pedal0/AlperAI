@@ -1,6 +1,6 @@
 # Chatbot OpenRouter
 
-Ce projet permet de générer automatiquement l'arborescence d'un projet en fonction d'une description fournie par l'utilisateur. Il utilise l'API OpenRouter pour obtenir la structure du projet au format JSON.
+Ce projet permet de générer automatiquement l'arborescence d'un projet en fonction d'une description fournie par l'utilisateur. Il utilise l'API OpenRouter pour obtenir la structure du projet au format JSON et Streamlit pour fournir une interface web interactive.
 
 ## Prérequis
 
@@ -17,7 +17,13 @@ Ce projet permet de générer automatiquement l'arborescence d'un projet en fonc
     pipenv install
     ```
 
-4. Créez un fichier `.env` à la racine du projet et ajoutez votre clé API OpenRouter :
+4. Si, malgré l'installation et l'activation de l'environnement avec `pipenv shell`, les dépendances ne semblent pas installées correctement, vous pouvez installer manuellement :
+    
+    ```
+    pipenv install streamlit openai python-dotenv
+    ```
+
+5. Créez un fichier `.env` à la racine du projet et ajoutez votre clé API OpenRouter :
 
     ```
     OPENROUTER_API_KEY=<votre_cle_api>
@@ -33,25 +39,21 @@ Ce projet permet de générer automatiquement l'arborescence d'un projet en fonc
     pipenv shell
     ```
 
-2. Lancez le script principal :
+2. Lancez l'application Streamlit :
 
     ```
-    python main.py
+    streamlit run main.py
     ```
 
-3. Lors de l'exécution, le script vous demandera :
-    - Le chemin absolu où vous souhaitez créer l'arborescence du projet.
-    - Une description de votre projet.
+3. Dans l'interface web qui s'ouvre, vous pourrez :
+    - Saisir le **chemin absolu** où vous souhaitez créer l'arborescence.
+    - Entrer une **description** de votre projet dans la zone de texte.
 
-    Par exemple :
-
-    - Chemin : `C:\Users\VotreNom\Documents\MonProjet`
-    - Description : "Un projet de gestion de tâches avec un dossier backend et un dossier frontend, où chaque fichier initial est créé avec un placeholder."
-
-Le programme générera la structure du projet en se basant sur votre description et créera les fichiers/dossiers correspondants à l'endroit indiqué.
+4. Cliquez sur **"Créer le projet"** pour générer la structure initiale.  
+   Si la structure générée ne correspond pas à vos attentes, cliquez sur **"Re-generer le projet"** pour supprimer le contenu du dossier existant et tenter une nouvelle génération avec le même prompt.
 
 ## Remarques
 
-- Assurez-vous que le chemin fourni lors de l'exécution est valide et accessible.
-- Le script utilise des fonctions de normalisation et extraction pour garantir la validité du JSON retourné par l'API.
-- N'hésitez pas à modifier les fichiers générés pour adapter le projet à vos besoins.
+- Assurez-vous que le chemin fourni est valide et accessible.
+- L'application utilise des placeholders pour indiquer l'état de la génération (en cours, succès ou erreur).
+- Vous pouvez personnaliser et modifier les fichiers générés en fonction de vos besoins.
