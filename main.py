@@ -1,5 +1,6 @@
 import os
 import json
+import streamlit as st
 from dotenv import load_dotenv
 from src.llm_service import get_project_structure
 from src.file_manager import create_project_files
@@ -7,22 +8,28 @@ from src.file_manager import create_project_files
 load_dotenv()
 
 def main():
-    """Exécution principale du script."""
-    project_path = input("Où créer le projet ? (chemin absolu) : ")
-    if not os.path.exists(project_path):
-        print("Chemin invalide.")
-        return
+    st.title("Structure Project Creator")
     
-    prompt = input("Décris ton projet : ")
-    print("Génération en cours... 🧠")
-    structure = get_project_structure(prompt)
+    project_path = st.text_input("Chemin absolu du projet")
+    prompt = st.text_area("Décris ton projet")
     
-    if structure:
-        print("Structure reçue :", json.dumps(structure, indent=2))
-        create_project_files(project_path, structure)
-        print("Projet créé avec succès ! 🚀")
-    else:
-        print("Erreur lors de la récupération de la structure du projet.")
+    if st.button("Créer le projet"):
+        if not os.path.exists(project_path):
+            st.error("Chemin invalide.")
+            return
+        
+        status_placeholder = st.empty()
+        status_placeholder.info("Génération en cours... 🧠")
+        
+        structure = get_project_structure(prompt)
+        
+        if structure:
+            create_project_files(project_path, structure)
+            status_placeholder.empty()
+            st.success("Projet créé avec succès ! 🚀")
+        else:
+            status_placeholder.empty()
+            st.error("Erreur lors de la récupération de la structure du projet.")
 
 if __name__ == "__main__":
     main()
