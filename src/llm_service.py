@@ -32,7 +32,7 @@ def get_project_structure(prompt):
                 f"'# Ce fichier contiendra la logique de traitement des données').\n"
                 f"JSON original: {response_text}"
             )
-            print(prompt)
+            # print(prompt)
     
     print("❌ Le LLM n'a pas réussi à fournir un JSON valide après plusieurs tentatives.")
     return None

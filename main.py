@@ -25,7 +25,7 @@ def main():
         structure = get_project_structure(prompt)
         
         if structure:
-            create_project_files(project_path, structure)
+            create_project_files(project_path, structure, prompt, structure)
             status_placeholder.empty()
             st.success("Projet créé avec succès ! 🚀")
         else:
@@ -47,7 +47,7 @@ def main():
         structure = get_project_structure(prompt)
         
         if structure:
-            create_project_files(project_path, structure)
+            create_project_files(project_path, structure, prompt, structure)
             status_placeholder.empty()
             st.success("Projet régénéré avec succès ! 🚀")
         else:
