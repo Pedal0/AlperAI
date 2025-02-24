@@ -1,59 +1,61 @@
 # Chatbot OpenRouter
 
-Ce projet permet de générer automatiquement l'arborescence d'un projet en fonction d'une description fournie par l'utilisateur. Il utilise l'API OpenRouter pour obtenir la structure du projet au format JSON et Streamlit pour fournir une interface web interactive.
+This project automatically generates the project structure based on a description provided by the user. It uses the OpenRouter API to obtain the project structure in JSON format and Streamlit to provide an interactive web interface.
 
-## Prérequis
+## Prerequisites
 
-- Python 3.8 ou supérieur
+- Python 3.8 or higher
 - Pipenv
 
 ## Installation
 
-1. Clonez le dépôt ou copiez les fichiers du projet sur votre machine.
-2. Ouvrez un terminal dans le dossier racine du projet.
-3. Installez les dépendances via Pipenv :
+1. Clone the repository or copy the project files to your machine.
+2. Open a terminal in the project's root folder.
+3. Install the dependencies via Pipenv:
 
-    ```
-    pipenv install
-    ```
+   ```
+   pipenv install
+   ```
 
-4. Si, malgré l'installation et l'activation de l'environnement avec `pipenv shell`, les dépendances ne semblent pas installées correctement, vous pouvez installer manuellement :
-    
-    ```
-    pipenv install streamlit openai python-dotenv
-    ```
+4. If, after installation and activating the environment with `pipenv shell`, the dependencies don't seem to be properly installed, you can install them manually:
 
-5. Créez un fichier `.env` à la racine du projet et ajoutez votre clé API OpenRouter :
+   ```
+   pipenv install streamlit openai python-dotenv
+   ```
 
-    ```
-    OPENROUTER_API_KEY=<votre_cle_api>
-    ```
+5. Create a `.env` file at the project's root and add your OpenRouter API key:
 
-    Vous pouvez obtenir votre clé API sur [OpenRouter](https://openrouter.ai/).
+   ```
+   OPENROUTER_API_KEY=<your_api_key>
+   ```
 
-## Utilisation
+   You can obtain your API key at [OpenRouter](https://openrouter.ai/).
 
-1. Activez l'environnement Pipenv :
+## Usage
 
-    ```
-    pipenv shell
-    ```
+1. Activate the Pipenv environment:
 
-2. Lancez l'application Streamlit :
+   ```
+   pipenv shell
+   ```
 
-    ```
-    streamlit run main.py
-    ```
+2. Launch the Streamlit application:
 
-3. Dans l'interface web qui s'ouvre, vous pourrez :
-    - Saisir le **chemin absolu** où vous souhaitez créer l'arborescence.
-    - Entrer une **description** de votre projet dans la zone de texte.
+   ```
+   streamlit run main.py
+   ```
 
-4. Cliquez sur **"Créer le projet"** pour générer la structure initiale.  
-   Si la structure générée ne correspond pas à vos attentes, cliquez sur **"Re-generer le projet"** pour supprimer le contenu du dossier existant et tenter une nouvelle génération avec le même prompt.
+3. In the web interface that opens, you can:
 
-## Remarques
+   - Enter the **absolute path** where you wish to create the project structure.
+   - Enter a **description** of your project in the text area.
 
-- Assurez-vous que le chemin fourni est valide et accessible.
-- L'application utilise des placeholders pour indiquer l'état de la génération (en cours, succès ou erreur).
-- Vous pouvez personnaliser et modifier les fichiers générés en fonction de vos besoins.
+4. Click **"Create Project"** to generate the initial structure.
+   If the generated structure does not meet your expectations, click **"Re-generate Project"** to erase the existing folder content and attempt a new generation with the same prompt.
+
+## Notes
+
+- Ensure that the provided path is valid and accessible.
+- The application uses placeholders to indicate the generation status (in progress, success, or error).
+- The generated project includes both the project structure and the initial code. However, you'll need to review and refine the code afterwards to ensure everything runs as expected. This setup serves as a solid foundation.
+- You can customize and modify the generated files according to your needs.
