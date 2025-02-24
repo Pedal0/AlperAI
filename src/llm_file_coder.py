@@ -26,7 +26,7 @@ def get_file_comments(user_prompt, file_name, project_structure):
 
     for attempt in range(3):
         completion = client.chat.completions.create(
-            model="cognitivecomputations/dolphin3.0-mistral-24b:free",
+            model="deepseek/deepseek-r1-distill-llama-70b:free",
             messages=[
                 {
                     "role": "system",
