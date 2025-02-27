@@ -42,7 +42,7 @@ This project automatically generates the project structure based on a descriptio
 2. Launch the Streamlit application:
 
    ```
-   streamlit run main.py
+   streamlit run app.py
    ```
 
 3. In the web interface that opens, you can:
