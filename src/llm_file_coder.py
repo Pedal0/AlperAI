@@ -24,13 +24,13 @@ def get_file_comments(user_prompt, file_name, project_structure):
         "Génère le code complet pour ce fichier. Réponds uniquement avec le code, sans explication ou commentaire supplémentaire."
     )
 
-    for attempt in range(3):
+    for attempt in range(10):
         completion = client.chat.completions.create(
-            model="deepseek/deepseek-r1-distill-llama-70b:free",
+            model="google/gemini-exp-1206:free",
             messages=[
                 {
                     "role": "system",
-                    "content": "Vous êtes un assistant spécialisé dans la génération de code pour des applications. Répondez uniquement avec le code complet à inclure dans le fichier, sans aucune explication ou commentaire."
+                    "content": "Vous êtes un assistant spécialisé dans la génération de code pour des applications. Répondez uniquement avec le code complet à inclure dans le fichier, sans aucune explication ou commentaire ou tout autre element de texte hors code."
                 },
                 {"role": "user", "content": composed_prompt}
             ]

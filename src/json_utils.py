@@ -9,17 +9,17 @@ def remove_json_comments(json_str):
 
 def extract_json(text):
     """
-    Extrait une chaîne JSON valide depuis un texte qui peut contenir 
-    du contenu autour, notamment dans un bloc markdown formaté en JSON.
+    Extrait une chaîne de code valide depuis un texte qui peut contenir 
+    du contenu autour, notamment dans un bloc markdown formaté.
     De plus, cette fonction supprime les commentaires éventuels.
     """
-    match = re.search(r'```(?:json)?\s*({[\s\S]*?})\s*```', text, re.DOTALL)
+    # First try to extract from markdown code blocks
+    match = re.search(r'```(?:[a-zA-Z]*)?(?:\n|\s)([\s\S]*?)\s*```', text, re.DOTALL)
     if match:
-        json_str = match.group(1)
-    else:
-        json_str = text.strip()
-    json_str = remove_json_comments(json_str)
-    return json_str
+        return match.group(1)
+    
+    # If no code block, use the entire content
+    return text.strip()
 
 def normalize_structure(structure):
     """
