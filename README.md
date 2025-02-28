@@ -50,8 +50,8 @@ This project automatically generates the project structure based on a descriptio
    - Enter the **absolute path** where you wish to create the project structure.
    - Enter a **description** of your project in the text area.
 
-4. Click **"Create Project"** to generate the initial structure.
-   If the generated structure does not meet your expectations, click **"Re-generate Project"** to erase the existing folder content and attempt a new generation with the same prompt.
+4. Click **"Create strcture Project"** to generate the initial structure.
+5. Click **"Generate code"** to generate the code fo each files.
 
 ## Notes
 
