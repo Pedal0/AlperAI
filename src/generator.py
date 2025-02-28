@@ -1,5 +1,7 @@
 import json
 import os
+import time
+import random
 from openai import OpenAI
 from src.config import (
     OPENROUTER_API_KEY, 
@@ -18,6 +20,22 @@ client = OpenAI(
 )
 
 _file_cache = {}
+_last_api_call_time = 0
+
+def _ensure_rate_limit():
+    """
+    Ensures there's a delay of 10-11 seconds between API calls.
+    """
+    global _last_api_call_time
+    current_time = time.time()
+    elapsed = current_time - _last_api_call_time
+    
+    if _last_api_call_time > 0 and elapsed < 10:
+        delay = 10 + random.uniform(0, 1) - elapsed
+        print(f"⏱️ Attente de {delay:.1f} secondes pour respecter la limite d'API...")
+        time.sleep(delay)
+    
+    _last_api_call_time = time.time()
 
 def generate_project_structure(project_description):
     """
@@ -59,6 +77,7 @@ def generate_project_structure(project_description):
     
     for attempt in range(MAX_RETRIES):
         try:
+            _ensure_rate_limit()
             completion = client.chat.completions.create(
                 model=STRUCTURE_MODEL,
                 messages=[
@@ -117,6 +136,7 @@ def generate_file_content(project_description, file_path, file_description, proj
     
     for attempt in range(MAX_RETRIES):
         try:
+            _ensure_rate_limit()
             completion = client.chat.completions.create(
                 model=CODE_MODEL,
                 messages=[
