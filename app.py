@@ -5,7 +5,7 @@ from src.generator import generate_project_structure, generate_project_files
 from src.file_utils import create_project_files
 
 st.set_page_config(
-    page_title="Générateur de Site Web par IA",
+    page_title="Générateur de projet",
     page_icon="🤖",
     layout="wide"
 )
