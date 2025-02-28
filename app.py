@@ -5,7 +5,7 @@ from src.generator import generate_project_structure, generate_project_files
 from src.file_utils import create_project_files
 
 st.set_page_config(
-    page_title="Générateur de Site Web par IA",
+    page_title="Générateur de projet",
     page_icon="🤖",
     layout="wide"
 )
@@ -42,7 +42,7 @@ if not st.session_state.popup_shown:
 
 st.markdown("""
 Cette application vous permet de générer un site web ou une application à partir d'une simple description.
-Fournissez un descriptif de votre projet et un chemin où sauvegarder les fichiers.
+Fournissez un descriptif de votre projet (fonctionnalités, langage, etc) et un chemin où sauvegarder les fichiers.
 """)
 
 project_path = st.text_input("Chemin du dossier projet", os.path.expanduser("~/mon_projet"))
