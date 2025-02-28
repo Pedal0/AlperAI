@@ -129,7 +129,7 @@ def generate_file_content(project_description, file_path, file_description, proj
     Fichier à générer: {file_path}
     Description: {file_description}
     
-    Génère le contenu complet de ce fichier. Assure-toi qu'il respecte les bonnes pratiques
+    Génère le code" complet de ce fichier. Assure-toi qu'il respecte les bonnes pratiques
     de son langage et qu'il s'intègre correctement avec les autres fichiers du projet.
     Réponds uniquement avec le code, sans explication ni commentaire autour du code.
     """
