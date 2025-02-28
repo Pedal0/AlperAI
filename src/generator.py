@@ -13,6 +13,7 @@ from src.config import (
 )
 from src.json_utils import extract_json, normalize_structure
 from src.file_utils import get_flat_file_list
+from src.code_analyzer import collect_project_functions, format_function_info
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
@@ -30,8 +31,8 @@ def _ensure_rate_limit():
     current_time = time.time()
     elapsed = current_time - _last_api_call_time
     
-    if _last_api_call_time > 0 and elapsed < 10:
-        delay = 10 + random.uniform(0, 1) - elapsed
+    if _last_api_call_time > 0 and elapsed < 11:
+        delay = 11 - elapsed
         print(f"⏱️ Attente de {delay:.1f} secondes pour respecter la limite d'API...")
         time.sleep(delay)
     
@@ -101,7 +102,7 @@ def generate_project_structure(project_description):
     
     raise Exception("Échec de la génération de la structure après plusieurs tentatives")
 
-def generate_file_content(project_description, file_path, file_description, project_structure):
+def generate_file_content(project_description, file_path, file_description, project_structure, files_content=None):
     """
     Génère le contenu d'un fichier spécifique.
     
@@ -110,6 +111,7 @@ def generate_file_content(project_description, file_path, file_description, proj
         file_path (str): Chemin du fichier
         file_description (str): Description du fichier
         project_structure (dict): Structure complète du projet
+        files_content (dict, optional): Contenu des fichiers déjà générés
         
     Returns:
         str: Contenu du fichier
@@ -119,6 +121,13 @@ def generate_file_content(project_description, file_path, file_description, proj
     
     file_ext = os.path.splitext(file_path)[1].lower()
     
+    # Information des fonctions existantes à ajouter au prompt
+    functions_info = ""
+    if files_content:
+        project_functions = collect_project_functions(files_content)
+        if project_functions:
+            functions_info = format_function_info(project_functions)
+    
     prompt = f"""
     Description du projet:
     {project_description}
@@ -126,11 +135,14 @@ def generate_file_content(project_description, file_path, file_description, proj
     Structure complète du projet:
     {json.dumps(project_structure, indent=2)}
     
+    {functions_info}
+    
     Fichier à générer: {file_path}
     Description: {file_description}
     
-    Génère le code" complet de ce fichier. Assure-toi qu'il respecte les bonnes pratiques
+    Génère le code complet de ce fichier. Assure-toi qu'il respecte les bonnes pratiques
     de son langage et qu'il s'intègre correctement avec les autres fichiers du projet.
+    NE MODIFIE PAS les fonctions existantes, utilise-les telles quelles.
     Réponds uniquement avec le code, sans explication ni commentaire autour du code.
     """
     
@@ -187,7 +199,8 @@ def generate_project_files(project_description, project_structure, regenerate=Tr
             project_description, 
             file_path, 
             description, 
-            project_structure
+            project_structure,
+            files_content
         )
         files_content[file_path] = content
     

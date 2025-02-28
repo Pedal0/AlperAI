@@ -10,7 +10,36 @@ st.set_page_config(
     layout="wide"
 )
 
+if 'popup_shown' not in st.session_state:
+    st.session_state.popup_shown = False
+
 st.title("Générateur de Site Web par IA")
+
+if not st.session_state.popup_shown:
+    popup_container = st.container()
+    with popup_container:
+        col1, col2, col3 = st.columns([1, 3, 1])
+        with col2:
+            st.warning("""
+            ### Langages pris en charge
+            Ce bot prend en charge avec une suite logique les langages suivants :
+            - `py` : Python
+            - `js`, `jsx` : JavaScript
+            - `ts`, `tsx` : TypeScript 
+            - `php` : PHP
+            - `java` : Java
+            - `cs` : C#
+            - `rb` : Ruby
+            - `go` : Go
+            - `html` : HTML
+            - `css` : CSS
+            
+            Si le langage que vous souhaitez n'est pas présent dans cette liste, vous pouvez quand même l'essayer, mais la cohérence n'est pas garantie.
+            """)
+            if st.button("Fermer"):
+                st.session_state.popup_shown = True
+                st.rerun()
+
 st.markdown("""
 Cette application vous permet de générer un site web ou une application à partir d'une simple description.
 Fournissez un descriptif de votre projet et un chemin où sauvegarder les fichiers.
