@@ -42,7 +42,7 @@ if not st.session_state.popup_shown:
 
 st.markdown("""
 Cette application vous permet de générer un site web ou une application à partir d'une simple description.
-Fournissez un descriptif de votre projet et un chemin où sauvegarder les fichiers.
+Fournissez un descriptif de votre projet (fonctionnalités, langage, etc) et un chemin où sauvegarder les fichiers.
 """)
 
 project_path = st.text_input("Chemin du dossier projet", os.path.expanduser("~/mon_projet"))
