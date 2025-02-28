@@ -1,38 +1,65 @@
 import json
 import re
 
-def remove_json_comments(json_str):
-    """
-    Supprime les commentaires de style JavaScript (// ...) dans une chaîne JSON.
-    """
-    return re.sub(r'//.*?(?=\r?\n)', '', json_str)
-
 def extract_json(text):
     """
-    Extrait une chaîne JSON valide depuis un texte qui peut contenir 
-    du contenu autour, notamment dans un bloc markdown formaté en JSON.
-    De plus, cette fonction supprime les commentaires éventuels.
+    Extrait un objet JSON valide d'une chaîne de texte.
+    Si le texte contient des blocs de code, tente d'extraire le JSON de ces blocs.
+    
+    Args:
+        text (str): Le texte contenant potentiellement un objet JSON
+        
+    Returns:
+        str or None: Le JSON extrait ou None si aucun JSON valide n'est trouvé
     """
-    match = re.search(r'```(?:json)?\s*({[\s\S]*?})\s*```', text, re.DOTALL)
-    if match:
-        json_str = match.group(1)
-    else:
-        json_str = text.strip()
-    json_str = remove_json_comments(json_str)
-    return json_str
+    code_blocks = re.findall(r'```(?:json)?\s*([\s\S]*?)```', text)
+    
+    if code_blocks:
+        for block in code_blocks:
+            try:
+                json.loads(block.strip())
+                return block.strip()
+            except json.JSONDecodeError:
+                continue
+    
+    try:
+        start = text.find('{')
+        end = text.rfind('}')
+        
+        if start != -1 and end != -1 and start < end:
+            potential_json = text[start:end+1]
+            json.loads(potential_json)
+            return potential_json
+    except json.JSONDecodeError:
+        pass
+    
+    return None
 
 def normalize_structure(structure):
     """
-    Normalise la structure JSON pour s'assurer qu'elle est bien formatée.
+    Normalise la structure de fichiers pour s'assurer qu'elle est au format attendu.
+    Vérifie que les dossiers sont des dictionnaires et les fichiers sont des chaînes.
     
-    - Si la structure est une liste, elle est convertie en dictionnaire avec chaque élément pour clé et une valeur vide.
-    - Si c'est un dictionnaire, on normalise récursivement chaque valeur.
-    - Si c'est une chaîne de caractères, on retourne la chaîne elle-même.
+    Args:
+        structure (dict): La structure à normaliser
+        
+    Returns:
+        dict: La structure normalisée
     """
-    if isinstance(structure, list):
-        return {item: "" for item in structure}
-    elif isinstance(structure, dict):
-        return {k: normalize_structure(v) for k, v in structure.items()}
-    elif isinstance(structure, str):
-        return structure
-    return {}
+    normalized = {}
+    
+    for key, value in structure.items():
+        if isinstance(value, dict):
+            normalized[key] = normalize_structure(value)
+        elif isinstance(value, list):
+            normalized[key] = {}
+            for item in value:
+                if isinstance(item, str):
+                    normalized[key][item] = "Fichier généré automatiquement"
+                elif isinstance(item, dict):
+                    for file_key, file_desc in item.items():
+                        normalized[key][file_key] = file_desc
+        elif isinstance(value, str):
+            normalized[key] = value
+            
+    return normalized
