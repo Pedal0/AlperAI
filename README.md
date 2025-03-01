@@ -53,6 +53,10 @@ This project automatically generates the project structure based on a descriptio
 4. Click **"Create strcture Project"** to generate the initial structure.
 5. Click **"Generate code"** to generate the code fo each files.
 
+## License
+
+This project is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License - see the [LICENSE](LICENSE) file for details.
+
 ## Notes
 
 - Ensure that the provided path is valid and accessible.
