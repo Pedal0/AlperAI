@@ -51,3 +51,37 @@ def get_flat_file_list(structure, parent_path=""):
             files.append((current_path, value))
     
     return files
+
+def save_corrected_files(base_path, modified_files, selected_files=None):
+    """
+    Sauvegarde les fichiers corrigés dans un dossier spécifique.
+    
+    Args:
+        base_path (str): Chemin du dossier projet d'origine
+        modified_files (dict): Dictionnaire des fichiers modifiés (chemin => contenu)
+        selected_files (list, optional): Liste des chemins des fichiers à sauvegarder
+        
+    Returns:
+        str: Chemin du dossier contenant les fichiers corrigés
+    """
+    corrected_dir = os.path.join(os.path.dirname(base_path), os.path.basename(base_path) + "_corrected")
+    
+    try:
+        os.makedirs(corrected_dir, exist_ok=True)
+        
+        files_to_save = modified_files
+        if selected_files is not None:
+            files_to_save = {fp: modified_files[fp] for fp in selected_files if fp in modified_files}
+        
+        for file_path, content in files_to_save.items():
+            full_path = os.path.join(corrected_dir, file_path)
+            
+            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            
+            with open(full_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+        
+        return corrected_dir
+    except Exception as e:
+        print(f"Erreur lors de la sauvegarde des fichiers corrigés: {str(e)}")
+        return None
