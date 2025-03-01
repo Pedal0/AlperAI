@@ -1,8 +1,9 @@
 import streamlit as st
 import os
 import json
-from src.generator import generate_project_structure, generate_project_files
-from src.file_utils import create_project_files
+import re
+from src.generator import generate_project_structure, generate_project_files, verify_project_files
+from src.file_utils import create_project_files, save_corrected_files
 
 st.set_page_config(
     page_title="Générateur de projet",
@@ -12,6 +13,9 @@ st.set_page_config(
 
 if 'popup_shown' not in st.session_state:
     st.session_state.popup_shown = False
+
+if 'selected_corrections' not in st.session_state:
+    st.session_state.selected_corrections = {}
 
 st.title("Générateur de Site Web par IA")
 
@@ -56,6 +60,7 @@ if 'project_structure' not in st.session_state:
     st.session_state.project_structure = None
     st.session_state.is_structure_generated = False
     st.session_state.is_files_generated = False
+    st.session_state.verification_results = None
 
 if st.button("Générer la structure du projet", disabled=not project_description):
     with st.spinner("Génération de la structure du projet en cours..."):
@@ -103,15 +108,140 @@ if st.session_state.is_structure_generated and st.session_state.project_structur
                 st.error(f"Erreur lors de la génération des fichiers: {str(e)}")
 
 if st.session_state.is_files_generated:
-    with st.expander("Voir le contenu des fichiers générés"):
-        files_content = generate_project_files(
-            project_description, 
-            st.session_state.project_structure,
-            regenerate=False 
-        )
-        
-        for file_path, content in files_content.items():
-            st.subheader(f"📄 {file_path}")
-            st.code(content, language="python" if file_path.endswith(".py") else "")
+    files_content = generate_project_files(
+        project_description, 
+        st.session_state.project_structure,
+        regenerate=False 
+    )
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("Vérifier et corriger le code"):
+            with st.spinner("Vérification et correction du code en cours..."):
+                try:
+                    verification_results = verify_project_files(
+                        project_description,
+                        st.session_state.project_structure,
+                        files_content
+                    )
+                    st.session_state.verification_results = verification_results
+                    
+                    # Initialiser les sélections
+                    st.session_state.selected_corrections = {
+                        file_path: True for file_path in verification_results['modified_files'].keys()
+                    }
+                    
+                    if verification_results['needs_correction']:
+                        corrected_dir = save_corrected_files(project_path, verification_results['modified_files'])
+                        if corrected_dir:
+                            st.session_state.corrected_dir = corrected_dir
+                    
+                except Exception as e:
+                    st.error(f"Erreur lors de la vérification du code: {str(e)}")
+    
+    with col2:
+        if st.session_state.get('verification_results'):
+            if not st.session_state.verification_results['needs_correction']:
+                st.success("✅ Le code est parfaitement fonctionnel. Aucune correction nécessaire.")
+            else:
+                num_files = len(st.session_state.verification_results['modified_files'])
+                modified_count = len([f for f, status in st.session_state.verification_results['analysis_results'].items() 
+                                   if status == "MODIFIÉ"])
+                st.warning(f"⚠️ {modified_count} fichiers nécessitent des corrections pour assurer la compatibilité.")
+                st.info(f"Version corrigée disponible dans: {st.session_state.get('corrected_dir', 'N/A')}")
+                
+                # Interface de sélection des corrections
+                if modified_count > 0:
+                    st.subheader("Sélectionner les corrections à appliquer")
+                    
+                    for file_path in st.session_state.verification_results['modified_files'].keys():
+                        st.session_state.selected_corrections[file_path] = st.checkbox(
+                            f"Appliquer les corrections pour: {file_path}",
+                            value=True,
+                            key=f"select_{file_path}"
+                        )
+                    
+                    if st.button("Appliquer les corrections sélectionnées"):
+                        with st.spinner("Application des corrections..."):
+                            # Filtrer uniquement les fichiers sélectionnés
+                            selected_files = {
+                                file_path: content 
+                                for file_path, content in st.session_state.verification_results['modified_files'].items()
+                                if st.session_state.selected_corrections.get(file_path, False)
+                            }
+                            
+                            if selected_files:
+                                success = create_project_files(project_path, selected_files)
+                                if success:
+                                    st.success(f"✅ Corrections appliquées avec succès pour {len(selected_files)} fichiers!")
+                                else:
+                                    st.error("❌ Erreur lors de l'application des corrections.")
+                            else:
+                                st.info("Aucune correction sélectionnée.")
+
+    with st.expander("Voir le contenu des fichiers"):
+        # Onglets pour choisir entre fichiers originaux et corrigés
+        if st.session_state.get('verification_results') and st.session_state.verification_results['needs_correction']:
+            tab1, tab2 = st.tabs(["Fichiers originaux", "Fichiers corrigés"])
+            
+            with tab1:
+                for file_path, content in files_content.items():
+                    language = "python" if file_path.endswith(".py") else ""
+                    if file_path.endswith(".js"): language = "javascript"
+                    if file_path.endswith(".html"): language = "html"
+                    if file_path.endswith(".css"): language = "css"
+                    
+                    st.subheader(f"📄 {file_path}")
+                    
+                    # Afficher le statut d'analyse
+                    if file_path in st.session_state.verification_results.get('analysis_results', {}):
+                        analysis = st.session_state.verification_results['analysis_results'][file_path]
+                        if analysis == "PARFAIT":
+                            st.success("✓ Ce fichier est parfait, aucune correction nécessaire.")
+                        elif analysis == "MODIFIÉ":
+                            st.warning("⚠ Ce fichier nécessite des corrections.")
+                    
+                    st.code(content, language=language)
+            
+            with tab2:
+                for file_path, content in files_content.items():
+                    language = "python" if file_path.endswith(".py") else ""
+                    if file_path.endswith(".js"): language = "javascript"
+                    if file_path.endswith(".html"): language = "html"
+                    if file_path.endswith(".css"): language = "css"
+                    
+                    st.subheader(f"📄 {file_path}")
+                    
+                    # Afficher le statut d'analyse
+                    if file_path in st.session_state.verification_results.get('analysis_results', {}):
+                        analysis = st.session_state.verification_results['analysis_results'][file_path]
+                        if analysis == "PARFAIT":
+                            st.success("✓ Ce fichier est parfait, aucune correction nécessaire.")
+                            st.code(content, language=language)
+                        elif analysis == "MODIFIÉ":
+                            st.warning("⚠ Ce fichier a été corrigé.")
+                            st.code(st.session_state.verification_results['modified_files'][file_path], language=language)
+                            st.info(st.session_state.verification_results['suggestions'][file_path])
+                        elif analysis == "ERREUR":
+                            st.error("❌ Erreur lors de l'analyse de ce fichier.")
+                            st.code(content, language=language)
+                    else:
+                        st.code(content, language=language)
+        else:
+            # Si pas de corrections, afficher simplement les fichiers
+            for file_path, content in files_content.items():
+                language = "python" if file_path.endswith(".py") else ""
+                if file_path.endswith(".js"): language = "javascript"
+                if file_path.endswith(".html"): language = "html"
+                if file_path.endswith(".css"): language = "css"
+                
+                st.subheader(f"📄 {file_path}")
+                st.code(content, language=language)
+                if st.session_state.get('verification_results') and file_path in st.session_state.verification_results.get('suggestions', {}):
+                    if file_path in st.session_state.verification_results.get('analysis_results', {}) and st.session_state.verification_results['analysis_results'][file_path] == "PARFAIT":
+                        st.success(st.session_state.verification_results['suggestions'][file_path])
+                    else:
+                        st.info(st.session_state.verification_results['suggestions'][file_path])
 
 st.markdown("---")
