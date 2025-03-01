@@ -55,23 +55,27 @@ def generate_project_structure(project_description):
     
     Réponds seulement avec un objet JSON représentant la structure de fichiers et dossiers.
     Les dossiers sont des objets imbriqués et les fichiers sont des paires clé-valeur où
-    la clé est le nom du fichier et la valeur est une brève description de son contenu.
+    la clé est le nom du fichier et la valeur est une description de son contenu.
+    
+    IMPORTANT: Pour chaque fichier, inclus TOUJOURS dans la description une liste détaillée des variables, 
+    fonctions, classes et composants à implémenter avec leurs noms exacts. Sois très précis sur les noms 
+    des variables à utiliser pour faciliter l'intégration entre les fichiers.
     
     Par exemple pour une application Flask:
     {{
-      "app.py": "Point d'entrée de l'application Flask",
-      "requirements.txt": "Dépendances du projet",
+      "app.py": "Point d'entrée de l'application Flask. Variables: app (Flask instance), db (database connection), Variables globales: UPLOAD_FOLDER, ALLOWED_EXTENSIONS. Fonctions: create_app(), init_db(), allowed_file(filename)",
+      "requirements.txt": "Dépendances du projet: flask, flask-sqlalchemy, etc.",
       "static": {{
         "css": {{
-          "style.css": "Styles principaux"
+          "style.css": "Styles principaux. Classes CSS: header, navigation, footer, card, button-primary"
         }},
         "js": {{
-          "main.js": "Scripts JavaScript"
+          "main.js": "Scripts JavaScript. Fonctions: initApp(), handleFormSubmit(formData), toggleMenu(). Variables: apiEndpoint, userData"
         }}
       }},
       "templates": {{
-        "base.html": "Template de base",
-        "index.html": "Page d'accueil"
+        "base.html": "Template de base. Blocks Jinja: title, content, scripts",
+        "index.html": "Page d'accueil. Variables passées du backend: user_name, items_list"
       }}
     }}
     """
@@ -135,6 +139,7 @@ def generate_file_content(project_description, file_path, file_description, proj
     Structure complète du projet:
     {json.dumps(project_structure, indent=2)}
     
+    Focntions qui ont déjà été implémentées:
     {functions_info}
     
     Fichier à générer: {file_path}
@@ -142,8 +147,9 @@ def generate_file_content(project_description, file_path, file_description, proj
     
     Génère le code complet de ce fichier. Assure-toi qu'il respecte les bonnes pratiques
     de son langage et qu'il s'intègre correctement avec les autres fichiers du projet.
-    NE MODIFIE PAS les fonctions existantes, utilise-les telles quelles.
+    NE MODIFIE PAS les fonctions existantes, utilise-les telles quelles en prenant en compte les fonctions deja implémentées.
     Réponds uniquement avec le code, sans explication ni commentaire autour du code.
+    Prend une attention particuliere aux détails et à la qualité du code.
     """
     
     for attempt in range(MAX_RETRIES):

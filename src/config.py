@@ -6,7 +6,8 @@ load_dotenv()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 
 STRUCTURE_MODEL = "google/gemini-exp-1206:free"  
-CODE_MODEL = "google/gemini-exp-1206:free"       
+CODE_MODEL = "google/gemini-exp-1206:free"
+CORRECT_CODE_MODEL = "qwen/qwen-2.5-coder-32b-instruct:free"
 
 STRUCTURE_SYSTEM_PROMPT = """
 Vous êtes un expert en architecture logicielle et en conception de sites web.
