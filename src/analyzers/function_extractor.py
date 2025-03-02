@@ -2,35 +2,6 @@ import ast
 import re
 from typing import Dict, List, Optional
 
-def detect_language(file_path: str) -> str:
-    """
-    Détecte le langage de programmation en fonction de l'extension du fichier.
-    
-    Args:
-        file_path (str): Chemin du fichier
-        
-    Returns:
-        str: Nom du langage détecté
-    """
-    extension = file_path.split('.')[-1].lower() if '.' in file_path else ""
-    
-    language_map = {
-        'py': 'python',
-        'js': 'javascript',
-        'jsx': 'javascript',
-        'ts': 'typescript',
-        'tsx': 'typescript',
-        'php': 'php',
-        'java': 'java',
-        'cs': 'csharp',
-        'rb': 'ruby',
-        'go': 'go',
-        'html': 'html',
-        'css': 'css'
-    }
-    
-    return language_map.get(extension, 'unknown')
-
 def extract_function_signatures(content: str, language: str) -> List[Dict]:
     """
     Extrait les signatures des fonctions à partir du contenu d'un fichier.
@@ -198,47 +169,3 @@ def extract_go_functions(content: str) -> List[Dict]:
         functions.append({"name": name, "params": params, "docstring": None})
     
     return functions
-
-def collect_project_functions(files_content: Dict[str, str]) -> Dict[str, List[Dict]]:
-    """
-    Collecte toutes les signatures de fonctions pour chaque fichier du projet.
-    
-    Args:
-        files_content (Dict[str, str]): Dictionnaire avec les chemins et contenus des fichiers
-        
-    Returns:
-        Dict[str, List[Dict]]: Dictionnaire des signatures de fonctions par fichier
-    """
-    project_functions = {}
-    
-    for file_path, content in files_content.items():
-        language = detect_language(file_path)
-        if language != 'unknown':
-            functions = extract_function_signatures(content, language)
-            if functions:
-                project_functions[file_path] = functions
-    
-    return project_functions
-
-def format_function_info(project_functions: Dict[str, List[Dict]]) -> str:
-    """
-    Formate les informations des fonctions pour une utilisation dans le prompt.
-    
-    Args:
-        project_functions (Dict[str, List[Dict]]): Dictionnaire des signatures de fonctions par fichier
-        
-    Returns:
-        str: Texte formaté des informations de fonctions
-    """
-    result = "Fonctions existantes dans le projet:\n\n"
-    
-    for file_path, functions in project_functions.items():
-        if functions:
-            language = detect_language(file_path)
-            result += f"Fichier: {file_path} (langage: {language})\n"
-            for func in functions:
-                params_str = ", ".join(func["params"])
-                result += f"  - {func['name']}({params_str})\n"
-            result += "\n"
-    
-    return result

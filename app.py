@@ -2,8 +2,8 @@ import streamlit as st
 import os
 import json
 import re
-from src.generator import generate_project_structure, generate_project_files, verify_project_files
-from src.file_utils import create_project_files, save_corrected_files
+from src.generators import generate_project_structure, generate_project_files, verify_project_files
+from src.utils import create_project_files, save_corrected_files
 
 st.set_page_config(
     page_title="Générateur de projet",
@@ -132,11 +132,6 @@ if st.session_state.is_files_generated:
                         file_path: True for file_path in verification_results['modified_files'].keys()
                     }
                     
-                    if verification_results['needs_correction']:
-                        corrected_dir = save_corrected_files(project_path, verification_results['modified_files'])
-                        if corrected_dir:
-                            st.session_state.corrected_dir = corrected_dir
-                    
                 except Exception as e:
                     st.error(f"Erreur lors de la vérification du code: {str(e)}")
     
@@ -149,7 +144,6 @@ if st.session_state.is_files_generated:
                 modified_count = len([f for f, status in st.session_state.verification_results['analysis_results'].items() 
                                    if status == "MODIFIÉ"])
                 st.warning(f"⚠️ {modified_count} fichiers nécessitent des corrections pour assurer la compatibilité.")
-                st.info(f"Version corrigée disponible dans: {st.session_state.get('corrected_dir', 'N/A')}")
                 
                 # Interface de sélection des corrections
                 if modified_count > 0:
@@ -176,7 +170,7 @@ if st.session_state.is_files_generated:
                                 if success:
                                     st.success(f"✅ Corrections appliquées avec succès pour {len(selected_files)} fichiers!")
                                 else:
-                                    st.error("❌ Erreur lors de l'application des corrections.")
+                                    st.error("Erreur lors de l'application des corrections.")
                             else:
                                 st.info("Aucune correction sélectionnée.")
 
