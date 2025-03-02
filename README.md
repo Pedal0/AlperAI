@@ -1,6 +1,6 @@
 # Chatbot OpenRouter
 
-This project automatically generates the project structure based on a description provided by the user. It uses the OpenRouter API to obtain the project structure in JSON format and Streamlit to provide an interactive web interface.
+This project automatically generates the project structure based on a description provided by the user. It uses the OpenRouter API or OpenAI API to obtain the project structure in JSON format and Streamlit to provide an interactive web interface.
 
 ## Prerequisites
 
@@ -23,10 +23,11 @@ This project automatically generates the project structure based on a descriptio
    pipenv install streamlit openai python-dotenv
    ```
 
-5. Create a `.env` file at the project's root and add your OpenRouter API key:
+5. Create a `.env` file at the project's root and add your OpenRouter API key or OpenAI API key:
 
    ```
    OPENROUTER_API_KEY=<your_api_key>
+   OPENAI_API_KEY=<your_api_key>
    ```
 
    You can obtain your API key at [OpenRouter](https://openrouter.ai/).
@@ -52,6 +53,20 @@ This project automatically generates the project structure based on a descriptio
 
 4. Click **"Create strcture Project"** to generate the initial structure.
 5. Click **"Generate code"** to generate the code fo each files.
+
+## API Configuration
+
+By default, the application is configured to use the OpenAI API. If you want to use the OpenRouter API instead:
+
+1. In `config.py`:
+   - Uncomment the OpenRouter-related code sections
+   - Comment out the OpenAI-related code sections
+
+2. In the `generators` folder files:
+   - Uncomment the OpenRouter-related code sections
+   - Comment out the OpenAI-related code sections
+
+Ensure you have the appropriate API key set in your `.env` file for the service you choose to use.
 
 ## License
 
