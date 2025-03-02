@@ -2,7 +2,8 @@ import json
 import time
 from openai import OpenAI
 from src.config import (
-    OPENROUTER_API_KEY,
+    OPENAI_API_KEY,
+    # OPENROUTER_API_KEY,
     STRUCTURE_MODEL,
     STRUCTURE_SYSTEM_PROMPT,
     MAX_RETRIES
@@ -10,12 +11,13 @@ from src.config import (
 from src.json_utils import extract_json, normalize_structure
 
 client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=OPENROUTER_API_KEY,
+    api_key=OPENAI_API_KEY,
+    # base_url="https://openrouter.ai/api/v1",
+    # api_key=OPENROUTER_API_KEY,
 )
 
 _last_api_call_time = 0
-
+delay_between_calls = 1
 def _ensure_rate_limit():
     """
     Ensures there's a delay of 10-11 seconds between API calls.
@@ -24,8 +26,8 @@ def _ensure_rate_limit():
     current_time = time.time()
     elapsed = current_time - _last_api_call_time
     
-    if _last_api_call_time > 0 and elapsed < 11:
-        delay = 11 - elapsed
+    if _last_api_call_time > 0 and elapsed < delay_between_calls:
+        delay = delay_between_calls - elapsed
         print(f"⏱️ Attente de {delay:.1f} secondes pour respecter la limite d'API...")
         time.sleep(delay)
     

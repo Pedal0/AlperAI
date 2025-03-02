@@ -3,11 +3,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+# OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
-STRUCTURE_MODEL = "cognitivecomputations/dolphin3.0-mistral-24b:free"  
-CODE_MODEL = "cognitivecomputations/dolphin3.0-mistral-24b:free"
-CORRECT_CODE_MODEL = "nvidia/llama-3.1-nemotron-70b-instruct:free"
+# STRUCTURE_MODEL = "cognitivecomputations/dolphin3.0-mistral-24b:free"  
+# CODE_MODEL = "cognitivecomputations/dolphin3.0-mistral-24b:free"
+# CORRECT_CODE_MODEL = "nvidia/llama-3.1-nemotron-70b-instruct:free"
+STRUCTURE_MODEL = "gpt-4o-mini"  
+CODE_MODEL = "gpt-4o-mini"
+CORRECT_CODE_MODEL = "gpt-4o-mini"
 
 STRUCTURE_SYSTEM_PROMPT = """
 Vous êtes un expert en architecture logicielle et en conception de sites web.
