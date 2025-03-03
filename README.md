@@ -1,4 +1,4 @@
-# Chatbot OpenRouter
+# Chatbot OpenRouter / OpenAI
 
 This project automatically generates the project structure based on a description provided by the user. It uses the OpenRouter API or OpenAI API to obtain the project structure in JSON format and Streamlit to provide an interactive web interface.
 
