@@ -101,6 +101,7 @@ if st.session_state.is_structure_generated and st.session_state.project_structur
                 
                 if success:
                     st.session_state.is_files_generated = True
+                    st.balloons()
                     st.success(f"✅ Projet généré avec succès dans le dossier: {project_path}")
                 else:
                     st.error("Une erreur est survenue lors de la création des fichiers.")
@@ -168,6 +169,7 @@ if st.session_state.is_files_generated:
                             if selected_files:
                                 success = create_project_files(project_path, selected_files)
                                 if success:
+                                    st.balloons()
                                     st.success(f"✅ Corrections appliquées avec succès pour {len(selected_files)} fichiers!")
                                 else:
                                     st.error("Erreur lors de l'application des corrections.")
