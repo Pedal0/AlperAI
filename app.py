@@ -81,7 +81,7 @@ def main():
             
             if success:
                 progress_bar.progress(100)
-                st.ballons()
+                st.balloons()
                 status_text.text("Application generated successfully!")
                 
                 st.success(f"Your application has been generated at: {output_path}")
