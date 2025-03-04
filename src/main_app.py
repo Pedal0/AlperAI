@@ -2,8 +2,8 @@ import os
 import json
 import time
 import logging
-from api.api_client import AIAppGeneratorAPI
-from file_manager.file_manager import FileSystemManager
+from src.api.api_client import AIAppGeneratorAPI
+from src.file_manager.file_manager import FileSystemManager
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
