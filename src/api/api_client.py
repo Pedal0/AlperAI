@@ -4,6 +4,17 @@ import time
 import logging
 from typing import Dict, List, Any, Optional
 
+# Fix the imports to reference config from the src package
+from src.config import (
+    REQUIREMENTS_ANALYZER_PROMPT,
+    ARCHITECTURE_DESIGNER_PROMPT,
+    DATABASE_DESIGNER_PROMPT,
+    API_DESIGNER_PROMPT,
+    CODE_GENERATOR_PROMPT,
+    TEST_GENERATOR_PROMPT,
+    CODE_REVIEWER_PROMPT
+)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -39,7 +50,7 @@ class AIAppGeneratorAPI:
                 attempts += 1
                 logger.error(f"API call error: {e}")
                 if attempts < self.max_retries:
-                    wait_time = self.retry_delay * (2 ** (attempts - 1))  # Exponential backoff
+                    wait_time = self.retry_delay * (2 ** (attempts - 1))  
                     logger.info(f"Retrying in {wait_time} seconds...")
                     time.sleep(wait_time)
                 else:
@@ -74,16 +85,11 @@ class AIAppGeneratorAPI:
             return None
     
     def analyze_requirements(self, user_prompt: str) -> Optional[Dict[str, Any]]:
-        from config import REQUIREMENTS_ANALYZER_PROMPT
-        
         response = self.call_agent(REQUIREMENTS_ANALYZER_PROMPT, user_prompt, max_tokens=2000)
         return self._safe_parse_json(response)
     
     def design_architecture(self, requirements_spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        from config import ARCHITECTURE_DESIGNER_PROMPT
-        
         req_json = json.dumps(requirements_spec, indent=2)
-        
         response = self.call_agent(ARCHITECTURE_DESIGNER_PROMPT, req_json, max_tokens=4000)
         
         architecture = self._safe_parse_json(response)
@@ -96,8 +102,6 @@ class AIAppGeneratorAPI:
         return architecture
     
     def design_database(self, requirements_spec: Dict[str, Any], architecture: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        from config import DATABASE_DESIGNER_PROMPT
-        
         context = {
             "requirements": requirements_spec,
             "architecture": architecture
@@ -107,8 +111,6 @@ class AIAppGeneratorAPI:
         return self._safe_parse_json(response)
     
     def design_api(self, requirements_spec: Dict[str, Any], architecture: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        from config import API_DESIGNER_PROMPT
-        
         context = {
             "requirements": requirements_spec,
             "architecture": architecture
@@ -118,8 +120,6 @@ class AIAppGeneratorAPI:
         return self._safe_parse_json(response)
     
     def generate_code(self, file_spec: Dict[str, Any], project_context: Dict[str, Any]) -> Optional[str]:
-        from config import CODE_GENERATOR_PROMPT
-        
         context = {
             "file_specification": file_spec,
             "project_context": project_context
@@ -128,8 +128,6 @@ class AIAppGeneratorAPI:
         return self.call_agent(CODE_GENERATOR_PROMPT, json.dumps(context), max_tokens=4000)
     
     def test_generator(self, file_path: str, code_content: str, project_context: Dict[str, Any]) -> Optional[str]:
-        from config import TEST_GENERATOR_PROMPT
-        
         context = {
             "file_path": file_path,
             "code_content": code_content,
@@ -139,8 +137,6 @@ class AIAppGeneratorAPI:
         return self.call_agent(TEST_GENERATOR_PROMPT, json.dumps(context), max_tokens=3000)
     
     def code_reviewer(self, file_path: str, code_content: str, file_spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        from config import CODE_REVIEWER_PROMPT
-        
         context = {
             "file_path": file_path,
             "code_content": code_content,
