@@ -14,16 +14,12 @@ def main():
     
     st.title("AI Application Generator")
     st.markdown("""
-    This tool uses AI to generate complete Python applications based on your description.
+    This tool uses AI to generate complete applications based on your description.
     Just provide a detailed description of what you want to build, set the output directory,
     and click "Generate Application".
     """)
     
-    default_api_key = os.getenv("OPENAI_API_KEY", "")
-    api_key = st.text_input("OpenAI API Key", 
-                           value=default_api_key,
-                           type="password",
-                           help="Enter your OpenAI API key or set it in the .env file")
+    api_key =  os.getenv("OPENAI_API_KEY", "")
     
     user_prompt = st.text_area("Describe the application you want to build", 
                               height=150,
@@ -120,7 +116,7 @@ def main():
     2. **Architecture Design**: It designs the overall structure of your application.
     3. **Database Schema**: It creates appropriate database schemas if needed.
     4. **API Design**: It designs API interfaces for the application components.
-    5. **Code Generation**: It generates the actual Python code for the application.
+    5. **Code Generation**: It generates the actual code for the application.
     6. **Code Review**: It reviews the generated code and makes improvements if necessary.
     7. **Project Packaging**: It creates project files like requirements.txt and README.md.
     """)
