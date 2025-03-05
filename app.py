@@ -73,7 +73,13 @@ def main():
             
             app_generator.generate_application.__globals__['print'] = print_override
             
-            success = app_generator.generate_application(user_prompt, output_path)
+            success = app_generator.generate_application(
+                user_prompt, 
+                output_path,
+                include_tests=include_tests,
+                create_docker=create_docker,
+                add_ci_cd=add_ci_cd
+            )
             
             if success:
                 progress_bar.progress(100)
