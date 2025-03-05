@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Dict, Any, List
 
 class FileSystemManager:
@@ -39,10 +40,22 @@ class FileSystemManager:
         
         os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
         
+        # Clean markdown code blocks formatting
+        cleaned_content = self._clean_markdown_code_blocks(code_content)
+        
         with open(absolute_path, 'w', encoding='utf-8') as f:
-            f.write(code_content)
+            f.write(cleaned_content)
             
         return absolute_path
+
+    def _clean_markdown_code_blocks(self, content: str) -> str:        
+        pattern = r"```[a-zA-Z0-9_+#-]*\n([\s\S]*?)\n```"
+        
+        matches = re.findall(pattern, content)
+        if matches:
+            return matches[0]
+        
+        return content
     
     def create_requirements_file(self, output_path: str, dependencies: List[str]) -> str:
         requirements_path = os.path.join(output_path, "requirements.txt")

@@ -4,7 +4,6 @@ import time
 import logging
 from typing import Dict, List, Any, Optional
 
-# Fix the imports to reference config from the src package
 from src.config import (
     REQUIREMENTS_ANALYZER_PROMPT,
     ARCHITECTURE_DESIGNER_PROMPT,
@@ -12,7 +11,11 @@ from src.config import (
     API_DESIGNER_PROMPT,
     CODE_GENERATOR_PROMPT,
     TEST_GENERATOR_PROMPT,
-    CODE_REVIEWER_PROMPT
+    CODE_REVIEWER_PROMPT,
+    API_MODEL,
+    API_TEMPERATURE,
+    MAX_TOKENS_DEFAULT,
+    MAX_TOKENS_LARGE
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -22,12 +25,12 @@ class AIAppGeneratorAPI:
     def __init__(self, api_key: str):
         self.api_key = api_key
         openai.api_key = api_key
-        self.model = "gpt-4o-mini"
-        self.temperature = 0.2
+        self.model = API_MODEL
+        self.temperature = API_TEMPERATURE
         self.max_retries = 3
         self.retry_delay = 2 
         
-    def call_agent(self, prompt: str, user_input: str, max_tokens: int = 2000) -> Optional[str]:
+    def call_agent(self, prompt: str, user_input: str, max_tokens: int = MAX_TOKENS_DEFAULT) -> Optional[str]:
         """Call the OpenAI API with retry mechanism and better error handling"""
         attempts = 0
         
@@ -85,12 +88,12 @@ class AIAppGeneratorAPI:
             return None
     
     def analyze_requirements(self, user_prompt: str) -> Optional[Dict[str, Any]]:
-        response = self.call_agent(REQUIREMENTS_ANALYZER_PROMPT, user_prompt, max_tokens=2000)
+        response = self.call_agent(REQUIREMENTS_ANALYZER_PROMPT, user_prompt, max_tokens=MAX_TOKENS_DEFAULT)
         return self._safe_parse_json(response)
     
     def design_architecture(self, requirements_spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         req_json = json.dumps(requirements_spec, indent=2)
-        response = self.call_agent(ARCHITECTURE_DESIGNER_PROMPT, req_json, max_tokens=4000)
+        response = self.call_agent(ARCHITECTURE_DESIGNER_PROMPT, req_json, max_tokens=MAX_TOKENS_LARGE)
         
         architecture = self._safe_parse_json(response)
         
@@ -107,7 +110,7 @@ class AIAppGeneratorAPI:
             "architecture": architecture
         }
         
-        response = self.call_agent(DATABASE_DESIGNER_PROMPT, json.dumps(context), max_tokens=3000)
+        response = self.call_agent(DATABASE_DESIGNER_PROMPT, json.dumps(context), max_tokens=MAX_TOKENS_DEFAULT)
         return self._safe_parse_json(response)
     
     def design_api(self, requirements_spec: Dict[str, Any], architecture: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -116,7 +119,7 @@ class AIAppGeneratorAPI:
             "architecture": architecture
         }
         
-        response = self.call_agent(API_DESIGNER_PROMPT, json.dumps(context), max_tokens=3000)
+        response = self.call_agent(API_DESIGNER_PROMPT, json.dumps(context), max_tokens=MAX_TOKENS_DEFAULT)
         return self._safe_parse_json(response)
     
     def generate_code(self, file_spec: Dict[str, Any], project_context: Dict[str, Any]) -> Optional[str]:
@@ -125,7 +128,7 @@ class AIAppGeneratorAPI:
             "project_context": project_context
         }
         
-        return self.call_agent(CODE_GENERATOR_PROMPT, json.dumps(context), max_tokens=4000)
+        return self.call_agent(CODE_GENERATOR_PROMPT, json.dumps(context), max_tokens=MAX_TOKENS_LARGE)
     
     def test_generator(self, file_path: str, code_content: str, project_context: Dict[str, Any]) -> Optional[str]:
         context = {
@@ -134,7 +137,7 @@ class AIAppGeneratorAPI:
             "project_context": project_context
         }
         
-        return self.call_agent(TEST_GENERATOR_PROMPT, json.dumps(context), max_tokens=3000)
+        return self.call_agent(TEST_GENERATOR_PROMPT, json.dumps(context), max_tokens=MAX_TOKENS_DEFAULT)
     
     def code_reviewer(self, file_path: str, code_content: str, file_spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         context = {
@@ -143,5 +146,5 @@ class AIAppGeneratorAPI:
             "file_specification": file_spec
         }
         
-        response = self.call_agent(CODE_REVIEWER_PROMPT, json.dumps(context), max_tokens=2000)
+        response = self.call_agent(CODE_REVIEWER_PROMPT, json.dumps(context), max_tokens=MAX_TOKENS_DEFAULT)
         return self._safe_parse_json(response)
