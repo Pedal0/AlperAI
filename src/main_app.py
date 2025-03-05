@@ -13,13 +13,18 @@ class AppGenerator:
         self.api_client = AIAppGeneratorAPI(api_key)
         self.file_manager = FileSystemManager()
         
-    def generate_application(self, user_prompt, output_path):
+    def generate_application(self, user_prompt, output_path, include_tests=False, create_docker=False, add_ci_cd=False):
         print(f"Analyzing requirements from prompt: '{user_prompt[:50]}...'")
         requirements = self.api_client.analyze_requirements(user_prompt)
         if not requirements:
             print("Failed to analyze requirements. Aborting.")
             return False
             
+        # Add configurations to requirements
+        requirements["generate_tests"] = include_tests
+        requirements["create_docker"] = create_docker
+        requirements["add_ci_cd"] = add_ci_cd
+        
         app_name = requirements.get('app_name', 'application')
         print(f"Designing architecture for {app_name}")
         architecture = self.api_client.design_architecture(requirements)

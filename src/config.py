@@ -37,6 +37,10 @@ Based on the provided requirements specification document, you will:
 3. Define component relationships and dependencies
 4. Establish data flow patterns between components
 
+If "generate_tests" is true in the requirements, include test files in your architecture.
+If "create_docker" is true, include Dockerfile and docker-compose.yml in your architecture.
+If "add_ci_cd" is true, include appropriate CI/CD configuration files (like .github/workflows).
+
 Your output must be a valid, well-formed JSON structure representing the complete project layout with:
 - "directories": Array of directories to create
 - "files": Array of files to generate, each with:
