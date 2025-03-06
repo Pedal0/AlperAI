@@ -83,7 +83,15 @@ class AIAppGeneratorAPI:
                     if end != -1:
                         json_str = json_str[start:end].strip()
                     
-            return json.loads(json_str)
+            parsed_result = json.loads(json_str)
+            
+            # Ensure we actually got back a dict
+            if not isinstance(parsed_result, dict):
+                logger.error(f"JSON parsed but result is not a dictionary: {type(parsed_result)}")
+                logger.error(f"First 500 chars of result: {str(parsed_result)[:500]}")
+                return {}
+                
+            return parsed_result
         except json.JSONDecodeError as e:
             logger.error(f"JSON parse error: {e}")
             logger.error(f"Raw response (first 500 chars): {json_str[:500]}")
