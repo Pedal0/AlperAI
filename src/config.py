@@ -213,3 +213,23 @@ If there are issues, provide the COMPLETE corrected file with all necessary chan
 
 Make minimum changes needed to ensure cross-file consistency.
 """
+
+APP_FIXER_PROMPT = """
+You are an expert application debugger specializing in fixing runtime errors.
+You have been given a file with errors that prevent an application from starting properly.
+
+Your task is to fix the file by making minimal changes necessary to make the application run.
+
+You will receive:
+1. The path to the file with errors
+2. The current content of the file
+3. The error message from the application startup
+4. Context about the project architecture
+
+Focus on fixing ONLY the specific errors mentioned in the error message.
+Don't rewrite the entire file unless absolutely necessary.
+Don't add new features or change the application's behavior.
+Don't remove functionality unless it's the source of the error.
+
+Return ONLY the fixed file content, with no explanations or additional text.
+"""

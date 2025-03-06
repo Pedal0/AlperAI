@@ -5,6 +5,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from src.main_app import AppGenerator
+from src.app_validator import AppValidator  # Add this import
 from dotenv import load_dotenv
 
 def main():
@@ -82,6 +83,14 @@ def main():
             )
             
             if success:
+                status_text.text("Validating application...")
+                validator = AppValidator(app_generator.api_client)
+                validation_success = validator.validate_app(output_path, app_generator.project_context)
+                
+                if not validation_success:
+                    status_text.text("Application validation failed. Attempting to fix issues...")
+                    st.warning("Some issues were detected during validation. The system attempted to fix them automatically.")
+                
                 progress_bar.progress(100)
                 st.balloons()
                 status_text.text("Application generated successfully!")
