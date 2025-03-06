@@ -1,12 +1,15 @@
 import streamlit as st
 import sys
 import os
+import logging
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from src.main_app import AppGenerator
 from src.app_validator import AppValidator  # Add this import
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 def main():
     load_dotenv()
@@ -66,58 +69,71 @@ def main():
                 logs.append(message)
                 log_placeholder.code("\n".join(logs), language="bash")
             
-            def print_override(message):
+            def print_override(*args, **kwargs):
                 nonlocal progress_value
+                message = " ".join(str(arg) for arg in args)
                 update_log(message)
                 progress_value = min(progress_value + 5, 95)
                 progress_bar.progress(progress_value)
             
+            # Store original print
+            original_print = print
             app_generator.generate_application.__globals__['print'] = print_override
             
-            success = app_generator.generate_application(
-                user_prompt, 
-                output_path,
-                include_tests=include_tests,
-                create_docker=create_docker,
-                add_ci_cd=add_ci_cd
-            )
-            
-            if success:
-                status_text.text("Validating application...")
-                validator = AppValidator(app_generator.api_client)
-                validation_success = validator.validate_app(output_path, app_generator.project_context)
-                
-                if not validation_success:
-                    status_text.text("Application validation failed. Attempting to fix issues...")
-                    st.warning("Some issues were detected during validation. The system attempted to fix them automatically.")
-                
-                progress_bar.progress(100)
-                st.balloons()
-                status_text.text("Application generated successfully!")
-                
-                st.success(f"Your application has been generated at: {output_path}")
-                
-                st.subheader("Generated Files")
-                files = []
-                for root, dirs, filenames in os.walk(output_path):
-                    for filename in filenames:
-                        files.append(os.path.join(root, filename))
-                
-                for file in files:
-                    rel_file = os.path.relpath(file, output_path)
-                    with st.expander(rel_file):
-                        with open(file, 'r') as f:
-                            st.code(f.read(), language="python")
-                
-                st.download_button(
-                    label="Download as ZIP",
-                    data=create_zip(output_path),
-                    file_name="generated_application.zip",
-                    mime="application/zip"
+            try:
+                success = app_generator.generate_application(
+                    user_prompt, 
+                    output_path,
+                    include_tests=include_tests,
+                    create_docker=create_docker,
+                    add_ci_cd=add_ci_cd
                 )
-            else:
-                status_text.text("Application generation failed.")
-                st.error("Failed to generate application. Please check the logs for details.")
+                
+                if success:
+                    status_text.text("Validating application...")
+                    validator = AppValidator(app_generator.api_client)
+                    validation_success = validator.validate_app(output_path, app_generator.project_context)
+                    
+                    if not validation_success:
+                        status_text.text("Application validation failed. Attempting to fix issues...")
+                        st.warning("Some issues were detected during validation. The system attempted to fix them automatically.")
+                    
+                    progress_bar.progress(100)
+                    st.balloons()
+                    status_text.text("Application generated successfully!")
+                    
+                    st.success(f"Your application has been generated at: {output_path}")
+                    
+                    st.subheader("Generated Files")
+                    files = []
+                    for root, dirs, filenames in os.walk(output_path):
+                        for filename in filenames:
+                            files.append(os.path.join(root, filename))
+                    
+                    for file in files:
+                        rel_file = os.path.relpath(file, output_path)
+                        with st.expander(rel_file):
+                            with open(file, 'r') as f:
+                                st.code(f.read(), language="python")
+                    
+                    st.download_button(
+                        label="Download as ZIP",
+                        data=create_zip(output_path),
+                        file_name="generated_application.zip",
+                        mime="application/zip"
+                    )
+                else:
+                    status_text.text("Application generation failed.")
+                    st.error("Failed to generate application. Please check the logs for details.")
+                    
+            except Exception as e:
+                # Restore original print for proper error logging
+                app_generator.generate_application.__globals__['print'] = original_print
+                logger.exception("Application generation failed")
+                raise e
+            finally:
+                # Always restore original print
+                app_generator.generate_application.__globals__['print'] = original_print
                 
         except Exception as e:
             progress_bar.progress(100)
