@@ -10,46 +10,66 @@ logger = logging.getLogger(__name__)
 
 class AppGenerator:
     def __init__(self, api_key):
-        self.api_client = AIAppGeneratorAPI(api_key)
+        self._api_client = AIAppGeneratorAPI(api_key)
         self.file_manager = FileSystemManager()
+        # Initialize attributes to store project data
+        self._requirements_spec = None
+        self._architecture = None
+        self._database_schema = None
+        self._api_spec = None
+        
+    @property
+    def api_client(self):
+        return self._api_client
+    
+    @property
+    def project_context(self):
+        if not hasattr(self, '_requirements_spec') or self._requirements_spec is None:
+            return {}
+            
+        return {
+            "requirements": self._requirements_spec,
+            "architecture": self._architecture,
+            "database": self._database_schema,
+            "api": self._api_spec
+        }
         
     def generate_application(self, user_prompt, output_path, include_tests=False, create_docker=False, add_ci_cd=False):
         print(f"Analyzing requirements from prompt: '{user_prompt[:50]}...'")
-        requirements = self.api_client.analyze_requirements(user_prompt)
-        if not requirements:
+        self._requirements_spec = self.api_client.analyze_requirements(user_prompt)
+        if not self._requirements_spec:
             print("Failed to analyze requirements. Aborting.")
             return False
             
-        # Add configurations to requirements
-        requirements["generate_tests"] = include_tests
-        requirements["create_docker"] = create_docker
-        requirements["add_ci_cd"] = add_ci_cd
+        self._requirements_spec["generate_tests"] = include_tests
+        self._requirements_spec["create_docker"] = create_docker
+        self._requirements_spec["add_ci_cd"] = add_ci_cd
         
-        app_name = requirements.get('app_name', 'application')
+        app_name = self._requirements_spec.get('app_name', 'application')
         print(f"Designing architecture for {app_name}")
-        architecture = self.api_client.design_architecture(requirements)
-        if not architecture:
+        self._architecture = self.api_client.design_architecture(self._requirements_spec)
+        if not self._architecture:
             print("Failed to design architecture. Aborting.")
             logger.error("Architecture design failed - check API response")
             return False
             
         print("Designing database schema")
-        database = self.api_client.design_database(requirements, architecture)
-        if not database:
+        self._database_schema = self.api_client.design_database(self._requirements_spec, self._architecture)
+        if not self._database_schema:
             print("Warning: Failed to design database schema. Continuing with limited functionality.")
-            database = {"database_type": "none", "schema": {}, "tables": []}
+            self._database_schema = {"database_type": "none", "schema": {}, "tables": []}
         
         print("Designing API interfaces")
-        api_design = self.api_client.design_api(requirements, architecture)
-        if not api_design:
+        self._api_spec = self.api_client.design_api(self._requirements_spec, self._architecture)
+        if not self._api_spec:
             print("Warning: Failed to design API. Continuing with limited functionality.")
-            api_design = {"api_type": "none", "endpoints": []}
+            self._api_spec = {"api_type": "none", "endpoints": []}
         
         project_context = {
-            "requirements": requirements,
-            "architecture": architecture,
-            "database": database,
-            "api": api_design
+            "requirements": self._requirements_spec,
+            "architecture": self._architecture,
+            "database": self._database_schema,
+            "api": self._api_spec
         }
         
         os.makedirs(output_path, exist_ok=True)
@@ -57,7 +77,7 @@ class AppGenerator:
             json.dump(project_context, f, indent=2)
         
         print(f"Creating project structure at {output_path}")
-        files_to_generate = self.file_manager.create_project_structure(output_path, architecture)
+        files_to_generate = self.file_manager.create_project_structure(output_path, self._architecture)
         
         if not files_to_generate:
             print("Warning: No files to generate based on architecture.")
@@ -89,7 +109,7 @@ class AppGenerator:
             generated_files += 1
             
         dependencies = []
-        for dependency in architecture.get("dependencies", []):
+        for dependency in self._architecture.get("dependencies", []):
             if isinstance(dependency, str):
                 dependencies.append(dependency)
             elif isinstance(dependency, dict):
@@ -102,7 +122,7 @@ class AppGenerator:
                     
         self.file_manager.create_requirements_file(output_path, dependencies)
         
-        self.file_manager.create_readme(output_path, requirements)
+        self.file_manager.create_readme(output_path, self._requirements_spec)
         
         print(f"Application generation complete. Generated {generated_files} files.")
         return True
