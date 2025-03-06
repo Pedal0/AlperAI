@@ -26,12 +26,8 @@ This project automatically generates the project structure based on a descriptio
 5. Create a `.env` file at the project's root and add your OpenRouter API key or OpenAI API key:
 
    ```
-   OPENROUTER_API_KEY=<your_api_key>
    OPENAI_API_KEY=<your_api_key>
    ```
-
-   You can obtain your API key at [OpenRouter](https://openrouter.ai/).
-
 ## Usage
 
 1. Activate the Pipenv environment:
@@ -51,20 +47,9 @@ This project automatically generates the project structure based on a descriptio
    - Enter the **absolute path** where you wish to create the project structure.
    - Enter a **description** of your project in the text area.
 
-4. Click **"Create strcture Project"** to generate the initial structure.
-5. Click **"Generate code"** to generate the code fo each files.
+4. Click **"Generate Application"** to generate the code fo each files.
 
 ## API Configuration
-
-By default, the application is configured to use the OpenAI API. If you want to use the OpenRouter API instead:
-
-1. In `config.py`:
-   - Uncomment the OpenRouter-related code sections
-   - Comment out the OpenAI-related code sections
-
-2. In the `generators` folder files:
-   - Uncomment the OpenRouter-related code sections
-   - Comment out the OpenAI-related code sections
 
 Ensure you have the appropriate API key set in your `.env` file for the service you choose to use.
 
