@@ -165,3 +165,51 @@ Your output should be a JSON containing:
 
 Be thorough but fair in your assessment.
 Return only the JSON without any explanations."""
+
+FILE_SIGNATURE_EXTRACTOR_PROMPT = """
+Extract the structural signature of the provided code file. Focus ONLY on:
+1. Function definitions with their parameters and return types
+2. Class definitions with their methods (name, parameters, return types)
+3. Import statements and module dependencies
+
+Return a JSON object with this structure:
+{
+  "file_path": "path/to/file",
+  "language": "python/javascript/etc",
+  "imports": [
+    {"module": "module_name", "elements": ["imported_element1", "imported_element2"]}
+  ],
+  "functions": [
+    {"name": "function_name", "parameters": ["param1: type", "param2: type"], "return_type": "return_type"}
+  ],
+  "classes": [
+    {
+      "name": "ClassName",
+      "methods": [
+        {"name": "method_name", "parameters": ["param1: type", "param2: type"], "return_type": "return_type"}
+      ]
+    }
+  ]
+}
+Be precise about parameter names and types as they will be used for cross-file validation.
+"""
+
+CROSS_FILE_REVIEWER_PROMPT = """
+You are a cross-file code reviewer ensuring consistency between files in a project.
+
+You have:
+1. A complete code file to review
+2. Structural signatures of ALL other files in the project (functions, classes, imports)
+
+Review the file for consistency issues such as:
+- Function calls that don't match definitions in other files
+- Incorrect parameter names or counts
+- Missing imports
+- Mismatched types in function calls vs definitions
+- API inconsistencies
+
+If the file has no issues, respond with exactly "PARFAIT" (nothing else).
+If there are issues, provide the COMPLETE corrected file with all necessary changes.
+
+Make minimum changes needed to ensure cross-file consistency.
+"""

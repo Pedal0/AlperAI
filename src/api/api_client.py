@@ -12,6 +12,8 @@ from src.config import (
     CODE_GENERATOR_PROMPT,
     TEST_GENERATOR_PROMPT,
     CODE_REVIEWER_PROMPT,
+    FILE_SIGNATURE_EXTRACTOR_PROMPT,
+    CROSS_FILE_REVIEWER_PROMPT,
     API_MODEL,
     API_TEMPERATURE,
     MAX_TOKENS_DEFAULT,
@@ -148,3 +150,67 @@ class AIAppGeneratorAPI:
         
         response = self.call_agent(CODE_REVIEWER_PROMPT, json.dumps(context), max_tokens=MAX_TOKENS_DEFAULT)
         return self._safe_parse_json(response)
+    
+    def extract_file_signature(self, file_path: str, content: str) -> Dict[str, Any]:
+        context = {
+            "file_path": file_path,
+            "code_content": content
+        }
+        
+        response = self.call_agent(FILE_SIGNATURE_EXTRACTOR_PROMPT, json.dumps(context), max_tokens=MAX_TOKENS_DEFAULT)
+        signature = self._safe_parse_json(response)
+        
+        if not signature:
+            return {
+                "file_path": file_path,
+                "functions": [],
+                "classes": [],
+                "imports": []
+            }
+            
+        return signature
+    
+    def cross_file_code_reviewer(self, all_files: Dict[str, str], project_context: Dict[str, Any]) -> Dict[str, str]:
+        results = {}
+        
+        project_signatures = {}
+        for path, content in all_files.items():
+            project_signatures[path] = self.extract_file_signature(path, content)
+        
+        for file_path, content in all_files.items():
+            context = {
+                "file_to_review": file_path,
+                "file_content": content,
+                "project_signatures": project_signatures,
+                "project_context": project_context
+            }
+            
+            response = self.call_agent(CROSS_FILE_REVIEWER_PROMPT, json.dumps(context), max_tokens=MAX_TOKENS_LARGE)
+            
+            if response and response.strip() == "PARFAIT":
+                results[file_path] = "PARFAIT"
+            else:
+                code_content = self._extract_code_content(response, file_path)
+                results[file_path] = code_content if code_content else response
+                
+        return results
+    
+    def _extract_code_content(self, response: str, file_path: str) -> Optional[str]:
+        if "```" in response:
+            start_markers = ["```python", "```javascript", "```java", "```typescript", "```"]
+            for marker in start_markers:
+                if marker in response:
+                    parts = response.split(marker, 1)
+                    if len(parts) > 1:
+                        code_part = parts[1]
+                        end_marker_pos = code_part.find("```")
+                        if end_marker_pos != -1:
+                            return code_part[:end_marker_pos].strip()
+        
+        if file_path in response:
+            lines = response.split('\n')
+            for i, line in enumerate(lines):
+                if file_path in line and i+1 < len(lines):
+                    return '\n'.join(lines[i+1:])
+        
+        return None
