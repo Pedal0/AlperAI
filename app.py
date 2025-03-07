@@ -6,10 +6,38 @@ import logging
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from src.main_app import AppGenerator
-from src.app_validator import AppValidator  # Add this import
+from src.app_validator import AppValidator
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
+
+def get_language_from_extension(file_path):
+    """Determine the appropriate language for syntax highlighting based on file extension"""
+    ext = os.path.splitext(file_path)[1].lower()
+    language_map = {
+        '.py': 'python',
+        '.js': 'javascript',
+        '.html': 'html',
+        '.css': 'css',
+        '.json': 'json',
+        '.md': 'markdown',
+        '.sql': 'sql',
+        '.sh': 'bash',
+        '.bat': 'bash',
+        '.yml': 'yaml',
+        '.yaml': 'yaml',
+        '.tsx': 'typescript',
+        '.ts': 'typescript',
+        '.jsx': 'javascript'
+    }
+    return language_map.get(ext, 'text')
+
+def is_binary_file(file_path):
+    """Check if a file is likely to be binary rather than text"""
+    binary_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.ico', '.pdf', '.zip', '.tar', 
+                         '.gz', '.exe', '.dll', '.so', '.pyc', '.ttf', '.woff']
+    ext = os.path.splitext(file_path)[1].lower()
+    return ext in binary_extensions
 
 def main():
     load_dotenv()
@@ -103,19 +131,7 @@ def main():
                     status_text.text("Application generated successfully!")
                     
                     st.success(f"Your application has been generated at: {output_path}")
-                    
-                    st.subheader("Generated Files")
-                    files = []
-                    for root, dirs, filenames in os.walk(output_path):
-                        for filename in filenames:
-                            files.append(os.path.join(root, filename))
-                    
-                    for file in files:
-                        rel_file = os.path.relpath(file, output_path)
-                        with st.expander(rel_file):
-                            with open(file, 'r') as f:
-                                st.code(f.read(), language="python")
-                    
+                                        
                     st.download_button(
                         label="Download as ZIP",
                         data=create_zip(output_path),
@@ -127,12 +143,10 @@ def main():
                     st.error("Failed to generate application. Please check the logs for details.")
                     
             except Exception as e:
-                # Restore original print for proper error logging
                 app_generator.generate_application.__globals__['print'] = original_print
                 logger.exception("Application generation failed")
                 raise e
             finally:
-                # Always restore original print
                 app_generator.generate_application.__globals__['print'] = original_print
                 
         except Exception as e:
