@@ -17,7 +17,9 @@ from src.config import (
     API_MODEL,
     API_TEMPERATURE,
     MAX_TOKENS_DEFAULT,
-    MAX_TOKENS_LARGE
+    MAX_TOKENS_LARGE,
+    PROJECT_FILES_GENERATOR_PROMPT
+
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -33,7 +35,6 @@ class AIAppGeneratorAPI:
         self.retry_delay = 2 
         
     def call_agent(self, prompt: str, user_input: str, max_tokens: int = MAX_TOKENS_DEFAULT) -> Optional[str]:
-        """Call the OpenAI API with retry mechanism and better error handling"""
         attempts = 0
         
         while attempts < self.max_retries:
@@ -63,7 +64,6 @@ class AIAppGeneratorAPI:
                     return None
     
     def _safe_parse_json(self, json_str: str) -> Optional[Dict[str, Any]]:
-        """Safely parse JSON with detailed error reporting"""
         if not json_str:
             logger.error("Empty response received")
             return None
@@ -85,7 +85,6 @@ class AIAppGeneratorAPI:
                     
             parsed_result = json.loads(json_str)
             
-            # Ensure we actually got back a dict
             if not isinstance(parsed_result, dict):
                 logger.error(f"JSON parsed but result is not a dictionary: {type(parsed_result)}")
                 logger.error(f"First 500 chars of result: {str(parsed_result)[:500]}")
@@ -222,3 +221,18 @@ class AIAppGeneratorAPI:
                     return '\n'.join(lines[i+1:])
         
         return None
+
+    def generate_project_file(self, file_type: str, project_context: Dict[str, Any], file_structure: List[str]) -> str:      
+        context = {
+            "file_type": file_type,
+            "project_context": project_context,
+            "file_structure": file_structure
+        }
+        
+        response = self.call_agent(
+            PROJECT_FILES_GENERATOR_PROMPT,
+            json.dumps(context),
+            max_tokens=MAX_TOKENS_DEFAULT
+        )
+        
+        return response
