@@ -53,7 +53,12 @@ class AppGenerator:
             language = tech_stack.get('language', '').lower()
             framework = tech_stack.get('framework', '').lower()
             
-            if ((language == 'python' and framework in ['flask', 'django']) or
+            # Detect static website (HTML/CSS/JS without a backend framework)
+            if (language in ['html', 'javascript'] and not framework) or framework == 'static':
+                requirements["is_static_website"] = True
+                requirements["technical_stack"]["framework"] = "static"
+                print("Detected static website (HTML/CSS/JS without backend)")
+            elif ((language == 'python' and framework in ['flask', 'django']) or
                 (language == 'php') or
                 (language == 'javascript' and framework in ['express', 'next', 'nuxt']) or
                 (framework in ['laravel', 'symfony', 'rails', 'asp.net'])):
@@ -215,8 +220,9 @@ class AppGenerator:
         
         tech_stack = self._requirements_spec.get('technical_stack', {})
         language = tech_stack.get('language', '').lower() if isinstance(tech_stack, dict) else ''
+        is_static_website = self._requirements_spec.get('is_static_website', False)
         
-        if language not in ['javascript', 'typescript', 'node', 'react', 'vue', 'angular']:
+        if language not in ['javascript', 'typescript', 'node', 'react', 'vue', 'angular'] and not is_static_website:
             print("Generating requirements.txt")
             requirements_content = self._api_client.generate_project_file(
                 'requirements.txt',
