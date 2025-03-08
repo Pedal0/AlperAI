@@ -2,6 +2,8 @@ import os
 import re
 import logging
 from typing import Dict, Any, List
+from .writer import write_code_to_file
+from .structure_creator import create_directories
 
 logger = logging.getLogger(__name__)
 
@@ -10,6 +12,7 @@ class FileSystemManager:
         pass
         
     def create_project_structure(self, output_path: str, architecture: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Create project structure based on the architecture specification"""
         if not os.path.exists(output_path):
             os.makedirs(output_path)
             
@@ -24,14 +27,13 @@ class FileSystemManager:
                     directories.add(os.path.join(output_path, dir_path))
                 files_to_generate.append(file_spec)
         
-        for directory in sorted(directories):
-            os.makedirs(directory, exist_ok=True)
+        create_directories(directories)
             
         for directory in directories:
-            if any(os.path.basename(f) == "__init__.py" for f in os.listdir(directory)):
+            if any(os.path.basename(f) == "__init__.py" for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))):
                 continue
             
-            if any(f.endswith(".py") for f in os.listdir(directory)):
+            if any(f.endswith(".py") for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))):
                 init_path = os.path.join(directory, "__init__.py")
                 with open(init_path, 'w') as f:
                     f.write("")
@@ -39,17 +41,8 @@ class FileSystemManager:
         return files_to_generate
     
     def write_code_to_file(self, output_path: str, file_path: str, code_content: str) -> str:
-        absolute_path = os.path.join(output_path, file_path)
-        
-        os.makedirs(os.path.dirname(absolute_path), exist_ok=True)
-        
-        # Clean markdown code blocks formatting
-        cleaned_content = self._clean_markdown_code_blocks(code_content)
-        
-        with open(absolute_path, 'w', encoding='utf-8') as f:
-            f.write(cleaned_content)
-            
-        return absolute_path
+        """Write code to a file and return the absolute path"""
+        return write_code_to_file(output_path, file_path, code_content)
 
     def _clean_markdown_code_blocks(self, content: str) -> str:        
         pattern = r"```[a-zA-Z0-9_+#-]*\n([\s\S]*?)\n```"

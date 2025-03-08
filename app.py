@@ -5,8 +5,8 @@ import logging
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from src.main_app import AppGenerator
-from src.app_validator import AppValidator
+from src.generators.app_generator import AppGenerator
+from src.validators.app_validator import AppValidator
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,27 @@ def is_binary_file(file_path):
     ext = os.path.splitext(file_path)[1].lower()
     return ext in binary_extensions
 
+def create_zip(directory):
+    """Create a ZIP archive of the directory"""
+    import zipfile
+    import io
+    
+    zip_buffer = io.BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                file_path = os.path.join(root, file)
+                zip_file.write(
+                    file_path, 
+                    os.path.relpath(file_path, os.path.join(directory, '..'))
+                )
+    
+    zip_buffer.seek(0)
+    return zip_buffer.getvalue()
+
 def main():
+    """Main Streamlit application function"""
     load_dotenv()
     
     st.set_page_config(page_title="AI Application Generator", layout="wide")
@@ -51,7 +71,7 @@ def main():
     and click "Generate Application".
     """)
     
-    api_key =  os.getenv("OPENAI_API_KEY", "")
+    api_key = os.getenv("OPENAI_API_KEY", "")
     
     user_prompt = st.text_area("Describe the application you want to build", 
                               height=150,
@@ -165,24 +185,6 @@ def main():
     6. **Code Review**: It reviews the generated code and makes improvements if necessary.
     7. **Project Packaging**: It creates project files like requirements.txt and README.md.
     """)
-
-def create_zip(directory):
-    import zipfile
-    import io
-    
-    zip_buffer = io.BytesIO()
-    
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        for root, dirs, files in os.walk(directory):
-            for file in files:
-                file_path = os.path.join(root, file)
-                zip_file.write(
-                    file_path, 
-                    os.path.relpath(file_path, os.path.join(directory, '..'))
-                )
-    
-    zip_buffer.seek(0)
-    return zip_buffer.getvalue()
 
 if __name__ == "__main__":
     main()
