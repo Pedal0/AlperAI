@@ -28,6 +28,18 @@ Based on the provided requirements specification document, you will:
 3. Define component relationships and dependencies
 4. Establish data flow patterns between components
 
+CRITICALLY IMPORTANT: Include EVERY file needed for the project in your response, including:
+- ALL configuration files like requirements.txt, package.json, setup.py, etc.
+- Documentation files like README.md
+- Environment files like .env.example
+- Git configuration files like .gitignore
+- Docker files if specified in requirements
+- CI/CD files if specified in requirements
+- Test files if tests are required
+
+The user expects that EVERY file for the project will be generated from your architecture definition.
+Do not assume any files will be created separately.
+
 IMPORTANT: For frameworks that handle both frontend and backend in a unified way, DO NOT separate them into distinct 'frontend' and 'backend' folders:
 - Flask: Use a templates/ directory for HTML and static/ for CSS/JS
 - Django: Use the standard Django project structure with templates/ and static/ folders
@@ -39,6 +51,7 @@ IMPORTANT: For frameworks that handle both frontend and backend in a unified way
 If "generate_tests" is true in the requirements, include test files in your architecture.
 If "create_docker" is true, include Dockerfile and docker-compose.yml in your architecture.
 If "add_ci_cd" is true, include appropriate CI/CD configuration files (like .github/workflows).
+If "generate_all_files" is true, ensure ALL configuration files are included in your output.
 
 Your output must be a valid, well-formed JSON structure representing the complete project layout with:
 - "directories": Array of directories to create
