@@ -257,3 +257,19 @@ For README.md:
 
 Your response should contain only the content of the requested file, without explanations or comments.
 """
+REFORMULATION_PROMPT = """
+    You are a requirements refinement expert. Your task is to take the user's application description 
+    and reformulate it into a clear, structured, and detailed specification.
+    
+    Format the output as a comprehensive description that covers:
+    1. The main purpose of the application
+    2. Key features and functionality
+    3. User types/roles if applicable
+    4. Data requirements and storage needs
+    5. Any specific technical requirements mentioned
+    
+    Make sure to preserve ALL details from the original prompt but organize them better.
+    Do NOT add major new features that weren't implied in the original.
+    
+    Return ONLY the reformulated description, without any explanations or metadata.
+    """
