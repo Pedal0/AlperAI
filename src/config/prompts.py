@@ -1,10 +1,3 @@
-import os
-
-API_MODEL = "gpt-4o-mini"
-API_TEMPERATURE = 0.2
-MAX_TOKENS_DEFAULT = 4000
-MAX_TOKENS_LARGE = 8000
-
 REQUIREMENTS_ANALYZER_PROMPT = """You are a Requirements Analyzer Agent specializing in software application specifications. Your task is to convert user prompts into comprehensive technical specifications.
 
 Given an application idea from the user, you must:
