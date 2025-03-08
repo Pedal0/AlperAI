@@ -4,6 +4,7 @@ import subprocess
 import logging
 import json
 import time
+import webbrowser
 from typing import Dict, Any, Optional, Tuple, List
 from src.config import APP_FIXER_PROMPT
 
@@ -25,8 +26,16 @@ class AppValidator:
     def validate_app(self, app_path: str, project_context: Dict[str, Any], extended_dep_wait: bool = True) -> bool:
         language = project_context.get("architecture", {}).get("language", "python").lower()
         
-        logger.info(f"Validating {language} application at {app_path}")
+        # Check if this is a static website
+        is_static_website = project_context.get("requirements", {}).get("is_static_website", False)
         
+        logger.info(f"Validating {'static website' if is_static_website else language + ' application'} at {app_path}")
+        
+        # For static websites, check if index.html exists
+        if is_static_website:
+            return self._validate_static_website(app_path)
+        
+        # Handle regular applications with backend
         js_dependencies = detect_javascript_dependencies(app_path, project_context)
         if js_dependencies and not os.path.exists(os.path.join(app_path, "package.json")):
             self._create_package_json(app_path, js_dependencies)
@@ -53,6 +62,27 @@ class AppValidator:
             return True
             
         return self._attempt_fix_application(app_path, error_info, project_context)
+        
+    def _validate_static_website(self, app_path: str) -> bool:
+        """Validate a static website by checking for index.html"""
+        index_path = os.path.join(app_path, "index.html")
+        
+        if os.path.exists(index_path):
+            logger.info(f"Static website validated successfully - index.html found at {index_path}")
+            
+            # Optionally try to open the index.html in a browser
+            try:
+                # Just log that we would open the file, but don't actually do it
+                logger.info(f"Static website could be viewed by opening: {index_path}")
+                # Uncomment the following line if you want to actually open the file in browser
+                # webbrowser.open('file://' + os.path.abspath(index_path))
+            except:
+                pass
+                
+            return True
+        else:
+            logger.error("Static website validation failed - index.html not found")
+            return False
 
     def _fix_dependency_files(self, app_path: str, language: str, project_context: Dict[str, Any]) -> None:
         """Try to fix dependency files like requirements.txt or package.json"""
@@ -244,7 +274,10 @@ class AppValidator:
                     logger.info(f"Found JS entry point: {rel_path}")
                 else:
                     start_cmd = ["cmd", "/c", "echo", "No JS entry point found"]
-                
+        elif language in ["html", "css"]:
+            # For static websites
+            env_cmds = []
+            start_cmd = ["cmd", "/c", "echo", "Static website - open index.html in browser"]
         else:
             env_cmds = []
             start_cmd = ["cmd", "/c", "echo", f"Validation not supported for {language}"]

@@ -6,6 +6,7 @@ from .django_adapter import adjust_for_django
 from .php_adapter import adjust_for_php
 from .express_adapter import adjust_for_express
 from .generic_adapter import adjust_for_generic
+from .static_adapter import adjust_for_static_website
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,9 @@ def adjust_architecture_for_framework(
     language = tech_stack.get('language', '').lower() if isinstance(tech_stack, dict) else ''
     framework = tech_stack.get('framework', '').lower() if isinstance(tech_stack, dict) else ''
     app_name = requirements_spec.get('app_name', 'main')
+    
+    # Check if this is a static website
+    is_static_website = requirements_spec.get('is_static_website', False)
     
     frontend_files = []
     backend_files = []
@@ -51,7 +55,10 @@ def adjust_architecture_for_framework(
     
     adjustment = None
     
-    if framework == 'flask' or (language == 'python' and 
+    if is_static_website or framework == 'static':
+        logger.info("Applying static website adjustments")
+        adjustment = adjust_for_static_website(frontend_files, backend_files, other_files)
+    elif framework == 'flask' or (language == 'python' and 
                                any('flask' in str(dep).lower() for dep in architecture.get('dependencies', []))):
         logger.info("Applying Flask-specific adjustments")
         adjustment = adjust_for_flask(frontend_files, backend_files, other_files)
