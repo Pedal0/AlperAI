@@ -6,7 +6,7 @@ from typing import Dict, Any, List, Optional
 from src.api.client import AIAppGeneratorAPI
 from src.file_manager.file_manager import FileSystemManager
 from src.generators.framework.framework_adapter import adjust_architecture_for_framework
-
+from src.config.prompts import CSS_DESIGNER_PROMPT  
 logger = logging.getLogger(__name__)
 
 class AppGenerator:
@@ -124,7 +124,16 @@ class AppGenerator:
             "file": file_spec
         }
         
-        code = self._api_client.generate_code(file_spec, project_context)
+        file_path = file_spec.get('path', '')
+        if file_path.endswith('.css'):
+            print(f"Using specialized CSS Designer for {file_path}")
+            code = self._api_client.call_agent(
+                CSS_DESIGNER_PROMPT,
+                json.dumps(project_context),
+                max_tokens=4000
+            )
+        else:
+            code = self._api_client.generate_code(file_spec, project_context)
         
         if not code:
             raise Exception(f"Failed to generate code for {file_spec.get('path')}")
@@ -217,17 +226,6 @@ class AppGenerator:
                 "spec": file_spec
             })
         
-        file_structure = []
-        for root, dirs, files in os.walk(output_path):
-            rel_root = os.path.relpath(root, output_path)
-            if rel_root == ".":
-                rel_root = ""
-            for file in files:
-                file_path = os.path.join(rel_root, file) if rel_root else file
-                file_structure.append(file_path)
-        
-        # Check if required configuration files were already generated
-        # If not using ai_generated_everything, we'll generate them separately
         if not ai_generated_everything:
             print("Generating configuration and documentation files")
             
@@ -256,43 +254,75 @@ class AppGenerator:
                     )
                     with open(os.path.join(output_path, "package.json"), 'w', encoding='utf-8') as f:
                         f.write(package_json_content)
-            
-            if 'README.md' not in file_structure:
-                print("Generating README.md")
-                readme_content = self._api_client.generate_project_file(
-                    'README.md',
-                    self.project_context,
-                    file_structure
-                )
-                with open(os.path.join(output_path, "README.md"), 'w', encoding='utf-8') as f:
-                    f.write(readme_content)
         
         print("Extracting file signatures for comprehensive validation")
         all_file_contents = {}
         
+        is_static_website = self._requirements_spec.get('is_static_website', False)
+        if isinstance(self._requirements_spec.get('technical_stack', {}), dict):
+            if self._requirements_spec.get('technical_stack', {}).get('framework', '') == 'static':
+                is_static_website = True
+        
         for file_info in generated_files:
-            if file_info["path"].endswith(('.py', '.js', '.ts', '.jsx', '.tsx')):
-                try:
-                    with open(file_info["absolute_path"], 'r', encoding='utf-8') as f:
-                        file_content = f.read()
-                        all_file_contents[file_info["path"]] = file_content
-                except Exception as e:
-                    print(f"Warning: Could not read {file_info['path']}: {str(e)}")
+            if is_static_website:
+                if file_info["path"].endswith(('.js')):
+                    try:
+                        with open(file_info["absolute_path"], 'r', encoding='utf-8') as f:
+                            file_content = f.read()
+                            all_file_contents[file_info["path"]] = file_content
+                    except Exception as e:
+                        print(f"Warning: Could not read {file_info['path']}: {str(e)}")
+            else:
+                if file_info["path"].endswith(('.py', '.js', '.ts', '.jsx', '.tsx')):
+                    try:
+                        with open(file_info["absolute_path"], 'r', encoding='utf-8') as f:
+                            file_content = f.read()
+                            all_file_contents[file_info["path"]] = file_content
+                    except Exception as e:
+                        print(f"Warning: Could not read {file_info['path']}: {str(e)}")
         
         if all_file_contents:
             print("Performing cross-file validation on all files")
             try:
                 results = self._api_client.cross_file_code_reviewer(all_file_contents, self.project_context)
                 
-                for file_path, fixed_content in results.items():
-                    if fixed_content != "PARFAIT":
-                        print(f"Fixing issues in {file_path}")
-                        self.file_manager.write_code_to_file(output_path, file_path, fixed_content)
+                if results and isinstance(results, dict):
+                    for file_path, fixed_content in results.items():
+                        if fixed_content != "PARFAIT":
+                            print(f"Fixing issues in {file_path}")
+                            self.file_manager.write_code_to_file(output_path, file_path, fixed_content)
+                else:
+                    logger.warning("Cross-file validation returned non-dictionary result")
             except Exception as e:
                 print(f"Warning: Cross-file validation failed: {str(e)}")
+                logger.exception("Cross-file validation error")  # Add this line to log the full traceback
         
-        print(f"Project successfully generated at {output_path}")
-        return output_path
+        file_structure = []
+        for root, dirs, files in os.walk(output_path):
+            rel_root = os.path.relpath(root, output_path)
+            if rel_root == ".":
+                rel_root = ""
+            for file in files:
+                file_path = os.path.join(rel_root, file) if rel_root else file
+                file_structure.append(file_path)
+        
+        print("Generating comprehensive README.md")
+        readme_content = self._api_client.generate_project_file(
+            'README.md',
+            self.project_context,
+            file_structure  # This now contains the final list of all files
+        )
+        with open(os.path.join(output_path, "README.md"), 'w', encoding='utf-8') as f:
+            f.write(readme_content)
+        
+        try:
+            print(f"Project successfully generated at {output_path}")
+            return output_path
+        except Exception as e:
+            logger.exception("Error in final project processing")
+            # Still return the path since the project was successfully generated
+            print(f"Project was successfully generated despite an error in final processing: {str(e)}")
+            return output_path
 
     def _design_json_data(self):
         """Design JSON data structures with sample data instead of a database schema"""

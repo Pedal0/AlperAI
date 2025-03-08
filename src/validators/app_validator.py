@@ -70,19 +70,30 @@ class AppValidator:
         if os.path.exists(index_path):
             logger.info(f"Static website validated successfully - index.html found at {index_path}")
             
-            # Optionally try to open the index.html in a browser
             try:
-                # Just log that we would open the file, but don't actually do it
+                webbrowser.open(f"file://{os.path.abspath(index_path)}")
+                logger.info(f"Opened static website in browser: {index_path}")
+            except Exception as e:
                 logger.info(f"Static website could be viewed by opening: {index_path}")
-                # Uncomment the following line if you want to actually open the file in browser
-                # webbrowser.open('file://' + os.path.abspath(index_path))
-            except:
-                pass
+                logger.debug(f"Could not open browser automatically: {str(e)}")
                 
             return True
         else:
-            logger.error("Static website validation failed - index.html not found")
-            return False
+            index_path = os.path.join(app_path, "src/index.html")
+            if os.path.exists(index_path):
+                logger.info(f"Static website validated successfully - index.html found at {index_path}")
+            
+                try:
+                    webbrowser.open(f"file://{os.path.abspath(index_path)}")
+                    logger.info(f"Opened static website in browser: {index_path}")
+                except Exception as e:
+                    logger.info(f"Static website could be viewed by opening: {index_path}")
+                    logger.debug(f"Could not open browser automatically: {str(e)}")
+                
+                return True
+            else:
+                logger.error("Static website validation failed - index.html not found")
+                return False
 
     def _fix_dependency_files(self, app_path: str, language: str, project_context: Dict[str, Any]) -> None:
         """Try to fix dependency files like requirements.txt or package.json"""
