@@ -17,8 +17,6 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,
                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-
-
 def main():
     """Main Streamlit application function"""
     load_dotenv()
@@ -42,7 +40,8 @@ def main():
             'add_ci_cd': False,
             'use_sample_json': False,
             'extended_dep_wait': True,
-            'is_static_website': False
+            'is_static_website': False,
+            'ai_generated_everything': True  # New option to force all files to be AI-generated
         }
         
     st.title("AI Application Generator")
@@ -107,7 +106,8 @@ def main():
                 'add_ci_cd': add_ci_cd,
                 'use_sample_json': use_sample_json,
                 'extended_dep_wait': extended_dep_wait,
-                'is_static_website': is_static_website
+                'is_static_website': is_static_website,
+                'ai_generated_everything': True  # Always keep this true
             }
             
             if st.button("Generate Application"):
@@ -124,6 +124,9 @@ def main():
                             prompt_to_process = user_prompt
                             if is_static_website:
                                 prompt_to_process = f"[STATIC WEBSITE] {user_prompt}"
+                            
+                            # Add flag to ensure all files are AI-generated
+                            prompt_to_process = f"[COMPLETE PROJECT WITH ALL FILES] {prompt_to_process}"
                             
                             # Initialize AI client
                             app_generator = AppGenerator(api_key)
@@ -218,9 +221,14 @@ def main():
                 reformulated_prompt = st.session_state.reformulated_prompt
                 is_static = advanced_options.get('is_static_website', False)
                 
-                if is_static and not reformulated_prompt.startswith("[STATIC WEBSITE]"):
+                # Ensure proper flags are present in the prompt
+                if is_static and not "[STATIC WEBSITE]" in reformulated_prompt:
                     reformulated_prompt = f"[STATIC WEBSITE] {reformulated_prompt}"
                     update_log("Preparing to generate static website (HTML/CSS/JavaScript only)")
+                
+                if not "[COMPLETE PROJECT WITH ALL FILES]" in reformulated_prompt:
+                    reformulated_prompt = f"[COMPLETE PROJECT WITH ALL FILES] {reformulated_prompt}"
+                    update_log("Ensuring all project files are AI-generated (no templates)")
                 
                 # Generate the application
                 try:
@@ -230,7 +238,8 @@ def main():
                         include_tests=advanced_options['include_tests'],
                         create_docker=advanced_options['create_docker'],
                         add_ci_cd=advanced_options['add_ci_cd'],
-                        use_sample_json=advanced_options['use_sample_json']
+                        use_sample_json=advanced_options['use_sample_json'],
+                        ai_generated_everything=True  # Force this option to be true
                     )
                     
                     if success:

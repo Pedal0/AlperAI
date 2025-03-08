@@ -131,8 +131,12 @@ class AppGenerator:
             
         return code
         
-    def generate_application(self, user_prompt, output_path, include_tests=False, create_docker=False, add_ci_cd=False, use_sample_json=False):
+    def generate_application(self, user_prompt, output_path, include_tests=False, create_docker=False, add_ci_cd=False, use_sample_json=False, ai_generated_everything=True):
         """Generate a complete application based on user prompt"""
+        # Ensure the user is informed that all files will be AI-generated
+        if ai_generated_everything:
+            print("Using AI to generate ALL project files (no templates)")
+        
         self._requirements_spec = self._build_requirements_spec(
             user_prompt, include_tests, create_docker, add_ci_cd
         )
@@ -158,6 +162,12 @@ class AppGenerator:
                 print("Using JSON files with sample data instead of database")
             else:
                 logger.warning(f"Could not set JSON data preferences, data_requirements has unexpected type: {type(self._requirements_spec['data_requirements'])}")
+        
+        # Add flag to ensure we generate all necessary configuration files
+        if ai_generated_everything and not self._requirements_spec.get("generate_all_files"):
+            self._requirements_spec["generate_all_files"] = True
+            self._requirements_spec["include_config_files"] = True
+            print("Ensuring all configuration files are included in the generated architecture")
         
         self._architecture = self._design_architecture()
         
@@ -216,40 +226,46 @@ class AppGenerator:
                 file_path = os.path.join(rel_root, file) if rel_root else file
                 file_structure.append(file_path)
         
-        print("Generating configuration and documentation files")
-        
-        tech_stack = self._requirements_spec.get('technical_stack', {})
-        language = tech_stack.get('language', '').lower() if isinstance(tech_stack, dict) else ''
-        is_static_website = self._requirements_spec.get('is_static_website', False)
-        
-        if language not in ['javascript', 'typescript', 'node', 'react', 'vue', 'angular'] and not is_static_website:
-            print("Generating requirements.txt")
-            requirements_content = self._api_client.generate_project_file(
-                'requirements.txt',
-                self.project_context,
-                file_structure
-            )
-            with open(os.path.join(output_path, "requirements.txt"), 'w', encoding='utf-8') as f:
-                f.write(requirements_content)
-        
-        if language in ['javascript', 'typescript', 'node', 'react', 'vue', 'angular']:
-            print("Generating package.json")
-            package_json_content = self._api_client.generate_project_file(
-                'package.json',
-                self.project_context,
-                file_structure
-            )
-            with open(os.path.join(output_path, "package.json"), 'w', encoding='utf-8') as f:
-                f.write(package_json_content)
-        
-        print("Generating README.md")
-        readme_content = self._api_client.generate_project_file(
-            'README.md',
-            self.project_context,
-            file_structure
-        )
-        with open(os.path.join(output_path, "README.md"), 'w', encoding='utf-8') as f:
-            f.write(readme_content)
+        # Check if required configuration files were already generated
+        # If not using ai_generated_everything, we'll generate them separately
+        if not ai_generated_everything:
+            print("Generating configuration and documentation files")
+            
+            tech_stack = self._requirements_spec.get('technical_stack', {})
+            language = tech_stack.get('language', '').lower() if isinstance(tech_stack, dict) else ''
+            is_static_website = self._requirements_spec.get('is_static_website', False)
+            
+            if language not in ['javascript', 'typescript', 'node', 'react', 'vue', 'angular'] and not is_static_website:
+                if 'requirements.txt' not in file_structure:
+                    print("Generating requirements.txt")
+                    requirements_content = self._api_client.generate_project_file(
+                        'requirements.txt',
+                        self.project_context,
+                        file_structure
+                    )
+                    with open(os.path.join(output_path, "requirements.txt"), 'w', encoding='utf-8') as f:
+                        f.write(requirements_content)
+            
+            if language in ['javascript', 'typescript', 'node', 'react', 'vue', 'angular']:
+                if 'package.json' not in file_structure:
+                    print("Generating package.json")
+                    package_json_content = self._api_client.generate_project_file(
+                        'package.json',
+                        self.project_context,
+                        file_structure
+                    )
+                    with open(os.path.join(output_path, "package.json"), 'w', encoding='utf-8') as f:
+                        f.write(package_json_content)
+            
+            if 'README.md' not in file_structure:
+                print("Generating README.md")
+                readme_content = self._api_client.generate_project_file(
+                    'README.md',
+                    self.project_context,
+                    file_structure
+                )
+                with open(os.path.join(output_path, "README.md"), 'w', encoding='utf-8') as f:
+                    f.write(readme_content)
         
         print("Extracting file signatures for comprehensive validation")
         all_file_contents = {}
