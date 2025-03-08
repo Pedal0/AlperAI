@@ -84,6 +84,13 @@ def main():
         include_tests = st.checkbox("Generate tests", value=False)
         create_docker = st.checkbox("Create Docker configuration", value=False)
         add_ci_cd = st.checkbox("Add CI/CD configuration", value=False)
+        col1, col2 = st.columns(2)
+        with col1:
+            use_sample_json = st.checkbox("Use sample JSON data instead of DB", value=False, 
+                                         help="Generate valid sample JSON data files instead of connecting to a database")
+        with col2:
+            extended_dep_wait = st.checkbox("Extended dependency installation time", value=True,
+                                          help="Add extra delay after installing dependencies to ensure they are properly installed")
     
     if st.button("Generate Application"):
         if not api_key:
@@ -134,13 +141,18 @@ def main():
                     output_path,
                     include_tests=include_tests,
                     create_docker=create_docker,
-                    add_ci_cd=add_ci_cd
+                    add_ci_cd=add_ci_cd,
+                    use_sample_json=use_sample_json
                 )
                 
                 if success:
                     status_text.text("Validating application...")
                     validator = AppValidator(app_generator.api_client)
-                    validation_success = validator.validate_app(output_path, app_generator.project_context)
+                    validation_success = validator.validate_app(
+                        output_path, 
+                        app_generator.project_context,
+                        extended_dep_wait=extended_dep_wait
+                    )
                     
                     if not validation_success:
                         status_text.text("Application validation failed. Attempting to fix issues...")

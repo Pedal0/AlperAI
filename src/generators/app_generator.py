@@ -126,7 +126,7 @@ class AppGenerator:
             
         return code
         
-    def generate_application(self, user_prompt, output_path, include_tests=False, create_docker=False, add_ci_cd=False):
+    def generate_application(self, user_prompt, output_path, include_tests=False, create_docker=False, add_ci_cd=False, use_sample_json=False):
         """Generate a complete application based on user prompt"""
         self._requirements_spec = self._build_requirements_spec(
             user_prompt, include_tests, create_docker, add_ci_cd
@@ -139,6 +139,21 @@ class AppGenerator:
         app_name = self._requirements_spec.get('app_name', 'Unnamed App')
         print(f"Designing architecture for {app_name}")
         
+        # Inject sample JSON preference in the requirements
+        if use_sample_json:
+            if not self._requirements_spec.get("data_requirements"):
+                self._requirements_spec["data_requirements"] = {}
+            elif isinstance(self._requirements_spec["data_requirements"], str):
+                # Convert string to dictionary if necessary
+                self._requirements_spec["data_requirements"] = {"description": self._requirements_spec["data_requirements"]}
+                
+            if isinstance(self._requirements_spec["data_requirements"], dict):
+                self._requirements_spec["data_requirements"]["use_json_files"] = True
+                self._requirements_spec["data_requirements"]["use_sample_data"] = True
+                print("Using JSON files with sample data instead of database")
+            else:
+                logger.warning(f"Could not set JSON data preferences, data_requirements has unexpected type: {type(self._requirements_spec['data_requirements'])}")
+        
         self._architecture = self._design_architecture()
         
         self._architecture = adjust_architecture_for_framework(self._architecture, self._requirements_spec)
@@ -146,11 +161,15 @@ class AppGenerator:
         if isinstance(self._requirements_spec.get('components', []), list) and any(
             'database' in comp.get('type', '') for comp in self._requirements_spec.get('components', []) 
             if isinstance(comp, dict)
-        ):
+        ) and not use_sample_json:
             print("Designing database schema")
             self._database_schema = self._design_database()
         else:
-            self._database_schema = {}
+            if use_sample_json:
+                print("Creating sample JSON data structures instead of database schema")
+                self._database_schema = self._design_json_data()
+            else:
+                self._database_schema = {}
         
         if isinstance(self._requirements_spec.get('components', []), list) and any(
             'api' in comp.get('type', '') for comp in self._requirements_spec.get('components', []) 
@@ -252,3 +271,40 @@ class AppGenerator:
         
         print(f"Project successfully generated at {output_path}")
         return output_path
+
+    def _design_json_data(self):
+        """Design JSON data structures with sample data instead of a database schema"""
+        if not self._requirements_spec or not self._architecture:
+            raise Exception("Requirements or architecture is missing")
+            
+        context = {
+            "requirements": self._requirements_spec,
+            "architecture": self._architecture,
+            "instructions": "Create sample JSON data structures instead of database schema. "
+                           "The data must be valid JSON, not Python code. Include realistic sample "
+                           "data that matches the application domain."
+        }
+        
+        json_data = self._api_client.call_agent(
+            "You are a JSON Data Structure Designer. Create sample JSON data files with realistic test data "
+            "based on the application requirements. The JSON data must be valid and contain no Python code. "
+            "Include multiple sample records for each entity type. Return only valid JSON structures.", 
+            json.dumps(context),
+            max_tokens=4000
+        )
+        
+        try:
+            sample_data = json.loads(json_data)
+            return {"json_data_structures": sample_data}
+        except json.JSONDecodeError:
+            import re
+            json_matches = re.findall(r'```(?:json)?\s*([\s\S]*?)\s*```', json_data)
+            if json_matches:
+                try:
+                    sample_data = json.loads(json_matches[0])
+                    return {"json_data_structures": sample_data}
+                except json.JSONDecodeError:
+                    pass
+                    
+            logger.warning("Failed to parse JSON data structures, returning empty schema")
+            return {"json_data_structures": {}}
