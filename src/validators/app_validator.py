@@ -3,6 +3,7 @@ import sys
 import subprocess
 import logging
 import json
+import time
 from typing import Dict, Any, Optional, Tuple, List
 from src.config import APP_FIXER_PROMPT
 
@@ -21,7 +22,7 @@ class AppValidator:
         self.api_client = api_client
         self.max_fix_attempts = 3
         
-    def validate_app(self, app_path: str, project_context: Dict[str, Any]) -> bool:
+    def validate_app(self, app_path: str, project_context: Dict[str, Any], extended_dep_wait: bool = True) -> bool:
         language = project_context.get("architecture", {}).get("language", "python").lower()
         
         logger.info(f"Validating {language} application at {app_path}")
@@ -34,7 +35,16 @@ class AppValidator:
         
         if not setup_environment(app_path, env_setup_cmds):
             logger.error("Failed to setup environment")
-            return False
+            # Try to fix dependency issues in requirements.txt or package.json
+            self._fix_dependency_files(app_path, language, project_context)
+            # Try again with the fixed dependencies
+            if not setup_environment(app_path, env_setup_cmds):
+                return False
+        
+        # Add delay after dependency installation if requested
+        if extended_dep_wait:
+            logger.info("Adding extra delay after dependency installation to ensure completion")
+            time.sleep(5)  # 5 seconds delay to make sure installations complete
             
         success, error_info = try_start_application(app_path, start_cmd)
         
@@ -43,6 +53,74 @@ class AppValidator:
             return True
             
         return self._attempt_fix_application(app_path, error_info, project_context)
+
+    def _fix_dependency_files(self, app_path: str, language: str, project_context: Dict[str, Any]) -> None:
+        """Try to fix dependency files like requirements.txt or package.json"""
+        if language == "python":
+            req_path = os.path.join(app_path, "requirements.txt")
+            if os.path.exists(req_path):
+                try:
+                    result = subprocess.run(
+                        ["pip", "install", "-r", req_path],
+                        cwd=app_path,
+                        capture_output=True,
+                        text=True
+                    )
+                    
+                    if result.returncode != 0:
+                        error_info = {"stdout": result.stdout, "stderr": result.stderr}
+                        
+                        with open(req_path, 'r') as f:
+                            content = f.read()
+                        
+                        fixed_content = fix_file_with_ai(
+                            self.api_client, 
+                            req_path,
+                            content,
+                            error_info,
+                            project_context
+                        )
+                        
+                        if fixed_content:
+                            with open(req_path, 'w') as f:
+                                f.write(fixed_content)
+                            logger.info("Fixed requirements.txt file")
+                
+                except Exception as e:
+                    logger.error(f"Error fixing requirements.txt: {str(e)}")
+        
+        elif language in ["javascript", "typescript", "node"]:
+            pkg_path = os.path.join(app_path, "package.json")
+            if os.path.exists(pkg_path):
+                try:
+                    result = subprocess.run(
+                        ["npm", "install"],
+                        cwd=app_path,
+                        capture_output=True,
+                        text=True
+                    )
+                    
+                    if result.returncode != 0:
+                        error_info = {"stdout": result.stdout, "stderr": result.stderr}
+                        
+                        with open(pkg_path, 'r') as f:
+                            content = f.read()
+                        
+                        fixed_content = fix_file_with_ai(
+                            self.api_client,
+                            pkg_path,
+                            content,
+                            error_info,
+                            project_context
+                        )
+                        
+                        if fixed_content:
+                            with open(pkg_path, 'w') as f:
+                                f.write(fixed_content)
+                            logger.info("Fixed package.json file")
+                
+                except Exception as e:
+                    logger.error(f"Error fixing package.json: {str(e)}")
 
     def _create_package_json(self, app_path: str, dependencies: List[str]) -> None:
         """Create a package.json file with the detected dependencies"""
