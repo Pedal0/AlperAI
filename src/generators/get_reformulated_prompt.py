@@ -8,7 +8,12 @@ from src.config import (
 def get_reformulated_prompt(api_client, user_prompt):
     """Use AI to reformat and structure the user's prompt"""    
     try:           
-        response = api_client.call_agent(REFORMULATION_PROMPT, user_prompt, max_tokens=1000)
+        response = api_client.call_agent(
+            REFORMULATION_PROMPT, 
+            user_prompt, 
+            max_tokens=1000,
+            agent_type="reformulation"
+        )
         logger.info(f"API response received, length: {len(response) if response else 0}")
         
         if response and "[COMPLETE PROJECT WITH ALL FILES]" in user_prompt and "[COMPLETE PROJECT WITH ALL FILES]" not in response:

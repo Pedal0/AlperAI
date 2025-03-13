@@ -16,5 +16,6 @@ def generate_tests(api_client, file_path: str, code_content: str, project_contex
     return api_client.call_agent(
         TEST_GENERATOR_PROMPT, 
         json.dumps(context), 
-        max_tokens=MAX_TOKENS_DEFAULT
+        max_tokens=MAX_TOKENS_DEFAULT,
+        agent_type="test"
     )

@@ -6,9 +6,9 @@ from typing import Dict, List, Any, Optional
 
 from src.config import (
     API_MODEL,
-    API_TEMPERATURE,
     MAX_TOKENS_DEFAULT,
-    MAX_TOKENS_LARGE
+    MAX_TOKENS_LARGE,
+    TEMPERATURES
 )
 from src.api.agent_calls.requirements import analyze_requirements
 from src.api.agent_calls.architecture import design_architecture
@@ -25,23 +25,26 @@ class AIAppGeneratorAPI:
         self.api_key = api_key
         openai.api_key = api_key
         self.model = API_MODEL
-        self.temperature = API_TEMPERATURE
+        self.temperature = TEMPERATURES["default"] 
         self.max_retries = 3
         self.retry_delay = 2 
         
-    def call_agent(self, prompt: str, user_input: str, max_tokens: int = MAX_TOKENS_DEFAULT) -> Optional[str]:
+    def call_agent(self, prompt: str, user_input: str, max_tokens: int = MAX_TOKENS_DEFAULT, agent_type: str = "default") -> Optional[str]:
         attempts = 0
+        
+        # Get appropriate temperature for this agent type
+        temperature = TEMPERATURES.get(agent_type, TEMPERATURES["default"])
         
         while attempts < self.max_retries:
             try:
-                logger.info(f"Making API call (attempt {attempts + 1}/{self.max_retries})")
+                logger.info(f"Making API call (attempt {attempts + 1}/{self.max_retries}) with temperature {temperature}")
                 response = openai.chat.completions.create(
                     model=self.model,
                     messages=[
                         {"role": "system", "content": prompt},
                         {"role": "user", "content": user_input}
                     ],
-                    temperature=self.temperature,
+                    temperature=temperature,
                     max_tokens=max_tokens
                 )
                 content = response.choices[0].message.content
