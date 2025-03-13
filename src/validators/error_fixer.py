@@ -60,7 +60,8 @@ def fix_file_with_ai(api_client, file_path: str, file_content: str,
     response = api_client.call_agent(
         APP_FIXER_PROMPT,
         json.dumps(fix_context),
-        max_tokens=4096
+        max_tokens=4096,
+        agent_type="fixer"
     )
     
     if not response:

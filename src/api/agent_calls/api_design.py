@@ -15,6 +15,7 @@ def design_api(api_client, requirements_spec: Dict[str, Any], architecture: Dict
     response = api_client.call_agent(
         API_DESIGNER_PROMPT, 
         json.dumps(context), 
-        max_tokens=MAX_TOKENS_DEFAULT
+        max_tokens=MAX_TOKENS_DEFAULT,
+        agent_type="api"
     )
     return api_client._safe_parse_json(response)
