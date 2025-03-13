@@ -22,7 +22,8 @@ def review_code(api_client, file_path: str, code_content: str, file_spec: Dict[s
     response = api_client.call_agent(
         CODE_REVIEWER_PROMPT, 
         json.dumps(context), 
-        max_tokens=MAX_TOKENS_DEFAULT
+        max_tokens=MAX_TOKENS_DEFAULT,
+        agent_type="review"
     )
     return api_client._safe_parse_json(response)
 
@@ -36,7 +37,8 @@ def extract_file_signature(api_client, file_path: str, content: str) -> Dict[str
     response = api_client.call_agent(
         FILE_SIGNATURE_EXTRACTOR_PROMPT,
         json.dumps(context), 
-        max_tokens=MAX_TOKENS_DEFAULT
+        max_tokens=MAX_TOKENS_DEFAULT,
+        agent_type="review"
     )
     
     signature = api_client._safe_parse_json(response)
@@ -93,7 +95,8 @@ def cross_file_review(api_client, all_files: Dict[str, str], project_context: Di
         response = api_client.call_agent(
             CROSS_FILE_REVIEWER_PROMPT, 
             json.dumps(context), 
-            max_tokens=MAX_TOKENS_LARGE
+            max_tokens=MAX_TOKENS_LARGE,
+            agent_type="review"
         )
         
         if response and response.strip() == "PARFAIT":

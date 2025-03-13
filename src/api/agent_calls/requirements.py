@@ -9,6 +9,7 @@ def analyze_requirements(api_client, user_prompt: str) -> Optional[Dict[str, Any
     response = api_client.call_agent(
         REQUIREMENTS_ANALYZER_PROMPT, 
         user_prompt, 
-        max_tokens=MAX_TOKENS_DEFAULT
+        max_tokens=MAX_TOKENS_DEFAULT,
+        agent_type="requirements"
     )
     return api_client._safe_parse_json(response)
