@@ -11,7 +11,8 @@ def design_architecture(api_client, requirements_spec: Dict[str, Any]) -> Option
     response = api_client.call_agent(
         ARCHITECTURE_DESIGNER_PROMPT, 
         req_json, 
-        max_tokens=MAX_TOKENS_LARGE
+        max_tokens=MAX_TOKENS_LARGE,
+        agent_type="architecture"
     )
     
     architecture = api_client._safe_parse_json(response)
