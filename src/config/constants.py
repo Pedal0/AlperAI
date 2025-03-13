@@ -17,5 +17,5 @@ TEMPERATURES = {
     "fixer": 0.2             # Précis pour la correction d'erreurs
 }
 
-MAX_TOKENS_DEFAULT = 4000
-MAX_TOKENS_LARGE = 8000
+MAX_TOKENS_DEFAULT = 8000
+MAX_TOKENS_LARGE = 18000
