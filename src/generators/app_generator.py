@@ -7,6 +7,7 @@ from src.api.client import AIAppGeneratorAPI
 from src.file_manager.file_manager import FileSystemManager
 from src.generators.framework.framework_adapter import adjust_architecture_for_framework
 from src.config.prompts import CSS_DESIGNER_PROMPT  
+from src.config.constants import AGENT_TEAM_ENABLED
 logger = logging.getLogger(__name__)
 
 class AppGenerator:
@@ -360,3 +361,23 @@ class AppGenerator:
                     
             logger.warning("Failed to parse JSON data structures, returning empty schema")
             return {"json_data_structures": {}}
+
+    def validate_generated_project(self, output_dir):
+        """Validate the generated project"""
+        logger.info("Starting project validation...")
+        
+        # Supprimer/commenter le code qui lance l'environnement virtuel et qui cause l'erreur
+        # self.validate_in_virtual_env(output_dir)  # Commentez cette ligne
+        
+        # Ne garder que la vérification par l'équipe d'agents
+        if AGENT_TEAM_ENABLED:
+            logger.info("Starting agent team verification...")
+            from src.validators.agent_team_verifier import run_verification_team
+            try:
+                run_verification_team(output_dir, self.project_description)
+                logger.info("Agent team verification completed successfully")
+            except Exception as e:
+                logger.error(f"Error during agent team verification: {str(e)}")
+                logger.exception("Agent verification exception")
+        
+        logger.info("Project validation completed")

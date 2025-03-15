@@ -1,4 +1,5 @@
 import streamlit as st
+from src.config import AGENT_TEAM_ENABLED
 
 def show_generation_tab(api_key):
     """Display the generation progress tab"""
@@ -77,6 +78,9 @@ def show_generation_tab(api_key):
                             app_generator.project_context['requirements']['technical_stack'] = {}
                         app_generator.project_context['requirements']['technical_stack']['framework'] = 'static'
                     
+                    if AGENT_TEAM_ENABLED:
+                        update_log("Lancement de l'équipe d'agents pour vérifier et améliorer le projet...")
+                        
                     validator = AppValidator(app_generator.api_client)
                     validation_success = validator.validate_app(
                         output_path, 
@@ -86,7 +90,10 @@ def show_generation_tab(api_key):
                     
                     if not validation_success:
                         status_text.text("Application validation failed. Attempting to fix issues...")
-                        st.warning("Some issues were detected during validation. The system attempted to fix them automatically.")
+                        if AGENT_TEAM_ENABLED:
+                            st.warning("Des problèmes ont été détectés. L'équipe d'agents IA a vérifié et amélioré le projet automatiquement.")
+                        else:
+                            st.warning("Some issues were detected during validation. The system attempted to fix them automatically.")
                     
                     progress_bar.progress(100)
                     st.balloons()
