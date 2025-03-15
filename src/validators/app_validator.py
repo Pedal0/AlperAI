@@ -6,7 +6,7 @@ import json
 import time
 import webbrowser
 from typing import Dict, Any, Optional, Tuple, List
-from src.config import APP_FIXER_PROMPT
+from src.config import APP_FIXER_PROMPT, AGENT_TEAM_ENABLED
 
 from .environment_setup import setup_environment
 from .app_runner import try_start_application
@@ -14,6 +14,7 @@ from .dependency_detector import detect_javascript_dependencies
 from .requirements_cleaner import create_clean_requirements_cmd
 from .entry_point_finder import find_python_entry_point, find_js_entry_point
 from .error_fixer import identify_error_file, fix_file_with_ai
+from .agent_team_verifier import run_verification_team
 from .functions.validate_app import validate_app as validate_app_function
 from .functions.validate_static_website import _validate_static_website as validate_static_website_function
 from .functions.fix_dependency_files import _fix_dependency_files as fix_dependency_files_function
@@ -32,6 +33,13 @@ class AppValidator:
         self.max_fix_attempts = 3
 
     def validate_app(self, app_path: str, project_context: Dict[str, Any], extended_dep_wait: bool = True):
+        # Lancer l'équipe d'agents pour vérifier le projet
+        if AGENT_TEAM_ENABLED:
+            logger.info("Lancement de l'équipe d'agents de vérification...")
+            run_verification_team(app_path, project_context)
+            logger.info("Vérification par l'équipe d'agents terminée")
+        
+        # Continuer avec la validation standard
         return validate_app_function(self, app_path, project_context, extended_dep_wait) 
            
     def _validate_static_website(self, app_path: str) -> bool:

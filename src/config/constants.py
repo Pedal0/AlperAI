@@ -14,8 +14,18 @@ TEMPERATURES = {
     "test": 0.3,             # Précis pour les tests
     "css": 0.9,              # Très créatif pour le design CSS
     "reformulation": 0.7,    # Créatif pour la reformulation
-    "fixer": 0.2             # Précis pour la correction d'erreurs
+    "fixer": 0.2,            # Précis pour la correction d'erreurs
+    
+    # Températures pour l'équipe d'agents
+    "structure_creator": 0.3,  # Précis pour la structure du projet
+    "frontend_developer": 0.4, # Balance entre créativité et précision pour le frontend
+    "backend_developer": 0.2,  # Très précis pour le backend
+    "project_manager": 0.5     # Équilibré pour la coordination
 }
 
-MAX_TOKENS_DEFAULT = 8000
-MAX_TOKENS_LARGE = 18000
+# Configuration pour l'équipe d'agents de vérification
+AGENT_TEAM_ENABLED = True
+AGENT_TEAM_WAIT_TIME = 60  # Temps en secondes à attendre pour que les agents terminent leur travail
+
+MAX_TOKENS_DEFAULT = 6000
+MAX_TOKENS_LARGE = 8000
