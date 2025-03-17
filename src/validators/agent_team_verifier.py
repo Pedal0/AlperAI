@@ -10,56 +10,40 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# Flag to ensure the verification team is launched only once
+_verification_team_launched = False
+
 def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> None:
     """
     Lance l'équipe d'agents pour vérifier et corriger le projet.
     Cette fonction ne retourne rien, les agents travaillent de façon autonome.
+    L'équipe n'est lancée qu'une seule fois pendant l'exécution du programme.
     
     Args:
         app_path: Chemin du projet généré
         project_context: Contexte du projet (requirements, architecture, etc.)
     """
+    global _verification_team_launched
+    
+    if _verification_team_launched:
+        logger.info("Agent team has already been launched, ignoring this new request")
+        return
+        
     if not AGENT_TEAM_ENABLED:
-        logger.info("L'équipe d'agents de vérification est désactivée")
+        logger.info("Agent verification team is disabled")
         return
     
-    logger.info(f"Lancement de l'équipe d'agents pour vérifier le projet à {app_path}")
+    logger.info(f"Launching agent team to verify the project at {app_path}")
     
     try:
         # Import des dépendances nécessaires pour les agents
-
         
         # Utilisation du chemin fourni par l'utilisateur
         abs_path = os.path.abspath(app_path)
-        logger.info(f"Les agents travaillent sur le chemin absolu: {abs_path}")
+        logger.info(f"Agents are working on absolute path: {abs_path}")
         
         # Création des outils pour la manipulation des fichiers
         file_tools = FileTools(Path(abs_path), True, True, True)
-        
-        # Création de l'agent spécialisé dans la structure du projet
-        structure_creator = Agent(
-            model=OpenAIChat("gpt-4o-mini"),
-            name="Structure_Creator",
-            tools=[file_tools],
-            instructions=[
-                """
-                Tu es un agent équipé d'un outil pour lire, écrire et parcourir des fichiers.
-                Tu es spécialisé dans la VÉRIFICATION et L'AMÉLIORATION de la structure d'un projet existant.
-                
-                Tes tâches:
-                1. ANALYSER la structure actuelle du projet
-                2. VÉRIFIER si tous les fichiers essentiels sont présents
-                3. IDENTIFIER les problèmes de structure ou d'organisation
-                4. CORRIGER la structure si nécessaire en modifiant ou ajoutant des fichiers
-                
-                N'efface PAS le projet existant pour en créer un nouveau.
-                Concentre-toi uniquement sur l'amélioration de la structure actuelle.
-                """
-            ],
-            markdown=True,
-            show_tool_calls=True,
-            add_history_to_messages=True,
-        )
 
         # Création de l'agent spécialisé dans le développement frontend
         frontend_developer = Agent(
@@ -68,18 +52,24 @@ def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> Non
             tools=[file_tools],
             instructions=[
                 """
-                Tu es un agent équipé d'un outil pour lire, écrire et parcourir des fichiers.
-                Tu es spécialisé dans la VÉRIFICATION et L'AMÉLIORATION du code frontend d'un projet existant.
+                You are an agent equipped with tools to read, write and browse files.
+                You specialize in VERIFYING and IMPROVING frontend code of an existing project.
                 
-                Tes tâches:
-                1. ANALYSER les fichiers frontend existants (HTML, CSS, JS, etc.)
-                2. VÉRIFIER leur qualité, fonctionnalité et cohérence
-                3. IDENTIFIER les problèmes, bugs ou incohérences
-                4. CORRIGER ces problèmes en modifiant directement les fichiers
-                5. AMÉLIORER l'UI/UX si nécessaire
+                IMPORTANT INSTRUCTIONS:
+                - ANALYZE EXHAUSTIVELY ALL frontend files in the project
+                - DO NOT create new files except in cases of extreme necessity
+                - Explore all directories to find all relevant files
+                - Examine the complete content of each file
                 
-                Ne recrée PAS le frontend à partir de zéro.
-                Concentre-toi sur la correction et l'amélioration du code existant.
+                Your tasks:
+                1. ANALYZE existing frontend files (HTML, CSS, JS, etc.)
+                2. CHECK their quality, functionality and consistency
+                3. IDENTIFY problems, bugs or inconsistencies
+                4. FIX these problems by directly modifying existing files
+                5. IMPROVE UI/UX if necessary
+                
+                Do NOT recreate the frontend from scratch.
+                Focus on correcting and improving the existing code.
                 """
             ],
         )
@@ -91,18 +81,24 @@ def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> Non
             tools=[file_tools],
             instructions=[
                 """
-                Tu es un agent équipé d'un outil pour lire, écrire et parcourir des fichiers.
-                Tu es spécialisé dans la VÉRIFICATION et L'AMÉLIORATION du code backend d'un projet existant.
+                You are an agent equipped with tools to read, write and browse files.
+                You specialize in VERIFYING and IMPROVING backend code of an existing project.
                 
-                Tes tâches:
-                1. ANALYSER les fichiers backend existants
-                2. VÉRIFIER la logique métier, les connexions à la base de données, les API, etc.
-                3. IDENTIFIER les bugs, problèmes de performance, failles de sécurité
-                4. CORRIGER ces problèmes en modifiant directement les fichiers
-                5. ASSURER la cohérence avec le frontend
+                IMPORTANT INSTRUCTIONS:
+                - ANALYZE EXHAUSTIVELY ALL backend files in the project
+                - DO NOT create new files except in cases of extreme necessity
+                - Systematically explore all directories to identify all files
+                - Thoroughly examine the complete content of each file
                 
-                Ne recrée PAS le backend à partir de zéro.
-                Concentre-toi sur la correction et l'amélioration du code existant.
+                Your tasks:
+                1. ANALYZE existing backend files
+                2. VERIFY business logic, database connections, APIs, etc.
+                3. IDENTIFY bugs, performance issues, security vulnerabilities
+                4. FIX these problems by directly modifying existing files
+                5. ENSURE consistency with the frontend
+                
+                Do NOT recreate the backend from scratch.
+                Focus on correcting and improving the existing code.
                 """
             ],
         )
@@ -112,29 +108,39 @@ def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> Non
             model=OpenAIChat("gpt-4o-mini"),
             name="Project_Manager",
             team=[
-                structure_creator,
                 frontend_developer,
                 backend_developer
             ],
+            tools=[file_tools],
             instructions=[
                 """
-                Tu es un agent expert en gestion de projet et en vérification de code.
-                Ta mission est de VÉRIFIER et AMÉLIORER un projet qui vient d'être généré par IA.
+                You are an expert agent in project management and code verification.
+                Your mission is to VERIFY and IMPROVE a project that was just generated by AI.
                 
-                Instructions importantes:
-                - Tu travailles sur un projet EXISTANT qui a déjà été généré
-                - N'essaie PAS de créer un nouveau projet à partir de zéro
-                - Concentre-toi sur la VÉRIFICATION et l'AMÉLIORATION du code existant
+                CRUCIAL INSTRUCTIONS:
+                - EXHAUSTIVELY analyze ALL project files without exception
+                - DO NOT create new files except in cases of extreme necessity
+                - Ensure your team meticulously explores all directories
+                - Verify that each file is examined in depth
+                - Prioritize modifying existing files rather than creating new ones
                 
-                Voici ton processus de travail:
-                1. ANALYSE l'état actuel du projet dans le répertoire spécifié
-                2. DEMANDE à Structure_Creator de vérifier et corriger la structure du projet
-                3. DEMANDE à Frontend_Developer de vérifier et améliorer le code frontend
-                4. DEMANDE à Backend_Developer de vérifier et améliorer le code backend
-                5. VÉRIFIE la cohérence globale du projet et assure-toi qu'il fonctionne correctement
+                Your responsibility is to ensure that:
+                - You are working on an EXISTING project that has already been generated
+                - Do NOT try to create a new project from scratch
+                - Focus on VERIFYING and IMPROVING the existing code
                 
-                Pour chaque agent que tu diriges, donne des instructions PRÉCISES sur ce qu'il doit vérifier
-                et améliorer dans le projet existant.
+                Here is your work process:
+                1. ANALYZE the current state of the project in the specified directory
+                2. ASK Frontend_Developer to verify and improve the frontend code
+                3. ASK Backend_Developer to verify and improve the backend code
+                4. CHECK the overall coherence of the project and make sure it works correctly
+                5. FINALIZE by writing a completion message in a file named 'verification_complete.txt' at the root directory
+                
+                For each agent you direct, give PRECISE instructions on what they should verify
+                and improve in the existing project.
+                
+                When you've completed your work, make sure to create a verification_complete.txt file with a
+                summary of all improvements made to indicate the verification process is finished.
                 """
             ],
             markdown=True,
@@ -143,33 +149,58 @@ def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> Non
         )
 
         # Lancement de l'équipe d'agents
-        logger.info("Démarrage du processus de vérification avec l'équipe d'agents...")
+        logger.info("Starting the verification process with the agent team...")
         
         # Préparation de la description du projet basée sur le contexte
         project_description = f"""
-        Vérifie et optimise le projet qui vient d'être généré dans le répertoire {abs_path}.
+        Verify and optimize the project that has just been generated in the directory {abs_path}.
         
-        Le projet est: {project_context.get('requirements', {}).get('app_name', 'Application générée')}
+        IMPORTANT GUIDELINES:
+        - EXPLORE ALL CONTENT of the folder and its subfolders without exception
+        - EXAMINE in detail EACH project file
+        - DO NOT create new files except in cases of extreme necessity
+        - Prioritize modification and improvement of existing files
         
-        Description: {project_context.get('requirements', {}).get('app_description', 'Application Web')}
+        The project is: {project_context.get('requirements', {}).get('app_name', 'Generated Application')}
         
-        Stack technique: {project_context.get('architecture', {}).get('language', 'Python/JavaScript')}
+        Description: {project_context.get('requirements', {}).get('app_description', 'Web Application')}
         
-        NE CRÉE PAS un nouveau projet. Ta mission est de VÉRIFIER, CORRIGER et AMÉLIORER le projet existant.
+        Technical stack: {project_context.get('architecture', {}).get('language', 'Python/JavaScript')}
         
-        Commence par explorer le répertoire et analyser les fichiers existants avant de suggérer des modifications.
+        DO NOT CREATE a new project. Your mission is to VERIFY, FIX, and IMPROVE the existing project.
+        
+        Start by SYSTEMATICALLY exploring the directory and analyzing ALL existing files before suggesting modifications.
+        
+        After completion, create a verification_complete.txt file at the project root with a summary of improvements made.
         """
         
-        # Lancer les agents et attendre qu'ils terminent
-        project_manager.run(project_description)
+        # Lancer les agents sans attendre leur achèvement (mode asynchrone)
+        logger.info("Launching agent team in background...")
+        project_manager.run(project_description, wait_for_completion=False)
         
-        logger.info(f"Attente de {AGENT_TEAM_WAIT_TIME} secondes pour que les agents terminent...")
-        time.sleep(AGENT_TEAM_WAIT_TIME)
+        # Wait for a short time to ensure the agent is properly initialized
+        time.sleep(2)
         
-        logger.info("Vérification par l'équipe d'agents terminée avec succès")
+        logger.info("Agent team launched in background. Continuing main flow.")
+        
+        # Marquer l'équipe comme lancée pour éviter les lancements multiples
+        _verification_team_launched = True
+        
+        # Give some feedback about agent team verification continuing in background
+        logger.info(f"Agent team is running in the background and will continue to optimize the project at {abs_path}")
+        logger.info("You can check for a verification_complete.txt file in the project directory when they finish")
+        
+        # Create a placeholder to indicate verification is in progress
+        try:
+            with open(os.path.join(abs_path, 'verification_in_progress.txt'), 'w') as f:
+                f.write(f"Verification started at: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write("The agent team is working in the background to optimize your project.\n")
+                f.write("This file will be replaced by 'verification_complete.txt' when finished.\n")
+        except Exception as e:
+            logger.warning(f"Could not create verification status file: {str(e)}")
         
     except ImportError as e:
-        logger.error(f"Impossible d'importer la bibliothèque agno: {str(e)}")
-        logger.info("Assurez-vous que la bibliothèque 'agno' est installée pour utiliser l'équipe d'agents")
+        logger.error(f"Unable to import agno library: {str(e)}")
+        logger.info("Make sure the 'agno' library is installed to use the agent team")
     except Exception as e:
-        logger.error(f"Erreur lors de l'exécution de l'équipe d'agents: {str(e)}")
+        logger.error(f"Error during agent team execution: {str(e)}")
