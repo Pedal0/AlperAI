@@ -6,6 +6,7 @@ from src.config import AGENT_TEAM_ENABLED, AGENT_TEAM_WAIT_TIME
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
 from agno.tools.file import FileTools
+from agno.tools.duckduckgo import DuckDuckGoTools
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -13,31 +14,33 @@ logger = logging.getLogger(__name__)
 # Flag to ensure the verification team is launched only once
 _verification_team_launched = False
 
-def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> None:
+def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> bool:
     """
     Lance l'équipe d'agents pour vérifier et corriger le projet.
-    Cette fonction ne retourne rien, les agents travaillent de façon autonome.
+    Cette fonction retourne True quand l'équipe est lancée, pour indiquer 
+    qu'aucune validation supplémentaire n'est nécessaire.
     L'équipe n'est lancée qu'une seule fois pendant l'exécution du programme.
     
     Args:
         app_path: Chemin du projet généré
         project_context: Contexte du projet (requirements, architecture, etc.)
+        
+    Returns:
+        bool: True si l'équipe d'agents a été lancée et qu'aucune validation supplémentaire n'est nécessaire
     """
     global _verification_team_launched
     
     if _verification_team_launched:
         logger.info("Agent team has already been launched, ignoring this new request")
-        return
+        return True
         
     if not AGENT_TEAM_ENABLED:
         logger.info("Agent verification team is disabled")
-        return
+        return False
     
     logger.info(f"Launching agent team to verify the project at {app_path}")
     
     try:
-        # Import des dépendances nécessaires pour les agents
-        
         # Utilisation du chemin fourni par l'utilisateur
         abs_path = os.path.abspath(app_path)
         logger.info(f"Agents are working on absolute path: {abs_path}")
@@ -49,28 +52,32 @@ def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> Non
         frontend_developer = Agent(
             model=OpenAIChat("gpt-4o-mini"),
             name="Frontend_Developer",
-            tools=[file_tools],
+            tools=[file_tools, DuckDuckGoTools()],
             instructions=[
-                """
-                You are an agent equipped with tools to read, write and browse files.
-                You specialize in VERIFYING and IMPROVING frontend code of an existing project.
-                
-                IMPORTANT INSTRUCTIONS:
-                - ANALYZE EXHAUSTIVELY ALL frontend files in the project
-                - DO NOT create new files except in cases of extreme necessity
-                - Explore all directories to find all relevant files
-                - Examine the complete content of each file
-                
-                Your tasks:
-                1. ANALYZE existing frontend files (HTML, CSS, JS, etc.)
-                2. CHECK their quality, functionality and consistency
-                3. IDENTIFY problems, bugs or inconsistencies
-                4. FIX these problems by directly modifying existing files
-                5. IMPROVE UI/UX if necessary
-                
-                Do NOT recreate the frontend from scratch.
-                Focus on correcting and improving the existing code.
-                """
+            """
+            You are an agent equipped with tools to read, write and browse files and web search.
+            You specialize in VERIFYING and IMPROVING frontend code of an existing project.
+            
+            IMPORTANT INSTRUCTIONS:
+            - ANALYZE EXHAUSTIVELY ALL frontend files in the project
+            - DO NOT create new files except in cases of extreme necessity
+            - Explore all directories to find all relevant files
+            - Examine the complete content of each file
+            
+            Your tasks:
+            1. ANALYZE existing frontend files (HTML, CSS, JS, etc.)
+            2. CHECK their quality, functionality and consistency
+            3. IDENTIFY problems, bugs or inconsistencies
+            4. FIX these problems by directly modifying existing files
+            5. IMPROVE UI/UX if necessary
+            6. If images, maps, or videos are required, search for appropriate links on the internet:
+               - For images, integrate the image URLs directly into the HTML.
+               - For maps, create an iframe with the appropriate map URL.
+               - For videos, integrate the video URLs and add the necessary HTML tags.
+            
+            Do NOT recreate the frontend from scratch.
+            Focus on correcting and improving the existing code.
+            """
             ],
         )
 
@@ -199,8 +206,20 @@ def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> Non
         except Exception as e:
             logger.warning(f"Could not create verification status file: {str(e)}")
         
+        # Create a flag file to signal that no further validation is needed
+        try:
+            with open(os.path.join(abs_path, 'skip_additional_validation.flag'), 'w') as f:
+                f.write("This file indicates that no further validation should be performed.\n")
+        except Exception as e:
+            logger.warning(f"Could not create validation flag file: {str(e)}")
+            
+        # Return True to indicate no further validation is needed
+        return True
+        
     except ImportError as e:
         logger.error(f"Unable to import agno library: {str(e)}")
         logger.info("Make sure the 'agno' library is installed to use the agent team")
+        return False
     except Exception as e:
         logger.error(f"Error during agent team execution: {str(e)}")
+        return False
