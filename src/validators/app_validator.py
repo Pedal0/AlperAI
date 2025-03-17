@@ -36,10 +36,15 @@ class AppValidator:
         # Lancer l'équipe d'agents pour vérifier le projet
         if AGENT_TEAM_ENABLED:
             logger.info("Lancement de l'équipe d'agents de vérification...")
-            run_verification_team(app_path, project_context)
+            skip_additional_validation = run_verification_team(app_path, project_context)
             logger.info("Vérification par l'équipe d'agents terminée")
+            
+            # Si l'équipe d'agents a été lancée, on arrête ici et on ne fait pas de validation supplémentaire
+            if skip_additional_validation:
+                logger.info("Validation supplémentaire désactivée - pas de lancement d'application ou de navigateur")
+                return True
         
-        # Continuer avec la validation standard
+        # Continuer avec la validation standard uniquement si nécessaire
         return validate_app_function(self, app_path, project_context, extended_dep_wait) 
            
     def _validate_static_website(self, app_path: str) -> bool:
