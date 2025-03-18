@@ -4,9 +4,58 @@ from src.config import AGENT_TEAM_ENABLED
 def show_generation_tab(api_key):
     """Display the generation progress tab"""
     if st.session_state.generation_step == "generating":
+        # Vérifier si le projet a déjà été généré pour éviter de régénérer
+        if 'project_generated' not in st.session_state:
+            st.session_state.project_generated = False
+            
+        # Vérifier si un téléchargement a été effectué
+        if 'download_clicked' not in st.session_state:
+            st.session_state.download_clicked = False
+            
+        # Si le téléchargement a été effectué, rediriger vers la page principale
+        if st.session_state.download_clicked:
+            st.session_state.generation_step = 'initial'
+            st.session_state.download_clicked = False
+            st.session_state.project_generated = False
+            st.rerun()
+            return
+        
+        # Si le projet a déjà été généré, afficher seulement les boutons de téléchargement et de retour
+        if st.session_state.project_generated:
+            st.success(f"Your application has been generated at: {st.session_state.output_path}")
+            
+            from src.file_manager import create_zip
+            
+            # Générer le ZIP une seule fois et le stocker dans la session
+            if 'zip_data' not in st.session_state:
+                st.session_state.zip_data = create_zip(st.session_state.output_path)
+            
+            # Utiliser le callback pour marquer le téléchargement
+            def on_download_click():
+                st.session_state.download_clicked = True
+            
+            # Afficher le bouton de téléchargement
+            st.download_button(
+                label="Download as ZIP",
+                data=st.session_state.zip_data,
+                file_name="generated_application.zip",
+                mime="application/zip",
+                on_click=on_download_click
+            )
+            
+            # Bouton pour revenir à la page initiale
+            if st.button("Start a new project"):
+                st.session_state.generation_step = 'initial'
+                st.session_state.project_generated = False
+                if 'zip_data' in st.session_state:
+                    del st.session_state.zip_data
+                st.rerun()
+            
+            return
+        
+        # Code de génération normal
         from src.generators.app_generator import AppGenerator
         from src.validators.app_validator import AppValidator
-        from src.file_manager import create_zip
         
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -99,18 +148,11 @@ def show_generation_tab(api_key):
                     st.balloons()
                     status_text.text("Application generated successfully!")
                     
-                    st.success(f"Your application has been generated at: {output_path}")
-                                        
-                    st.download_button(
-                        label="Download as ZIP",
-                        data=create_zip(output_path),
-                        file_name="generated_application.zip",
-                        mime="application/zip"
-                    )
+                    # Marquer le projet comme généré pour éviter de régénérer
+                    st.session_state.project_generated = True
                     
-                    if st.button("Start Over"):
-                        st.session_state.generation_step = 'initial'
-                        st.rerun()
+                    # Forcer une réexécution pour afficher uniquement les boutons
+                    st.rerun()
                 else:
                     status_text.text("Application generation failed.")
                     st.error("Failed to generate application. Please check the logs for details.")

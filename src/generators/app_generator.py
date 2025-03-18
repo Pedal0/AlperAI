@@ -316,6 +316,27 @@ class AppGenerator:
         with open(os.path.join(output_path, "README.md"), 'w', encoding='utf-8') as f:
             f.write(readme_content)
         
+        # Convertir tous les .env.example en .env
+        env_example_path = os.path.join(output_path, '.env.example')
+        env_path = os.path.join(output_path, '.env')
+        
+        if os.path.exists(env_example_path):
+            try:
+                # Si un .env existe déjà, ne pas l'écraser
+                if not os.path.exists(env_path):
+                    with open(env_example_path, 'r', encoding='utf-8') as example_file:
+                        env_content = example_file.read()
+                    
+                    with open(env_path, 'w', encoding='utf-8') as env_file:
+                        env_file.write(env_content)
+                    
+                    print("Converted .env.example to .env")
+                    
+                    # Supprimer le .env.example après la conversion
+                    os.remove(env_example_path)
+            except Exception as e:
+                logger.warning(f"Could not convert .env.example to .env: {str(e)}")
+        
         try:
             print(f"Project successfully generated at {output_path}")
             return output_path
