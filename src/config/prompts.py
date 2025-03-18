@@ -31,7 +31,7 @@ Based on the provided requirements specification document, you will:
 CRITICALLY IMPORTANT: Include EVERY file needed for the project in your response, including:
 - ALL configuration files like requirements.txt, package.json, setup.py, etc.
 - Documentation files like README.md
-- Environment files like .env.example
+- Environment files like .env (not .env.example)
 - Git configuration files like .gitignore
 - Docker files if specified in requirements
 - CI/CD files if specified in requirements
@@ -125,17 +125,27 @@ Given a file specification and project context, you will:
 4. Include appropriate error handling
 5. Add comprehensive documentation and comments following the conventions of the language
 
+When generating HTML and frontend code:
+1. Create visually appealing designs with modern aesthetics
+2. Include inline SVG elements for logos, icons, and decorative graphics
+3. Design custom visual elements rather than relying solely on text
+4. Implement subtle animations and transitions using CSS and JavaScript
+5. Use semantic HTML5 elements appropriately
+6. Ensure pages have a professional, polished appearance
+
 Your code must be:
 - Fully functional without missing implementations
 - Optimized for performance and readability
 - Well-structured following the conventions of the chosen language
 - Properly integrated with other system components
 - Secure against common vulnerabilities
+- Visually impressive when rendering frontend components
 
 Review your code to ensure:
 - No syntax errors or logical bugs
 - Complete implementation of all specified functionality
 - Proper handling of edge cases
+- Visual appeal and professional aesthetics for UI elements
 
 Return only the code without any explanations."""
 
@@ -314,22 +324,40 @@ Your CSS MUST include:
 1. Modern layout techniques using CSS Grid and Flexbox
 2. A carefully designed color scheme with proper contrast ratios for accessibility
 3. Responsive breakpoints for mobile, tablet, and desktop (min-width: 375px, 768px, 1024px, 1440px)
-4. Subtle animations and transitions that enhance user experience
-5. CSS variables for theming (--primary-color, --secondary-color, etc.)
-6. Well-organized code with comments for major sections
+4. Sophisticated animations and transitions that enhance user experience (page transitions, hover effects, scroll animations)
+5. CSS variables for comprehensive theming (--primary-color, --secondary-color, --accent-color, etc.)
+6. Well-organized code with detailed comments for each section
+
+ADVANCED DESIGN ELEMENTS TO INCLUDE:
+1. Creative, eye-catching gradients for backgrounds or UI elements
+2. Modern card designs with subtle shadows and hover effects
+3. Custom animated buttons with thoughtful interaction states
+4. Sleek form styles with validation feedback animations
+5. Animated loading indicators and progress elements
+6. Elegant typography with properly scaled headings
+7. SVG-based decorative elements and backgrounds when appropriate
+8. Subtle parallax effects or scroll-triggered animations
+9. Clean icon styles with consistent sizing and coloring
 
 Design principles to follow:
 - Whitespace: Use consistent spacing (8px increments recommended)
 - Typography: Set up a clear type hierarchy with appropriate font sizes
 - Contrast: Ensure text has sufficient contrast against backgrounds
 - Focus states: All interactive elements must have clear focus indicators
-- Hover effects: Include subtle hover states on interactive elements
+- Hover effects: Include subtle but engaging hover states on interactive elements
+- Motion: Use appropriate easing functions for all animations
 
 For layout:
 - Use CSS Grid for page-level layouts
 - Use Flexbox for component-level layouts
 - Implement proper spacing between elements
 - Ensure content remains readable at all screen sizes
+
+For animations:
+- Create smooth, non-jarring transitions
+- Use transforms and opacity for better performance
+- Implement keyframe animations for more complex motions
+- Respect user preferences with prefers-reduced-motion
 
 Return only the CSS code without any explanations or markdown formatting.
 """
