@@ -8,11 +8,52 @@ from agno.models.openai import OpenAIChat
 from agno.tools.file import FileTools
 from agno.tools.duckduckgo import DuckDuckGoTools
 from pathlib import Path
+import threading
 
 logger = logging.getLogger(__name__)
 
 # Flag to ensure the verification team is launched only once
 _verification_team_launched = False
+
+def cleanup_temp_files(app_path: str):
+    """
+    Supprimer les fichiers temporaires de validation,
+    ne laissant que verification_complete.txt
+    """
+    temp_files = [
+        'skip_additional_validation.flag',
+        'verification_in_progress.txt'
+    ]
+    
+    for temp_file in temp_files:
+        try:
+            file_path = os.path.join(app_path, temp_file)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                logger.info(f"Fichier temporaire supprimé: {file_path}")
+        except Exception as e:
+            logger.warning(f"Impossible de supprimer le fichier temporaire {temp_file}: {str(e)}")
+
+def monitor_verification_completion(app_path: str):
+    """
+    Surveille la création du fichier verification_complete.txt
+    et supprime les fichiers temporaires quand il apparaît
+    """
+    complete_file = os.path.join(app_path, 'verification_complete.txt')
+    max_wait_time = 600  # 10 minutes maximum d'attente
+    check_interval = 5   # Vérifier toutes les 5 secondes
+    
+    start_time = time.time()
+    
+    while time.time() - start_time < max_wait_time:
+        if os.path.exists(complete_file):
+            logger.info("Vérification terminée, nettoyage des fichiers temporaires")
+            cleanup_temp_files(app_path)
+            return
+        time.sleep(check_interval)
+    
+    logger.warning("Délai d'attente dépassé pour la vérification, nettoyage des fichiers temporaires")
+    cleanup_temp_files(app_path)
 
 def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> bool:
     """
@@ -179,6 +220,7 @@ def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> boo
         Start by SYSTEMATICALLY exploring the directory and analyzing ALL existing files before suggesting modifications.
         
         After completion, create a verification_complete.txt file at the project root with a summary of improvements made.
+        DELETE any verification_in_progress.txt and skip_additional_validation.flag files when you're done.
         """
         
         # Lancer les agents sans attendre leur achèvement (mode asynchrone)
@@ -212,6 +254,13 @@ def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> boo
                 f.write("This file indicates that no further validation should be performed.\n")
         except Exception as e:
             logger.warning(f"Could not create validation flag file: {str(e)}")
+        
+        # Lancer un thread pour surveiller la complétion et nettoyer les fichiers temporaires
+        threading.Thread(
+            target=monitor_verification_completion, 
+            args=(abs_path,),
+            daemon=True
+        ).start()
             
         # Return True to indicate no further validation is needed
         return True
