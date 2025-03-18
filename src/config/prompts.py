@@ -31,7 +31,7 @@ Based on the provided requirements specification document, you will:
 CRITICALLY IMPORTANT: Include EVERY file needed for the project in your response, including:
 - ALL configuration files like requirements.txt, package.json, setup.py, etc.
 - Documentation files like README.md
-- Environment files like .env.example
+- Environment files like .env (not .env.example)
 - Git configuration files like .gitignore
 - Docker files if specified in requirements
 - CI/CD files if specified in requirements
