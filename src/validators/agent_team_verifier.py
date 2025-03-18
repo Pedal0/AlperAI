@@ -110,7 +110,7 @@ def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> boo
             2. CHECK their quality, functionality and consistency
             3. IDENTIFY problems, bugs or inconsistencies
             4. FIX these problems by directly modifying existing files
-            5. IMPROVE UI/UX if necessary
+            5. IMPROVE UI/UX if necessary (you can get components from the websites : https://www.heroui.pro/components, https://uiverse.io/elements)
             6. If images, maps, or videos are required, search for appropriate links on the internet:
                - For images, integrate the image URLs directly into the HTML.
                - For maps, create an iframe with the appropriate map URL.
