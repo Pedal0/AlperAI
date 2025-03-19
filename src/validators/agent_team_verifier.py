@@ -2,13 +2,14 @@ import logging
 import time
 import os
 from typing import Dict, Any
-from src.config import AGENT_TEAM_ENABLED, AGENT_TEAM_WAIT_TIME
+from src.config import AGENT_TEAM_ENABLED, AGENT_TEAM_WAIT_TIME, API_MODEL
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
 from agno.tools.file import FileTools
 from agno.tools.duckduckgo import DuckDuckGoTools
 from pathlib import Path
 import threading
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
@@ -71,12 +72,21 @@ def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> boo
     """
     global _verification_team_launched
     
+    # Load environment variables to ensure API keys are available
+    load_dotenv()
+    
     if _verification_team_launched:
         logger.info("Agent team has already been launched, ignoring this new request")
         return True
         
     if not AGENT_TEAM_ENABLED:
         logger.info("Agent verification team is disabled")
+        return False
+    
+    # Check for OpenAI API key
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    if not openai_api_key:
+        logger.error("No OpenAI API key found for agent team. Set OPENAI_API_KEY in .env file.")
         return False
     
     logger.info(f"Launching agent team to verify the project at {app_path}")
@@ -89,13 +99,20 @@ def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> boo
         # Création des outils pour la manipulation des fichiers
         file_tools = FileTools(Path(abs_path), True, True, True)
 
+        # Créer une version enrichie du contexte pour les agents
+        from src.generators.context_enricher import ContextEnricher
+        enriched_context = ContextEnricher.enrich_generation_context(project_context, app_path)
+        
+        # Convertir les informations de structure en texte lisible
+        file_structure_text = "\n".join([f"- {file}" for file in enriched_context.get('file_structure', [])])
+        
         # Création de l'agent spécialisé dans le développement frontend
         frontend_developer = Agent(
-            model=OpenAIChat("gpt-4o-mini"),
+            model=OpenAIChat(API_MODEL, api_key=openai_api_key),  # Explicitly provide API key
             name="Frontend_Developer",
             tools=[file_tools, DuckDuckGoTools()],
             instructions=[
-            """
+            f"""
             You are an agent equipped with tools to read, write and browse files and web search.
             You specialize in VERIFYING and IMPROVING frontend code of an existing project.
             
@@ -104,6 +121,9 @@ def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> boo
             - DO NOT create new files except in cases of extreme necessity
             - Explore all directories to find all relevant files
             - Examine the complete content of each file
+            
+            PROJECT STRUCTURE:
+            {file_structure_text}
             
             Your tasks:
             1. ANALYZE existing frontend files (HTML, CSS, JS, etc.)
@@ -116,6 +136,13 @@ def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> boo
                - For maps, create an iframe with the appropriate map URL.
                - For videos, integrate the video URLs and add the necessary HTML tags.
             
+            For JavaScript animations:
+            - Focus on enhancing user experience with subtle animations
+            - Add hover effects for interactive elements
+            - Implement smooth transitions between different states
+            - Create scroll-based animations when appropriate
+            - Ensure all animations are tasteful and professional
+            
             Do NOT recreate the frontend from scratch.
             Focus on correcting and improving the existing code.
             """
@@ -124,7 +151,7 @@ def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> boo
 
         # Création de l'agent spécialisé dans le développement backend
         backend_developer = Agent(
-            model=OpenAIChat("gpt-4o-mini"),
+            model=OpenAIChat(API_MODEL, api_key=openai_api_key),  # Explicitly provide API key
             name="Backend_Developer",
             tools=[file_tools],
             instructions=[
@@ -153,7 +180,7 @@ def run_verification_team(app_path: str, project_context: Dict[str, Any]) -> boo
 
         # Création du chef de projet qui coordonne les autres agents
         project_manager = Agent(
-            model=OpenAIChat("gpt-4o-mini"),
+            model=OpenAIChat(API_MODEL, api_key=openai_api_key),  # Explicitly provide API key
             name="Project_Manager",
             team=[
                 frontend_developer,
