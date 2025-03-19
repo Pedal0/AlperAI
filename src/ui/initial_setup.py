@@ -9,6 +9,17 @@ def show_initial_setup_tab(api_key):
     if st.session_state.generation_step == "initial":
         st.header("Define Your Application")
         
+        # Show API key status
+        if not api_key:
+            st.warning("No OpenAI API key found in environment. Make sure to set OPENAI_API_KEY in your .env file.")
+            openrouter_key = os.getenv("OPENROUTER_API_KEY")
+            if not openrouter_key:
+                st.error("No OpenRouter API key found either. You must set at least one API key in your .env file.")
+            else:
+                st.success("OpenRouter API key found in environment.")
+        else:
+            st.success("OpenAI API key found in environment.")
+        
         user_prompt = st.text_area(
             "Describe the application you want to build", 
             height=150,
@@ -38,6 +49,10 @@ def show_initial_setup_tab(api_key):
 def show_advanced_options():
     """Display advanced options expandable section"""
     with st.expander("Advanced Options"):
+        use_openrouter = st.checkbox("Use OpenRouter API (for non-agent team AI calls)", 
+                               value=st.session_state.advanced_options.get('use_openrouter', True),
+                               help="Use OpenRouter API with Gemini model instead of direct OpenAI API")
+                               
         is_static_website = st.checkbox("Static website (HTML/CSS/JS only, no backend)", 
                                    value=st.session_state.advanced_options.get('is_static_website', False),
                                    help="Generate a simple static website without a backend server")
@@ -63,6 +78,7 @@ def show_advanced_options():
     
     # Update session state with advanced options
     st.session_state.advanced_options = {
+        'use_openrouter': use_openrouter,  # New option for OpenRouter
         'include_tests': include_tests,
         'create_docker': create_docker,
         'add_ci_cd': add_ci_cd,

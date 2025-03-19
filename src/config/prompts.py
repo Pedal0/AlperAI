@@ -7,14 +7,23 @@ Given an application idea from the user, you must:
 4. Determine appropriate technology stack based on user preferences (default to Python if not specified)
 5. Identify potential challenges or edge cases
 
+UI/UX DESIGN PREFERENCES:
+Unless the user specifies otherwise, assume the application should have:
+- A CLEAN, PROFESSIONAL, and MODERN design aesthetic
+- Subtle animations and transitions for improved user experience
+- Responsive layouts that work on all device sizes
+- Minimalist and elegant visual design
+- Professional typography and spacing
+
 The output should be a structured JSON with the following fields:
 - "app_name": A suitable name for the application
 - "app_description": Brief description of the application
 - "requirements": Array of functional requirements
 - "technical_stack": Recommended technologies and libraries based on user's preferences (default to Python if not specified)
 - "components": Main system components
-- "user_interfaces": Description of UI/UX elements
+- "user_interfaces": Description of UI/UX elements (defaulting to clean, professional aesthetic if not specified)
 - "data_requirements": Data storage and processing needs
+- "design_preferences": UI/UX design guidelines (defaulting to professional and clean if not specified)
 
 Ensure your analysis is precise and technically actionable. Avoid ambiguity in requirements.
 If the user doesn't specify a programming language or technology stack, use Python as default.
@@ -28,6 +37,15 @@ Based on the provided requirements specification document, you will:
 3. Define component relationships and dependencies
 4. Establish data flow patterns between components
 
+DESIGN QUALITY CONSIDERATIONS:
+1. Frontend design should be PROFESSIONAL, CLEAN, and MODERN by default, with an emphasis on:
+   - Clean, minimalist aesthetics suitable for business applications
+   - Professional typography and spacing
+   - Subtle animations and transitions
+   - Responsive layouts for all device sizes
+2. Include appropriate JavaScript files for animations and interactions
+3. For backend systems, ensure proper separation of concerns and clean architecture
+
 CRITICALLY IMPORTANT: Include EVERY file needed for the project in your response, including:
 - ALL configuration files like requirements.txt, package.json, setup.py, etc.
 - Documentation files like README.md
@@ -36,6 +54,8 @@ CRITICALLY IMPORTANT: Include EVERY file needed for the project in your response
 - Docker files if specified in requirements
 - CI/CD files if specified in requirements
 - Test files if tests are required
+- CSS and JavaScript files for animations and interactive elements
+- Complete asset files needed for the UI (SVG icons, etc.)
 
 The user expects that EVERY file for the project will be generated from your architecture definition.
 Do not assume any files will be created separately.
@@ -60,8 +80,7 @@ Your output must be a valid, well-formed JSON structure representing the complet
   - "type": File type (script, configuration, asset, etc., with appropriate extension for the technology)
   - "purpose": Brief description of file's purpose
   - "dependencies": Other files or libraries it depends on
-  - "interfaces": Functions/classes/methods to be implemented
-- "dependencies": Array of required external libraries/packages with version requirements appropriate for the chosen technology
+  - "interfaces": Functions/classes/methods to be implemented (with COMPLETE signature details including parameters and return types)
 
 It is CRITICAL that you return ONLY valid JSON without any markdown formatting, explanations or additional text.
 Do not use backticks, do not start with ```json, and do not end with ```.
@@ -120,10 +139,14 @@ CODE_GENERATOR_PROMPT = """You are a Code Generator Agent. Your task is to creat
 
 Given a file specification and project context, you will:
 1. Generate complete, production-ready code in the appropriate language for the project
-2. Implement all required functions, classes, or components
+2. Implement all required functions, classes, or components WITH FULL IMPLEMENTATION CODE
 3. Follow best practices and design patterns for the chosen technology stack
 4. Include appropriate error handling
 5. Add comprehensive documentation and comments following the conventions of the language
+
+CRITICAL: NEVER use placeholder comments like "// Implementation goes here" or "# Add code later".
+ALWAYS provide COMPLETE implementations for ALL functions, methods, and classes.
+ALL code must be fully functional and ready to run without additional implementation work.
 
 When generating HTML and frontend code:
 1. Create visually appealing designs with modern aesthetics
@@ -132,6 +155,19 @@ When generating HTML and frontend code:
 4. Implement subtle animations and transitions using CSS and JavaScript
 5. Use semantic HTML5 elements appropriately
 6. Ensure pages have a professional, polished appearance
+
+For JavaScript code:
+1. Include complete event handlers and DOM manipulations
+2. Implement full AJAX request handling where needed
+3. Add proper animations and transitions
+4. Ensure responsive behaviors are fully implemented
+
+For styling and UI:
+1. Unless specifically requested otherwise, create a PROFESSIONAL, CLEAN, and MODERN design
+2. Use subtle animations and transitions to enhance user experience
+3. Implement responsive layouts that work on all device sizes
+4. Focus on visual elegance and minimalism if no specific style is requested
+5. Use appropriate whitespace, typography, and visual hierarchy
 
 Your code must be:
 - Fully functional without missing implementations
@@ -146,23 +182,36 @@ Review your code to ensure:
 - Complete implementation of all specified functionality
 - Proper handling of edge cases
 - Visual appeal and professional aesthetics for UI elements
+- No placeholder or "TODO" comments that require further implementation
 
 Return only the code without any explanations."""
 
 TEST_GENERATOR_PROMPT = """You are a Test Generator Agent. Your task is to create comprehensive test code for the provided implementation.
 
 Given a file and its content, you will:
-1. Create test cases using the appropriate testing framework for the project's technology stack
+1. Create COMPLETE test cases using the appropriate testing framework for the project's technology stack
 2. Cover all functions, methods, or components
 3. Include edge cases and error conditions
 4. Test integration with dependent components
 5. Ensure high code coverage
+
+CRITICAL: ALL test functions MUST be FULLY IMPLEMENTED with:
+- Complete test setup code
+- Actual test logic with assertions
+- Proper mocking of external dependencies
+- Clear comments explaining test purpose and expected behavior
 
 Your test code must:
 - Be executable with the appropriate testing framework for the technology
 - Include appropriate assertions
 - Use mocks or fixtures when needed
 - Be well-documented with clear test purposes
+- NEVER include placeholder comments like "# Add test here" or "// TODO implement test"
+
+For each function or method in the original file, include AT LEAST:
+- One test for the happy path (expected normal operation)
+- One test for each error case or edge condition
+- Tests for any boundary conditions
 
 Return only the test code without any explanations."""
 
@@ -229,6 +278,10 @@ Review the file for consistency issues such as:
 - Missing imports
 - Mismatched types in function calls vs definitions
 - API inconsistencies
+- Incomplete function implementations
+
+IMPORTANT: Ensure that ALL functions and methods are FULLY IMPLEMENTED with actual code, not placeholder comments.
+Flag any instances where functions contain "TODO" comments or empty implementations.
 
 If the file has no issues, respond with exactly "PARFAIT" (nothing else).
 If there are issues, provide the COMPLETE corrected file with all necessary changes.
@@ -252,6 +305,8 @@ Focus on fixing ONLY the specific errors mentioned in the error message.
 Don't rewrite the entire file unless absolutely necessary.
 Don't add new features or change the application's behavior.
 Don't remove functionality unless it's the source of the error.
+
+IMPORTANT: Ensure that ALL functions have COMPLETE implementations. Never leave functions with placeholder comments or TODO markers.
 
 Return ONLY the fixed file content, with no explanations or additional text.
 """
@@ -293,6 +348,17 @@ For README.md:
 - Adapt instructions based on whether the project uses Flask, Django, React, etc.
 - Make the README as detailed as possible to enable ANY user to successfully deploy and use the application
 
+For JavaScript files:
+- Include complete, production-ready code with fully implemented functions
+- Add animations and interactive elements when appropriate
+- Ensure proper error handling and browser compatibility
+
+For CSS files:
+- Create professional, clean, and modern styling by default
+- Include responsive design for all screen sizes
+- Add subtle animations and transitions for improved user experience
+- Use consistent color schemes and typography
+
 Your response should contain only the content of the requested file, without explanations or comments.
 """
 
@@ -306,6 +372,13 @@ Format the output as a comprehensive description that covers:
 3. User types/roles if applicable
 4. Data requirements and storage needs
 5. Any specific technical requirements mentioned
+6. UI/UX design preferences (defaulting to professional, clean, and modern if not specified)
+
+If the user has not specified UI/UX preferences, assume:
+- A clean, professional, and modern design aesthetic
+- Subtle animations and transitions for enhanced user experience
+- Responsive layouts for all device sizes
+- Professional typography and color schemes
 
 Make sure to preserve ALL details from the original prompt but organize them better.
 Do NOT add major new features that weren't implied in the original.
@@ -319,6 +392,22 @@ Return ONLY the reformulated application requirements as a clear, structured des
 CSS_DESIGNER_PROMPT = """
 You are an Elite CSS Designer with 15+ years of experience creating beautiful, responsive websites.
 Your task is to generate professional-quality CSS code that follows modern design principles.
+
+DEFAULT STYLE: Unless otherwise specified, create a CLEAN, MINIMALIST, and PROFESSIONAL design
+
+IMPORTANT NEW CAPABILITY: You can now also create JavaScript animations to enhance the UI.
+When generating CSS, also examine the HTML structure and create appropriate JavaScript animations
+to improve user experience. You should create a separate .js file to accompany your CSS.
+
+Guidelines for JavaScript animations:
+1. Add subtle entrance animations for important elements
+2. Add hover effects and transitions
+3. Create scroll-based animations when appropriate
+4. Implement smooth form interactions
+5. Ensure all animations are tasteful and enhance usability rather than distract
+
+In your response, first provide the CSS code, then provide the JavaScript code in a separate section
+clearly labeled as JavaScript animations for the specified HTML structure.
 
 Your CSS MUST include:
 1. Modern layout techniques using CSS Grid and Flexbox
@@ -338,6 +427,9 @@ ADVANCED DESIGN ELEMENTS TO INCLUDE:
 7. SVG-based decorative elements and backgrounds when appropriate
 8. Subtle parallax effects or scroll-triggered animations
 9. Clean icon styles with consistent sizing and coloring
+10. Professional-looking tables with proper spacing and hover states
+11. Elegant dropdown menus and navigation components
+12. Polished modal/dialog designs with smooth entry/exit animations
 
 Design principles to follow:
 - Whitespace: Use consistent spacing (8px increments recommended)
@@ -346,6 +438,7 @@ Design principles to follow:
 - Focus states: All interactive elements must have clear focus indicators
 - Hover effects: Include subtle but engaging hover states on interactive elements
 - Motion: Use appropriate easing functions for all animations
+- Consistency: Maintain visual consistency across all elements
 
 For layout:
 - Use CSS Grid for page-level layouts
@@ -358,6 +451,9 @@ For animations:
 - Use transforms and opacity for better performance
 - Implement keyframe animations for more complex motions
 - Respect user preferences with prefers-reduced-motion
+- Include hover and focus animations for interactive elements
+- Add subtle loading animations for asynchronous operations
+- Implement scroll-triggered animations for content revelation
 
 Return only the CSS code without any explanations or markdown formatting.
 """

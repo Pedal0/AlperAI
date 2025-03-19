@@ -27,21 +27,27 @@ def main():
     # Initialize session state for multi-step process
     initialize_session_state()
     
-    # Get API key from environment
-    api_key = os.getenv("OPENAI_API_KEY", "")
+    # Get API keys from environment
+    openai_api_key = os.getenv("OPENAI_API_KEY", "")
+    openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "")
+    
+    # Show API key requirements in the UI
+    if not openai_api_key and not openrouter_api_key:
+        st.error("No API keys found. Please add at least one of these to your .env file:")
+        st.code("OPENAI_API_KEY=your_openai_key_here\nOPENROUTER_API_KEY=your_openrouter_key_here")
     
     # Create tabs for the different steps
     tabs = create_tabs()
     
     # Show each tab's content
     with tabs[0]:
-        show_initial_setup_tab(api_key)
+        show_initial_setup_tab(openai_api_key)
     
     with tabs[1]:
         show_review_tab()
     
     with tabs[2]:
-        show_generation_tab(api_key)
+        show_generation_tab(openai_api_key)
     
     # Set the active tab based on the current step
     set_active_tab()

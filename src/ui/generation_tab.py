@@ -1,4 +1,6 @@
 import streamlit as st
+import traceback
+import os
 from src.config import AGENT_TEAM_ENABLED
 
 def show_generation_tab(api_key):
@@ -125,24 +127,38 @@ def show_generation_tab(api_key):
                         
                         if 'technical_stack' not in app_generator.project_context['requirements']:
                             app_generator.project_context['requirements']['technical_stack'] = {}
-                        app_generator.project_context['requirements']['technical_stack']['framework'] = 'static'
+                            
+                        # Fix for the TypeError - check if technical_stack is a dict before setting framework
+                        if isinstance(app_generator.project_context['requirements']['technical_stack'], dict):
+                            app_generator.project_context['requirements']['technical_stack']['framework'] = 'static'
+                        elif isinstance(app_generator.project_context['requirements']['technical_stack'], list):
+                            # If it's a list, we need a different approach - add a dict with framework info
+                            app_generator.project_context['requirements']['technical_stack'].append({'framework': 'static'})
+                        else:
+                            # If it's neither a dict nor a list, set it as a dict with framework property
+                            app_generator.project_context['requirements']['technical_stack'] = {'framework': 'static'}
                     
                     if AGENT_TEAM_ENABLED:
                         update_log("Lancement de l'équipe d'agents pour vérifier et améliorer le projet...")
                         
-                    validator = AppValidator(app_generator.api_client)
-                    validation_success = validator.validate_app(
-                        output_path, 
-                        app_generator.project_context,
-                        extended_dep_wait=advanced_options['extended_dep_wait']
-                    )
-                    
-                    if not validation_success:
-                        status_text.text("Application validation failed. Attempting to fix issues...")
-                        if AGENT_TEAM_ENABLED:
-                            st.warning("Des problèmes ont été détectés. L'équipe d'agents IA a vérifié et amélioré le projet automatiquement.")
-                        else:
-                            st.warning("Some issues were detected during validation. The system attempted to fix them automatically.")
+                    try:
+                        validator = AppValidator(app_generator.api_client)
+                        validation_success = validator.validate_app(
+                            output_path, 
+                            app_generator.project_context,
+                            extended_dep_wait=advanced_options['extended_dep_wait']
+                        )
+                        
+                        if not validation_success:
+                            status_text.text("Application validation failed. Attempting to fix issues...")
+                            if AGENT_TEAM_ENABLED:
+                                st.warning("Des problèmes ont été détectés. L'équipe d'agents IA a vérifié et amélioré le projet automatiquement.")
+                            else:
+                                st.warning("Some issues were detected during validation. The system attempted to fix them automatically.")
+                    except Exception as validation_error:
+                        status_text.text("Validation encountered errors but the application was generated.")
+                        st.warning(f"Validation error: {str(validation_error)}")
+                        update_log(f"Warning: Validation process encountered an error: {str(validation_error)}")
                     
                     progress_bar.progress(100)
                     st.balloons()
@@ -168,6 +184,29 @@ def show_generation_tab(api_key):
             progress_bar.progress(100)
             status_text.text("An error occurred during generation.")
             st.error(f"Error: {str(e)}")
+            
+            # Add detailed error information for debugging
+            error_details = traceback.format_exc()
+            with st.expander("Error Details"):
+                st.code(error_details)
+            
+            # Still mark as generated if output_path exists and has files
+            if os.path.exists(output_path) and len(os.listdir(output_path)) > 0:
+                st.success(f"Despite the error, files were generated at: {output_path}")
+                st.session_state.project_generated = True
+                
+                # Add a download button even when errors occur
+                from src.file_manager import create_zip
+                try:
+                    zip_data = create_zip(output_path)
+                    st.download_button(
+                        label="Download Generated Files as ZIP",
+                        data=zip_data,
+                        file_name="generated_application.zip",
+                        mime="application/zip"
+                    )
+                except Exception as zip_error:
+                    st.error(f"Could not create ZIP file: {str(zip_error)}")
             
             if st.button("Start Over"):
                 st.session_state.generation_step = 'initial'
