@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+from src.config import USE_OPENROUTER
 
 def initialize_session_state():
     """Initialize session state variables"""
@@ -13,6 +14,7 @@ def initialize_session_state():
         st.session_state.output_path = os.path.join(os.getcwd(), "generated_app")
     if 'advanced_options' not in st.session_state:
         st.session_state.advanced_options = {
+            'use_openrouter': USE_OPENROUTER,  # Initialize from config
             'include_tests': False,
             'create_docker': False,
             'add_ci_cd': False,

@@ -137,7 +137,30 @@ The system follows these steps to create your application:
 
 ## API Configuration
 
-The application uses OpenAI's models for code generation. By default, it uses `gpt-4o-mini`. You can modify the model and other parameters in `src/config/constants.py`.
+The application uses AI models for code generation. By default, it's configured to use OpenRouter's API with the `google/gemini-2.0-flash-001` model, but it can also use OpenAI's models (default: `gpt-4o-mini`). 
+
+You can configure these settings in `src/config/constants.py`:
+- Set `USE_OPENROUTER` to `True` or `False` to switch between OpenRouter and OpenAI
+- Change model names in `OPENROUTER_MODEL` or `API_MODEL`
+- Adjust temperature settings for different generation tasks
+
+### OpenRouter Integration
+
+The application supports OpenRouter as an alternative to OpenAI's API. This allows you to:
+- Access various AI models from different providers through a single API
+- Potentially reduce costs compared to direct OpenAI API usage
+- Use alternative models like Google's Gemini or Anthropic's Claude
+
+To use OpenRouter:
+1. Set up an account at [OpenRouter](https://openrouter.ai/)
+2. Get your API key from the OpenRouter dashboard
+3. Add it to your `.env` file:
+   ```
+   OPENROUTER_API_KEY=your_openrouter_api_key
+   ```
+4. Ensure `USE_OPENROUTER=True` in your configuration
+
+The application will automatically fall back to OpenAI if OpenRouter is enabled but no OpenRouter API key is found.
 
 ## License
 

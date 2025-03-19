@@ -7,11 +7,23 @@ from src.api.client import AIAppGeneratorAPI
 from src.file_manager.file_manager import FileSystemManager
 from src.generators.framework.framework_adapter import adjust_architecture_for_framework
 from src.config.prompts import CSS_DESIGNER_PROMPT  
-from src.config.constants import AGENT_TEAM_ENABLED
+from src.config.constants import AGENT_TEAM_ENABLED, USE_OPENROUTER
+from src.config import constants
+from src.generators.context_enricher import ContextEnricher
+
 logger = logging.getLogger(__name__)
 
 class AppGenerator:
     def __init__(self, api_key):
+        # Update USE_OPENROUTER from session state if available
+        try:
+            import streamlit as st
+            if 'advanced_options' in st.session_state and 'use_openrouter' in st.session_state.advanced_options:
+                constants.USE_OPENROUTER = st.session_state.advanced_options['use_openrouter']
+                logging.info(f"OpenRouter usage set to: {constants.USE_OPENROUTER}")
+        except ImportError:
+            pass  # Streamlit not available
+            
         self._api_client = AIAppGeneratorAPI(api_key)
         self.file_manager = FileSystemManager()
         self._requirements_spec = None
@@ -234,6 +246,16 @@ class AppGenerator:
             language = tech_stack.get('language', '').lower() if isinstance(tech_stack, dict) else ''
             is_static_website = self._requirements_spec.get('is_static_website', False)
             
+            # Initialize file_structure here to avoid the error
+            file_structure = []
+            for root, dirs, files in os.walk(output_path):
+                rel_root = os.path.relpath(root, output_path)
+                if rel_root == ".":
+                    rel_root = ""
+                for file in files:
+                    file_path = os.path.join(rel_root, file) if rel_root else file
+                    file_structure.append(file_path)
+            
             if language not in ['javascript', 'typescript', 'node', 'react', 'vue', 'angular'] and not is_static_website:
                 if 'requirements.txt' not in file_structure:
                     print("Generating requirements.txt")
@@ -395,10 +417,105 @@ class AppGenerator:
             logger.info("Starting agent team verification...")
             from src.validators.agent_team_verifier import run_verification_team
             try:
-                run_verification_team(output_dir, self.project_description)
+                # Fix: The project_description attribute may not exist
+                # Changed to use self.project_context instead
+                run_verification_team(output_dir, self.project_context)
                 logger.info("Agent team verification completed successfully")
             except Exception as e:
                 logger.error(f"Error during agent team verification: {str(e)}")
                 logger.exception("Agent verification exception")
         
         logger.info("Project validation completed")
+    
+    def _generate_code(self, output_path: str, architecture: Dict[str, Any]) -> None:
+        """Generate application code based on architecture"""
+        logger.info("Starting code generation...")
+        
+        file_manager = FileSystemManager()
+        files_to_generate = file_manager.create_project_structure(output_path, architecture)
+        
+        # Créer un répertoire pour JavaScript si aucun fichier JS n'est prévu
+        js_dir = os.path.join(output_path, 'js')
+        if not os.path.exists(js_dir):
+            os.makedirs(js_dir, exist_ok=True)
+            # Ajouter un fichier JS vide pour les animations
+            files_to_generate.append({
+                "path": "js/animations.js",
+                "type": "javascript",
+                "purpose": "JavaScript animations for UI enhancement"
+            })
+        
+        total_files = len(files_to_generate)
+        logger.info(f"Generating {total_files} files...")
+        
+        for index, file_spec in enumerate(files_to_generate):
+            try:
+                file_path = file_spec.get("path", "")
+                file_purpose = file_spec.get("purpose", "")
+                file_content = ""
+                
+                if not file_path:
+                    continue
+                
+                # Enrichir le contexte du projet avec la structure des fichiers
+                enriched_context = ContextEnricher.enrich_generation_context(
+                    self.project_context, 
+                    output_path
+                )
+                
+                logger.info(f"Generating file {index+1}/{total_files}: {file_path}")
+                
+                # Génération basée sur le type de fichier
+                if file_path.endswith((".py", ".js", ".html", ".css")):
+                    file_content = self._api_client.generate_code(
+                        file_spec, 
+                        enriched_context
+                    )
+                # ...existing code...
+            except Exception as e:
+                logger.error(f"Error generating file {file_path}: {str(e)}")
+                logger.exception("File generation exception")
+    
+    def generate(self, output_path: str) -> bool:
+        """Generate the complete application"""
+        logger.info(f"Starting generation in {output_path}...")
+        self._output_path = output_path  # Stocker le chemin de sortie
+        
+        try:
+            self._parse_user_prompt()
+            logger.info("User prompt parsed successfully")
+            
+            self._architecture = self._design_architecture()
+            logger.info("Architecture designed successfully")
+            
+            if self._requirements_spec.get('is_sample_json', False):
+                self._database_schema = self._design_json_data()
+            else:
+                self._database_schema = self._design_database_schema()
+            logger.info("Database schema designed successfully")
+            
+            self._api_spec = self._design_api()
+            logger.info("API designed successfully")
+            
+            # Ajouter le répertoire de sortie au contexte du projet
+            self._project_context_with_output = self.project_context.copy()
+            self._project_context_with_output['output_dir'] = output_path
+            
+            # Adapter l'architecture au framework
+            self._architecture = adjust_architecture_for_framework(
+                self._architecture,
+                self._requirements_spec
+            )
+            
+            self._generate_code(output_path, self._architecture)
+            logger.info("Code generation completed successfully")
+            
+            self.validate_generated_project(output_path)
+            logger.info("Project validation completed")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error during generation: {str(e)}")
+            logger.exception("Generation exception")
+            return False
