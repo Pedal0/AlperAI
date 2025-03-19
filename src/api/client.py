@@ -2,13 +2,18 @@ import json
 import openai
 import time
 import logging
+import os
 from typing import Dict, List, Any, Optional
+from dotenv import load_dotenv
 
 from src.config import (
     API_MODEL,
     MAX_TOKENS_DEFAULT,
     MAX_TOKENS_LARGE,
-    TEMPERATURES
+    TEMPERATURES,
+    USE_OPENROUTER,
+    OPENROUTER_BASE_URL,
+    OPENROUTER_MODEL
 )
 from src.api.agent_calls.requirements import analyze_requirements
 from src.api.agent_calls.architecture import design_architecture
@@ -21,13 +26,41 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class AIAppGeneratorAPI:
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-        openai.api_key = api_key
-        self.model = API_MODEL
-        self.temperature = TEMPERATURES["default"] 
+    def __init__(self, api_key: str = None):
+        # Load environment variables
+        load_dotenv()
+        
+        # Get API keys from environment variables if not provided
+        self.openai_api_key = api_key or os.getenv("OPENAI_API_KEY", "")
+        self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "")
+        
+        if not self.openai_api_key and not self.openrouter_api_key:
+            logger.error("No API keys found in .env file or provided as argument")
+            raise ValueError("No API keys found. Please add OPENAI_API_KEY or OPENROUTER_API_KEY to your .env file")
+        
+        # If OpenRouter is enabled but no key is available, use OpenAI
+        if USE_OPENROUTER and not self.openrouter_api_key:
+            logger.warning("OpenRouter is enabled but no OPENROUTER_API_KEY found. Falling back to OpenAI.")
+            
+        self.openai_client = None
+        self.setup_client()
+        self.model = OPENROUTER_MODEL if USE_OPENROUTER and self.openrouter_api_key else API_MODEL
+        self.temperature = TEMPERATURES["default"]
         self.max_retries = 3
-        self.retry_delay = 2 
+        self.retry_delay = 2
+        
+    def setup_client(self):
+        """Set up the OpenAI client based on configuration"""
+        if USE_OPENROUTER and self.openrouter_api_key:
+            self.openai_client = openai.OpenAI(
+                base_url=OPENROUTER_BASE_URL,
+                api_key=self.openrouter_api_key,
+            )
+            logger.info(f"Using OpenRouter with model: {OPENROUTER_MODEL}")
+        else:
+            openai.api_key = self.openai_api_key
+            self.openai_client = None
+            logger.info(f"Using OpenAI with model: {API_MODEL}")
         
     def call_agent(self, prompt: str, user_input: str, max_tokens: int = MAX_TOKENS_DEFAULT, agent_type: str = "default") -> Optional[str]:
         attempts = 0
@@ -38,15 +71,38 @@ class AIAppGeneratorAPI:
         while attempts < self.max_retries:
             try:
                 logger.info(f"Making API call (attempt {attempts + 1}/{self.max_retries}) with temperature {temperature}")
-                response = openai.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": prompt},
-                        {"role": "user", "content": user_input}
-                    ],
-                    temperature=temperature,
-                    max_tokens=max_tokens
-                )
+                
+                if USE_OPENROUTER and self.openrouter_api_key and agent_type != "agent_team":
+                    # Ensure client is properly initialized
+                    if not self.openai_client:
+                        self.setup_client()
+                        
+                    response = self.openai_client.chat.completions.create(
+                        model=OPENROUTER_MODEL,
+                        messages=[
+                            {"role": "system", "content": prompt},
+                            {"role": "user", "content": user_input}
+                        ],
+                        temperature=temperature,
+                        max_tokens=max_tokens
+                    )
+                else:
+                    # Use standard OpenAI for agent team or when OpenRouter is not configured
+                    if not self.openai_api_key:
+                        logger.error("No OpenAI API key available for this call")
+                        return None
+                        
+                    model_to_use = API_MODEL
+                    response = openai.chat.completions.create(
+                        model=model_to_use,
+                        messages=[
+                            {"role": "system", "content": prompt},
+                            {"role": "user", "content": user_input}
+                        ],
+                        temperature=temperature,
+                        max_tokens=max_tokens
+                    )
+                
                 content = response.choices[0].message.content
                 logger.info(f"API call successful, received {len(content)} characters")
                 return content
