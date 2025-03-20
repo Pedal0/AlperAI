@@ -3,7 +3,7 @@ import logging
 import os
 from typing import Dict, Any, List, Optional
 
-from src.config import CODE_GENERATOR_PROMPT, CSS_DESIGNER_PROMPT, PROJECT_FILES_GENERATOR_PROMPT, MAX_TOKENS_LARGE, MAX_TOKENS_DEFAULT
+from src.config import CODE_GENERATOR_PROMPT, CSS_DESIGNER_PROMPT, PROJECT_FILES_GENERATOR_PROMPT, MAX_TOKENS_LARGE, MAX_TOKENS_DEFAULT, BACKEND_DEVELOPER_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,20 @@ def generate_code(api_client, file_spec: Dict[str, Any], project_context: Dict[s
     # Détecter les fichiers CSS pour un traitement spécial
     is_css_file = file_path.endswith('.css')
     
-    prompt = CSS_DESIGNER_PROMPT if is_css_file else CODE_GENERATOR_PROMPT
+    # Détecter les fichiers backend pour un traitement spécial
+    is_backend_file = (
+        file_path.endswith(('.py', '.rb', '.php', '.java')) or 
+        ('api' in file_path.lower() or 'server' in file_path.lower() or 'backend' in file_path.lower()) or
+        ('api' in file_purpose.lower() or 'server' in file_purpose.lower() or 'backend' in file_purpose.lower())
+    )
+    
+    # Sélectionner le prompt approprié
+    if is_css_file:
+        prompt = CSS_DESIGNER_PROMPT
+    elif is_backend_file:
+        prompt = BACKEND_DEVELOPER_PROMPT
+    else:
+        prompt = CODE_GENERATOR_PROMPT
     
     context = {
         "file": file_spec,
@@ -52,12 +65,16 @@ def generate_code(api_client, file_spec: Dict[str, Any], project_context: Dict[s
             full_js_path = os.path.join(output_dir, js_path)
             os.makedirs(os.path.dirname(full_js_path), exist_ok=True)
             
-            with open(full_js_path, 'w', encoding='utf-8') as f:
-                f.write(js_part.strip())
-            
-            logger.info(f"JavaScript animations written to {js_path}")
+            with open(full_js_path, 'w', encoding='utf-8') as js_file:
+                # Clean up JavaScript part
+                js_content = js_part.strip()
+                if js_content.startswith('```javascript'):
+                    js_content = js_content.split('\n', 1)[1]
+                if js_content.endswith('```'):
+                    js_content = js_content.rsplit('\n', 1)[0]
+                js_file.write(js_content)
         
-        return css_part.strip()
+        return css_part
     
     return response
 

@@ -6,7 +6,7 @@ from typing import Dict, Any, List, Optional
 from src.api.client import AIAppGeneratorAPI
 from src.file_manager.file_manager import FileSystemManager
 from src.generators.framework.framework_adapter import adjust_architecture_for_framework
-from src.config.prompts import CSS_DESIGNER_PROMPT  
+from src.config.prompts import CSS_DESIGNER_PROMPT, BACKEND_DEVELOPER_PROMPT
 from src.config.constants import AGENT_TEAM_ENABLED, USE_OPENROUTER
 from src.config import constants
 from src.generators.context_enricher import ContextEnricher
@@ -727,12 +727,22 @@ class AppGenerator:
         for index, file_spec in enumerate(files_to_generate):
             try:
                 file_path = file_spec.get("path", "")
+                file_type = file_spec.get("type", "").lower()
+                file_purpose = file_spec.get("purpose", "").lower()
                 
                 if not file_path:
                     continue
-                
+                    
                 logger.info(f"Generating file {index+1}/{total_files}: {file_path}")
                 
+                # Déterminer si c'est un fichier backend
+                is_backend_file = (
+                    file_path.endswith(('.py', '.rb', '.php', '.java')) or 
+                    ('api' in file_path.lower() or 'server' in file_path.lower() or 'backend' in file_path.lower()) or
+                    ('api' in file_purpose.lower() or 'server' in file_purpose.lower() or 'backend' in file_purpose.lower())
+                )
+                
+                # Utiliser des prompts spécifiques selon le type de fichier
                 if file_path.endswith('.css'):
                     print(f"Using specialized CSS Designer for {file_path}")
                     file_content = self._api_client.call_agent(
@@ -743,9 +753,19 @@ class AppGenerator:
                         }),
                         max_tokens=4000
                     )
+                elif is_backend_file:
+                    print(f"Using specialized Backend Developer for {file_path}")
+                    file_content = self._api_client.call_agent(
+                        BACKEND_DEVELOPER_PROMPT,
+                        json.dumps({
+                            "file": file_spec,
+                            "project_context": enriched_context
+                        }),
+                        max_tokens=4000
+                    )
                 else:
                     file_content = self._api_client.generate_code(file_spec, enriched_context)
-                
+                    
                 absolute_path = self.file_manager.write_code_to_file(output_path, file_path, file_content)
                 generated_files.append({
                     "path": file_path,
