@@ -1,216 +1,225 @@
 import streamlit as st
-import traceback
 import os
-from src.config import AGENT_TEAM_ENABLED
+import subprocess
+import logging
+import time
+import threading
+from src.generators.app_generator import AppGenerator
+
+logger = logging.getLogger(__name__)
+
+def generate_application_thread(options, callback=None):
+    """
+    Fonction pour générer l'application
+    
+    Args:
+        options: Options de génération (dict)
+        callback: Fonction de callback pour les mises à jour de statut (non utilisée)
+    """
+    try:
+        # Initialiser le générateur
+        app_generator = AppGenerator(options["api_key"])
+        
+        # Enregistrer l'état initial dans la session
+        if 'generation_logs' not in st.session_state:
+            st.session_state.generation_logs = []
+        st.session_state.generation_logs.append("Initializing application generator...")
+        
+        # Lancer la génération
+        st.session_state.generation_logs.append("Starting application generation...")
+        app_path = app_generator.generate_application(
+            user_prompt=options["user_prompt"],
+            output_path=options["output_path"],
+            include_tests=options["include_tests"],
+            create_docker=options["create_docker"],
+            add_ci_cd=options["add_ci_cd"],
+            use_sample_json=options["use_sample_json"],
+            ai_generated_everything=options["ai_generated_everything"]
+        )
+        
+        # Enregistrer le succès dans la session
+        st.session_state.generation_logs.append(f"Application generated at: {app_path}")
+        st.session_state.generation_logs.append("Generation complete!")
+        st.session_state.generation_complete = True
+        st.session_state.generation_step = "complete"
+        st.session_state.app_path = app_path
+    except Exception as e:
+        error_msg = f"Error generating application: {str(e)}"
+        if 'generation_logs' in st.session_state:
+            st.session_state.generation_logs.append(error_msg)
+        logger.exception(error_msg)
+        st.session_state.generation_error = True
+        st.session_state.generation_error_message = error_msg
+        st.session_state.generation_step = "review"
 
 def show_generation_tab(api_key):
-    """Display the generation progress tab"""
-    if st.session_state.generation_step == "generating":
-        # Vérifier si le projet a déjà été généré pour éviter de régénérer
-        if 'project_generated' not in st.session_state:
-            st.session_state.project_generated = False
-            
-        # Vérifier si un téléchargement a été effectué
-        if 'download_clicked' not in st.session_state:
-            st.session_state.download_clicked = False
-            
-        # Si le téléchargement a été effectué, rediriger vers la page principale
-        if st.session_state.download_clicked:
-            st.session_state.generation_step = 'initial'
-            st.session_state.download_clicked = False
-            st.session_state.project_generated = False
-            st.rerun()
-            return
+    """Display the generation progress and results"""
+    
+    # Si la génération est terminée
+    if st.session_state.get("generation_step") == "complete" or st.session_state.get("generation_complete", False):
+        st.header("Generation Completed")
         
-        # Si le projet a déjà été généré, afficher seulement les boutons de téléchargement et de retour
-        if st.session_state.project_generated:
-            st.success(f"Your application has been generated at: {st.session_state.output_path}")
-            
-            from src.file_manager import create_zip
-            
-            # Générer le ZIP une seule fois et le stocker dans la session
-            if 'zip_data' not in st.session_state:
-                st.session_state.zip_data = create_zip(st.session_state.output_path)
-            
-            # Utiliser le callback pour marquer le téléchargement
-            def on_download_click():
-                st.session_state.download_clicked = True
-            
-            # Afficher le bouton de téléchargement
-            st.download_button(
-                label="Download as ZIP",
-                data=st.session_state.zip_data,
-                file_name="generated_application.zip",
-                mime="application/zip",
-                on_click=on_download_click
-            )
-            
-            # Bouton pour revenir à la page initiale
-            if st.button("Start a new project"):
-                st.session_state.generation_step = 'initial'
-                st.session_state.project_generated = False
-                if 'zip_data' in st.session_state:
-                    del st.session_state.zip_data
-                st.rerun()
-            
-            return
+        # Afficher un message de succès
+        st.success("✅ Project successfully generated!")
         
-        # Code de génération normal
-        from src.generators.app_generator import AppGenerator
-        from src.validators.app_validator import AppValidator
+        # Afficher le chemin du projet
+        output_path = st.session_state.get('output_path', "Unknown path")
+        st.info(f"Project location: `{output_path}`")
         
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+        # Afficher des commandes utiles
+        with st.expander("Useful commands", expanded=True):
+            st.code(f"cd {output_path}")
+            
+            # Ajouter des commandes en fonction du type de projet
+            # Détection automatique du type de projet basée sur les fichiers existants
+            if os.path.exists(os.path.join(output_path, "requirements.txt")):
+                st.session_state.project_type = "python"
+                st.code("pip install -r requirements.txt")
+                if os.path.exists(os.path.join(output_path, "app.py")):
+                    st.code("python app.py")
+                elif os.path.exists(os.path.join(output_path, "manage.py")):
+                    st.code("python manage.py runserver")
+            elif os.path.exists(os.path.join(output_path, "package.json")):
+                st.session_state.project_type = "node"
+                st.code("npm install")
+                st.code("npm start")
         
-        output_path = st.session_state.output_path
-        advanced_options = st.session_state.advanced_options
-        
-        try:
-            app_generator = AppGenerator(api_key)
-            
-            status_text.text("Analyzing requirements...")
-            progress_bar.progress(10)
-            
-            log_container = st.container()
-            log_placeholder = log_container.empty()
-            logs = []
-            
-            progress_value = 10
-            
-            def update_log(message):
-                logs.append(message)
-                log_placeholder.code("\n".join(logs), language="bash")
-            
-            def print_override(*args, **kwargs):
-                nonlocal progress_value
-                message = " ".join(str(arg) for arg in args)
-                update_log(message)
-                progress_value = min(progress_value + 5, 95)
-                progress_bar.progress(progress_value)
-            
-            original_print = print
-            app_generator.generate_application.__globals__['print'] = print_override
-            
-            # Process prompt based on static website selection
-            reformulated_prompt = st.session_state.reformulated_prompt
-            is_static = advanced_options.get('is_static_website', False)
-            
-            # Ensure proper flags are present in the prompt
-            if is_static and not "[STATIC WEBSITE]" in reformulated_prompt:
-                reformulated_prompt = f"[STATIC WEBSITE] {reformulated_prompt}"
-                update_log("Preparing to generate static website (HTML/CSS/JavaScript only)")
-            
-            if not "[COMPLETE PROJECT WITH ALL FILES]" in reformulated_prompt:
-                reformulated_prompt = f"[COMPLETE PROJECT WITH ALL FILES] {reformulated_prompt}"
-                update_log("Ensuring all project files are AI-generated (no templates)")
-            
-            # Generate the application
+        # Bouton pour ouvrir le dossier du projet
+        if st.button("Open Project Folder"):
             try:
-                success = app_generator.generate_application(
-                    reformulated_prompt,
-                    output_path,
-                    include_tests=advanced_options['include_tests'],
-                    create_docker=advanced_options['create_docker'],
-                    add_ci_cd=advanced_options['add_ci_cd'],
-                    use_sample_json=advanced_options['use_sample_json'],
-                    ai_generated_everything=True  # Force this option to be true
-                )
-                
-                if success:
-                    status_text.text("Validating application...")
-                    
-                    # Explicitly mark as static website in project context if needed
-                    if is_static and isinstance(app_generator.project_context, dict):
-                        if 'requirements' not in app_generator.project_context:
-                            app_generator.project_context['requirements'] = {}
-                        app_generator.project_context['requirements']['is_static_website'] = True
-                        
-                        if 'technical_stack' not in app_generator.project_context['requirements']:
-                            app_generator.project_context['requirements']['technical_stack'] = {}
-                            
-                        # Fix for the TypeError - check if technical_stack is a dict before setting framework
-                        if isinstance(app_generator.project_context['requirements']['technical_stack'], dict):
-                            app_generator.project_context['requirements']['technical_stack']['framework'] = 'static'
-                        elif isinstance(app_generator.project_context['requirements']['technical_stack'], list):
-                            # If it's a list, we need a different approach - add a dict with framework info
-                            app_generator.project_context['requirements']['technical_stack'].append({'framework': 'static'})
-                        else:
-                            # If it's neither a dict nor a list, set it as a dict with framework property
-                            app_generator.project_context['requirements']['technical_stack'] = {'framework': 'static'}
-                    
-                    if AGENT_TEAM_ENABLED:
-                        update_log("Lancement de l'équipe d'agents pour vérifier et améliorer le projet...")
-                        
+                subprocess.run(['explorer', os.path.normpath(output_path)])
+            except Exception as e:
+                st.error(f"Error opening directory: {str(e)}")
+        
+        # Afficher les logs de génération s'ils sont disponibles
+        logs = st.session_state.get('generation_logs', [])
+        if logs:
+            with st.expander("Generation Logs", expanded=True):
+                log_text = "\n".join(logs)
+                st.text_area("Generation log", value=log_text, height=300, label_visibility="collapsed")
+        
+        # Vérifier si la vérification par équipe d'agents est activée
+        if st.session_state.advanced_options.get("enable_agent_team", False):
+            st.subheader("AI Agent Team Verification")
+            verification_file = os.path.join(output_path, "verification_complete.txt")
+            in_progress_file = os.path.join(output_path, "verification_in_progress.txt")
+            
+            if os.path.exists(verification_file):
+                with st.expander("Verification Results", expanded=True):
                     try:
-                        validator = AppValidator(app_generator.api_client)
-                        validation_success = validator.validate_app(
-                            output_path, 
-                            app_generator.project_context,
-                            extended_dep_wait=advanced_options['extended_dep_wait']
-                        )
-                        
-                        if not validation_success:
-                            status_text.text("Application validation failed. Attempting to fix issues...")
-                            if AGENT_TEAM_ENABLED:
-                                st.warning("Des problèmes ont été détectés. L'équipe d'agents IA a vérifié et amélioré le projet automatiquement.")
-                            else:
-                                st.warning("Some issues were detected during validation. The system attempted to fix them automatically.")
-                    except Exception as validation_error:
-                        status_text.text("Validation encountered errors but the application was generated.")
-                        st.warning(f"Validation error: {str(validation_error)}")
-                        update_log(f"Warning: Validation process encountered an error: {str(validation_error)}")
-                    
-                    progress_bar.progress(100)
-                    st.balloons()
-                    status_text.text("Application generated successfully!")
-                    
-                    # Marquer le projet comme généré pour éviter de régénérer
-                    st.session_state.project_generated = True
-                    
-                    # Forcer une réexécution pour afficher uniquement les boutons
+                        with open(verification_file, 'r', encoding='utf-8') as f:
+                            verification_content = f.read()
+                        st.success("✅ Verification completed")
+                        st.text_area("Details", value=verification_content, height=200, label_visibility="collapsed")
+                    except Exception as e:
+                        st.error(f"Error reading verification file: {str(e)}")
+            elif os.path.exists(in_progress_file):
+                st.info("🔄 Agent team verification in progress...")
+                st.text("The AI agents are still improving your code. Check back in a few minutes.")
+                
+                # Ajouter un bouton pour recharger manuellement
+                if st.button("Check Verification Status"):
                     st.rerun()
-                else:
-                    status_text.text("Application generation failed.")
-                    st.error("Failed to generate application. Please check the logs for details.")
-                    
-                    if st.button("Start Over"):
-                        st.session_state.generation_step = 'initial'
-                        st.rerun()
-                
-            finally:
-                app_generator.generate_application.__globals__['print'] = original_print
-                
-        except Exception as e:
-            progress_bar.progress(100)
-            status_text.text("An error occurred during generation.")
-            st.error(f"Error: {str(e)}")
+            else:
+                st.warning("Agent team verification was enabled but no status file was found.")
+        
+        # Bouton pour démarrer un nouveau projet
+        if st.button("Start New Project"):
+            # Réinitialiser l'état de la session pour un nouveau projet
+            st.session_state.generation_step = "initial"
+            st.session_state.reformulated_prompt = ""
+            st.session_state.user_prompt = ""
+            st.session_state.generation_logs = []
+            st.session_state.generation_complete = False
+            if hasattr(st.session_state, 'generation_error'):
+                del st.session_state.generation_error
+            if hasattr(st.session_state, 'generation_error_message'):
+                del st.session_state.generation_error_message
+            if hasattr(st.session_state, 'generation_started'):
+                del st.session_state.generation_started
+            # Rediriger vers l'onglet de définition
+            st.rerun()
+    
+    # Si la génération est en cours
+    elif st.session_state.generation_step == "generating":
+        st.header("Generating Your Application")
+        
+        # Démarrer la génération si ce n'est pas déjà fait
+        if not st.session_state.get('generation_started', False):
+            st.session_state.generation_started = True
             
-            # Add detailed error information for debugging
-            error_details = traceback.format_exc()
-            with st.expander("Error Details"):
-                st.code(error_details)
-            
-            # Still mark as generated if output_path exists and has files
-            if os.path.exists(output_path) and len(os.listdir(output_path)) > 0:
-                st.success(f"Despite the error, files were generated at: {output_path}")
-                st.session_state.project_generated = True
+            # Initialiser les logs
+            if 'generation_logs' not in st.session_state:
+                st.session_state.generation_logs = []
                 
-                # Add a download button even when errors occur
-                from src.file_manager import create_zip
-                try:
-                    zip_data = create_zip(output_path)
-                    st.download_button(
-                        label="Download Generated Files as ZIP",
-                        data=zip_data,
-                        file_name="generated_application.zip",
-                        mime="application/zip"
-                    )
-                except Exception as zip_error:
-                    st.error(f"Could not create ZIP file: {str(zip_error)}")
+            # Stocker l'heure de début
+            st.session_state.start_time = time.time()
             
-            if st.button("Start Over"):
-                st.session_state.generation_step = 'initial'
+            if 'generate_options' in st.session_state:
+                options = st.session_state.generate_options
+                
+                # Lancer la génération directement sans thread pour éviter les problèmes de contexte
+                generate_application_thread(options)
+                
+                # Comme la génération est lancée en synchrone, nous devons actualiser manuellement
+                st.rerun()
+            else:
+                st.error("Generation options not found. Please go back to the Review tab.")
+                st.session_state.generation_logs.append("Error: Generation options not found")
+                st.session_state.generation_step = "review"
+                st.rerun()
+        
+        # Afficher la progression
+        with st.container():
+            # Afficher l'animation de chargement
+            st.markdown("### Generating application...")
+            
+            # Afficher une barre de progression indéterminée
+            progress_bar = st.progress(0)
+            for i in range(100):
+                # Pour une impression de progression, mais c'est juste visuel
+                progress_val = (i % 100) / 100
+                progress_bar.progress(progress_val)
+                
+                # Si la génération est terminée ou une erreur s'est produite, sortir de la boucle
+                if st.session_state.get('generation_complete', False) or st.session_state.get('generation_error', False):
+                    progress_bar.empty()
+                    st.rerun()
+                    break
+                
+                # Éviter de rafraîchir trop souvent pour ne pas surcharger l'interface
+                time.sleep(0.1)
+            
+            # Calculer le temps écoulé
+            elapsed_time = time.time() - st.session_state.get('start_time', time.time())
+            st.info(f"Time elapsed: {int(elapsed_time)} seconds")
+            
+            # Afficher les logs actuels
+            logs = st.session_state.get('generation_logs', [])
+            if logs:
+                st.subheader("Generation Progress")
+                log_text = "\n".join(logs)
+                st.text_area("Generation log", value=log_text, height=300, label_visibility="collapsed")
+            
+            # Vérifier s'il y a eu une erreur
+            if st.session_state.get('generation_error', False):
+                st.error(st.session_state.get('generation_error_message', "An error occurred during generation"))
+                if st.button("Go back to Review"):
+                    st.session_state.generation_step = "review"
+                    st.rerun()
+            
+            # Ajouter un bouton d'annulation
+            if st.button("Cancel Generation"):
+                st.session_state.generation_step = "review"
+                st.session_state.generation_logs.append("Generation cancelled by user")
                 st.rerun()
     
-    elif st.session_state.generation_step == "initial" or st.session_state.generation_step == "review":
-        st.info("Please complete the previous steps first.")
+    # Si la génération n'a pas encore commencé
+    else:
+        st.header("Application Generation")
+        st.info("Please complete the previous steps first:")
+        st.markdown("""
+        1. Go to the **Definition** tab to describe your application
+        2. Review the reformulated requirements in the **Review** tab
+        3. Click the "Generate Application Now" button in the Review tab
+        """)

@@ -30,6 +30,9 @@ TEMPERATURES = {
     "project_manager": 0.5     # Équilibré pour la coordination
 }
 
+# Par défaut, la vérification par l'équipe d'agents est désactivée
+AGENT_TEAM_ENABLED = False
+
 # Configuration pour l'équipe d'agents de vérification
 AGENT_TEAM_ENABLED = True
 AGENT_TEAM_WAIT_TIME = 60  # Temps en secondes à attendre pour que les agents terminent leur travail

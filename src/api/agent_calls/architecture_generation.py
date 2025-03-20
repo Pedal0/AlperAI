@@ -2,35 +2,32 @@ import json
 import logging
 from typing import Dict, Any, Optional
 
-from src.config import API_DESIGNER_PROMPT, MAX_TOKENS_DEFAULT
+from src.config import ARCHITECTURE_DESIGNER_PROMPT, MAX_TOKENS_LARGE
 
 logger = logging.getLogger(__name__)
 
-def design_api(api_client, requirements_spec: Dict[str, Any], architecture: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def generate_architecture(api_client, requirements_spec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
-    Design API interfaces based on requirements and architecture
+    Generate application architecture based on requirements specification
     
     Args:
-        api_client: API client instance
+        api_client: API client instance 
         requirements_spec: Requirements specification dictionary
-        architecture: Architecture specification dictionary
         
     Returns:
-        API specification dictionary or None if design failed
+        Architecture specification dictionary or None if generation failed
     """
-    context = {
-        "requirements": requirements_spec,
-        "architecture": architecture
-    }
+    req_json = json.dumps(requirements_spec, indent=2)
     
     response = api_client.call_agent(
-        API_DESIGNER_PROMPT, 
-        json.dumps(context), 
-        max_tokens=MAX_TOKENS_DEFAULT
+        ARCHITECTURE_DESIGNER_PROMPT, 
+        req_json, 
+        max_tokens=MAX_TOKENS_LARGE
     )
     
+    # Parse JSON response
     if not response:
-        logger.error("No response received for API design")
+        logger.error("No response received for architecture design")
         return None
         
     try:
@@ -49,15 +46,15 @@ def design_api(api_client, requirements_spec: Dict[str, Any], architecture: Dict
                 if end != -1:
                     response = response[start:end].strip()
                 
-        api_spec = json.loads(response)
+        architecture = json.loads(response)
         
-        if not isinstance(api_spec, dict):
-            logger.error(f"API design returned invalid format: {type(api_spec)}")
+        if not isinstance(architecture, dict):
+            logger.error(f"Architecture design returned invalid format: {type(architecture)}")
             return None
             
-        logger.info("API design successful")
-        return api_spec
+        logger.info("Architecture design successful")
+        return architecture
     except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse API specification JSON: {e}")
+        logger.error(f"Failed to parse architecture JSON: {e}")
         logger.error(f"Raw response (first 500 chars): {response[:500]}")
         return None

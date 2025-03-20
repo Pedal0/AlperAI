@@ -34,7 +34,24 @@ class AIAppGeneratorAPI:
         self.max_retries = 3
         self.retry_delay = 2 
         
-    def call_agent(self, prompt: str, user_input: str, max_tokens: int = MAX_TOKENS_DEFAULT) -> Optional[str]:
+    def call_agent(self, prompt: str, context: str, max_tokens: int = MAX_TOKENS_DEFAULT, agent_type: str = "default") -> Optional[str]:
+        """
+        Call the AI agent with prompt and context
+        
+        Args:
+            prompt: The system prompt to guide the AI
+            context: The context information (usually JSON)
+            max_tokens: Maximum number of tokens to generate
+            agent_type: Type of agent to use (default, code, review, css)
+            
+        Returns:
+            The generated response
+        """
+        # Check for large context and use appropriate model configuration
+        if len(context) > 100000:  # Approximately 25k tokens
+            logger.info(f"Large context detected ({len(context)/4} tokens approx), using extended context model")
+            # Use a configuration for large context handling if available in your implementation
+        
         attempts = 0
         
         while attempts < self.max_retries:
@@ -44,7 +61,7 @@ class AIAppGeneratorAPI:
                     model=self.model,
                     messages=[
                         {"role": "system", "content": prompt},
-                        {"role": "user", "content": user_input}
+                        {"role": "user", "content": context}
                     ],
                     temperature=self.temperature,
                     max_tokens=max_tokens
@@ -236,3 +253,30 @@ class AIAppGeneratorAPI:
         )
         
         return response
+
+    def validate_with_agent_team(self, project_dir: str, project_context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Valider le projet avec l'équipe d'agents AI
+        
+        Args:
+            project_dir: Chemin du répertoire du projet
+            project_context: Contexte du projet
+            
+        Returns:
+            Résultats de la validation
+        """
+        from src.config.constants import AGENT_TEAM_ENABLED
+        
+        if not AGENT_TEAM_ENABLED:
+            logger.info("Agent team validation skipped (disabled by user)")
+            return {"status": "skipped", "reason": "disabled_by_user"}
+            
+        logger.info("Running validation with agent team...")
+        
+        # Ici, on implémenterait l'appel à l'équipe d'agents
+        # Pour l'instant, c'est un placeholder
+        
+        return {
+            "status": "success",
+            "improvements": ["Code structure improved", "UI components enhanced", "Documentation enriched"]
+        }

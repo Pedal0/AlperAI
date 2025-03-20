@@ -7,13 +7,25 @@ from typing import Dict, List, Any, Optional
 from dotenv import load_dotenv
 
 from src.config import (
+    REQUIREMENTS_ANALYZER_PROMPT,
+    ARCHITECTURE_DESIGNER_PROMPT,
+    DATABASE_DESIGNER_PROMPT,
+    API_DESIGNER_PROMPT,
+    CODE_GENERATOR_PROMPT,
+    TEST_GENERATOR_PROMPT,
+    CODE_REVIEWER_PROMPT,
+    FILE_SIGNATURE_EXTRACTOR_PROMPT,
+    CROSS_FILE_REVIEWER_PROMPT,
     API_MODEL,
+    API_TEMPERATURE,
     MAX_TOKENS_DEFAULT,
     MAX_TOKENS_LARGE,
-    TEMPERATURES,
+    MAX_TOKENS_HUGE,
+    PROJECT_FILES_GENERATOR_PROMPT,
     USE_OPENROUTER,
     OPENROUTER_BASE_URL,
-    OPENROUTER_MODEL
+    OPENROUTER_MODEL,
+    TEMPERATURES
 )
 from src.api.agent_calls.requirements import analyze_requirements
 from src.api.agent_calls.architecture import design_architecture

@@ -13,6 +13,8 @@ from src.generators.context_enricher import ContextEnricher
 
 logger = logging.getLogger(__name__)
 
+from ..api.agent_calls.multi_file_generation import generate_multiple_files, write_multiple_files
+
 class AppGenerator:
     def __init__(self, api_key):
         # Update USE_OPENROUTER from session state if available
@@ -219,65 +221,140 @@ class AppGenerator:
             
         print(f"Creating project structure at {output_path}")
         files_to_generate = self.file_manager.create_project_structure(output_path, self._architecture)
-        print(f"Generating {len(files_to_generate)} files")
+        print(f"Preparing to generate {len(files_to_generate)} files")
         
-        generated_files = []
-        file_counter = 0
+        # Classifier les fichiers par type pour la génération par lots
+        frontend_files = []
+        backend_files = []
+        config_files = []
         
         for file_spec in files_to_generate:
-            file_counter += 1
             file_path = file_spec.get("path", "")
+            file_type = file_spec.get("type", "").lower()
+            file_purpose = file_spec.get("purpose", "").lower()
+            
             if not file_path:
                 continue
                 
-            print(f"Generating file: {file_path} ({file_counter}/{len(files_to_generate)})")
-            file_code = self._generate_file_code(file_spec)
-            absolute_path = self.file_manager.write_code_to_file(output_path, file_path, file_code)
-            generated_files.append({
-                "path": file_path,
-                "absolute_path": absolute_path,
-                "spec": file_spec
-            })
+            if file_path.endswith(("package.json", "requirements.txt", ".env", "Dockerfile", "docker-compose.yml", 
+                                  "README.md", ".gitignore")):
+                config_files.append(file_spec)
+            elif file_path.endswith((".html", ".css", ".js", ".jsx", ".ts", ".tsx", ".vue", ".svelte")) or \
+                 "frontend" in file_path.lower() or "ui" in file_purpose or "client" in file_purpose:
+                frontend_files.append(file_spec)
+            else:
+                backend_files.append(file_spec)
         
-        if not ai_generated_everything:
-            print("Generating configuration and documentation files")
-            
-            tech_stack = self._requirements_spec.get('technical_stack', {})
-            language = tech_stack.get('language', '').lower() if isinstance(tech_stack, dict) else ''
-            is_static_website = self._requirements_spec.get('is_static_website', False)
-            
-            # Initialize file_structure here to avoid the error
-            file_structure = []
-            for root, dirs, files in os.walk(output_path):
-                rel_root = os.path.relpath(root, output_path)
-                if rel_root == ".":
-                    rel_root = ""
-                for file in files:
-                    file_path = os.path.join(rel_root, file) if rel_root else file
-                    file_structure.append(file_path)
-            
-            if language not in ['javascript', 'typescript', 'node', 'react', 'vue', 'angular'] and not is_static_website:
-                if 'requirements.txt' not in file_structure:
-                    print("Generating requirements.txt")
-                    requirements_content = self._api_client.generate_project_file(
-                        'requirements.txt',
-                        self.project_context,
+        generated_files = []
+        
+        # Enrichir le contexte du projet
+        enriched_context = ContextEnricher.enrich_generation_context(
+            self.project_context, 
+            output_path
+        )
+        enriched_context['output_dir'] = output_path
+        
+        # Générer les fichiers de configuration individuellement
+        for file_spec in config_files:
+            try:
+                file_path = file_spec.get("path", "")
+                print(f"Generating file: {file_path}")
+                
+                if file_path.endswith("package.json") or file_path.endswith("requirements.txt"):
+                    file_type = "package.json" if file_path.endswith("package.json") else "requirements.txt"
+                    file_structure = ContextEnricher._get_project_structure(output_path)
+                    file_content = self._api_client.generate_project_file(
+                        file_type,
+                        enriched_context,
                         file_structure
                     )
-                    with open(os.path.join(output_path, "requirements.txt"), 'w', encoding='utf-8') as f:
-                        f.write(requirements_content)
-            
-            if language in ['javascript', 'typescript', 'node', 'react', 'vue', 'angular']:
-                if 'package.json' not in file_structure:
-                    print("Generating package.json")
-                    package_json_content = self._api_client.generate_project_file(
-                        'package.json',
-                        self.project_context,
-                        file_structure
+                else:
+                    file_content = self._api_client.generate_code(
+                        file_spec, 
+                        enriched_context
                     )
-                    with open(os.path.join(output_path, "package.json"), 'w', encoding='utf-8') as f:
-                        f.write(package_json_content)
+                
+                absolute_path = self.file_manager.write_code_to_file(output_path, file_path, file_content)
+                generated_files.append({
+                    "path": file_path,
+                    "absolute_path": absolute_path,
+                    "spec": file_spec
+                })
+            except Exception as e:
+                print(f"Error generating config file {file_path}: {str(e)}")
         
+        # Générer les fichiers frontend en lot (si > 1 fichier)
+        if len(frontend_files) > 1:
+            print(f"Generating {len(frontend_files)} frontend files in batch...")
+            try:
+                frontend_files_content = generate_multiple_files(
+                    self._api_client,
+                    frontend_files,
+                    enriched_context,
+                    "frontend"
+                )
+                
+                if frontend_files_content:
+                    written_files = write_multiple_files(output_path, frontend_files_content)
+                    print(f"Successfully generated {len(written_files)} frontend files in batch")
+                    
+                    # Ajouter les fichiers générés à la liste
+                    for file_path in written_files:
+                        rel_path = os.path.relpath(file_path, output_path)
+                        matching_spec = next((spec for spec in frontend_files if spec.get("path") == rel_path), {})
+                        generated_files.append({
+                            "path": rel_path,
+                            "absolute_path": file_path,
+                            "spec": matching_spec
+                        })
+                else:
+                    # Fallback à la génération individuelle
+                    print("Batch frontend generation failed, falling back to individual generation")
+                    self._generate_files_individually(frontend_files, generated_files, output_path, enriched_context)
+            except Exception as e:
+                print(f"Error in batch frontend generation: {str(e)}")
+                print("Falling back to individual generation for frontend files")
+                self._generate_files_individually(frontend_files, generated_files, output_path, enriched_context)
+        else:
+            # Si un seul fichier frontend, générer individuellement
+            self._generate_files_individually(frontend_files, generated_files, output_path, enriched_context)
+        
+        # Générer les fichiers backend en lot (si > 1 fichier)
+        if len(backend_files) > 1:
+            print(f"Generating {len(backend_files)} backend files in batch...")
+            try:
+                backend_files_content = generate_multiple_files(
+                    self._api_client,
+                    backend_files,
+                    enriched_context,
+                    "backend"
+                )
+                
+                if backend_files_content:
+                    written_files = write_multiple_files(output_path, backend_files_content)
+                    print(f"Successfully generated {len(written_files)} backend files in batch")
+                    
+                    # Ajouter les fichiers générés à la liste
+                    for file_path in written_files:
+                        rel_path = os.path.relpath(file_path, output_path)
+                        matching_spec = next((spec for spec in backend_files if spec.get("path") == rel_path), {})
+                        generated_files.append({
+                            "path": rel_path,
+                            "absolute_path": file_path,
+                            "spec": matching_spec
+                        })
+                else:
+                    # Fallback à la génération individuelle
+                    print("Batch backend generation failed, falling back to individual generation")
+                    self._generate_files_individually(backend_files, generated_files, output_path, enriched_context)
+            except Exception as e:
+                print(f"Error in batch backend generation: {str(e)}")
+                print("Falling back to individual generation for backend files")
+                self._generate_files_individually(backend_files, generated_files, output_path, enriched_context)
+        else:
+            # Si un seul fichier backend, générer individuellement
+            self._generate_files_individually(backend_files, generated_files, output_path, enriched_context)
+
         print("Extracting file signatures for comprehensive validation")
         all_file_contents = {}
         
@@ -409,21 +486,24 @@ class AppGenerator:
         """Validate the generated project"""
         logger.info("Starting project validation...")
         
-        # Supprimer/commenter le code qui lance l'environnement virtuel et qui cause l'erreur
-        # self.validate_in_virtual_env(output_dir)  # Commentez cette ligne
-        
-        # Ne garder que la vérification par l'équipe d'agents
+        # Vérifier si la validation par l'équipe d'agents est activée
         if AGENT_TEAM_ENABLED:
             logger.info("Starting agent team verification...")
             from src.validators.agent_team_verifier import run_verification_team
             try:
-                # Fix: The project_description attribute may not exist
-                # Changed to use self.project_context instead
                 run_verification_team(output_dir, self.project_context)
                 logger.info("Agent team verification completed successfully")
+                
+                # Créer un fichier de vérification complète pour l'interface utilisateur
+                verification_file = os.path.join(output_dir, "verification_complete.txt")
+                with open(verification_file, 'w') as f:
+                    f.write("Project successfully verified and improved by the AI agent team")
+                    
             except Exception as e:
                 logger.error(f"Error during agent team verification: {str(e)}")
                 logger.exception("Agent verification exception")
+        else:
+            logger.info("Agent team verification skipped - disabled by user")
         
         logger.info("Project validation completed")
     
@@ -519,3 +599,167 @@ class AppGenerator:
             logger.error(f"Error during generation: {str(e)}")
             logger.exception("Generation exception")
             return False
+
+    def _generate_code_batch(self, output_path: str, architecture: Dict[str, Any]) -> None:
+        """Generate application code in batches based on architecture"""
+        logger.info("Starting batch code generation...")
+        
+        file_manager = FileSystemManager()
+        files_to_generate = file_manager.create_project_structure(output_path, architecture)
+        
+        # Créer un répertoire pour JavaScript si aucun fichier JS n'est prévu
+        js_dir = os.path.join(output_path, 'js')
+        if not os.path.exists(js_dir):
+            os.makedirs(js_dir, exist_ok=True)
+            # Ajouter un fichier JS vide pour les animations
+            files_to_generate.append({
+                "path": "js/animations.js",
+                "type": "javascript",
+                "purpose": "JavaScript animations for UI enhancement"
+            })
+        
+        total_files = len(files_to_generate)
+        logger.info(f"Preparing to generate {total_files} files in batches...")
+        
+        # Enrichir le contexte du projet avec la structure des fichiers
+        enriched_context = ContextEnricher.enrich_generation_context(
+            self.project_context, 
+            output_path
+        )
+        
+        # Classifier les fichiers par type
+        backend_files = []
+        frontend_files = []
+        config_files = []
+        
+        for file_spec in files_to_generate:
+            file_path = file_spec.get("path", "")
+            file_type = file_spec.get("type", "").lower()
+            file_purpose = file_spec.get("purpose", "").lower()
+            
+            if not file_path:
+                continue
+                
+            if file_path.endswith(("package.json", "requirements.txt", ".env", "Dockerfile", "docker-compose.yml", 
+                                  "README.md", ".gitignore")):
+                config_files.append(file_spec)
+            elif file_path.endswith((".html", ".css", ".js", ".jsx", ".ts", ".tsx", ".vue", ".svelte")) or \
+                 "frontend" in file_path.lower() or "ui" in file_purpose or "client" in file_purpose:
+                frontend_files.append(file_spec)
+            else:
+                backend_files.append(file_spec)
+        
+        # Générer les fichiers de configuration individuellement
+        for file_spec in config_files:
+            try:
+                file_path = file_spec.get("path", "")
+                logger.info(f"Generating config file: {file_path}")
+                
+                if file_path.endswith("package.json") or file_path.endswith("requirements.txt"):
+                    file_type = "package.json" if file_path.endswith("package.json") else "requirements.txt"
+                    file_structure = ContextEnricher._get_project_structure(output_path)
+                    file_content = self._api_client.generate_project_file(
+                        file_type,
+                        enriched_context,
+                        file_structure
+                    )
+                else:
+                    file_content = self._api_client.generate_code(
+                        file_spec, 
+                        enriched_context
+                    )
+                
+                file_manager.write_code_to_file(output_path, file_path, file_content)
+            except Exception as e:
+                logger.error(f"Error generating config file {file_path}: {str(e)}")
+        
+        # Générer les fichiers backend en une seule requête
+        if backend_files:
+            logger.info(f"Generating {len(backend_files)} backend files in a single request...")
+            try:
+                backend_files_content = generate_multiple_files(
+                    self._api_client,
+                    backend_files,
+                    enriched_context,
+                    "backend"
+                )
+                
+                if backend_files_content:
+                    written_files = write_multiple_files(output_path, backend_files_content)
+                    logger.info(f"Successfully generated {len(written_files)} backend files")
+                else:
+                    logger.warning("No backend files were generated in batch mode, falling back to individual generation")
+                    self._generate_files_individually(output_path, backend_files, enriched_context)
+            except Exception as e:
+                logger.error(f"Error in batch backend generation: {str(e)}")
+                logger.info("Falling back to individual generation for backend files")
+                self._generate_files_individually(output_path, backend_files, enriched_context)
+        
+        # Générer les fichiers frontend en une seule requête
+        if frontend_files:
+            logger.info(f"Generating {len(frontend_files)} frontend files in a single request...")
+            try:
+                frontend_files_content = generate_multiple_files(
+                    self._api_client,
+                    frontend_files,
+                    enriched_context,
+                    "frontend"
+                )
+                
+                if frontend_files_content:
+                    written_files = write_multiple_files(output_path, frontend_files_content)
+                    logger.info(f"Successfully generated {len(written_files)} frontend files")
+                else:
+                    logger.warning("No frontend files were generated in batch mode, falling back to individual generation")
+                    self._generate_files_individually(output_path, frontend_files, enriched_context)
+            except Exception as e:
+                logger.error(f"Error in batch frontend generation: {str(e)}")
+                logger.info("Falling back to individual generation for frontend files")
+                self._generate_files_individually(output_path, frontend_files, enriched_context)
+    
+    def _generate_files_individually(self, files_to_generate, generated_files, output_path, enriched_context):
+        """Générer les fichiers un par un"""
+        file_manager = FileSystemManager()
+        total_files = len(files_to_generate)
+        
+        logger.info(f"Generating {total_files} files individually...")
+        
+        for index, file_spec in enumerate(files_to_generate):
+            try:
+                file_path = file_spec.get("path", "")
+                
+                if not file_path:
+                    continue
+                
+                logger.info(f"Generating file {index+1}/{total_files}: {file_path}")
+                
+                if file_path.endswith('.css'):
+                    print(f"Using specialized CSS Designer for {file_path}")
+                    file_content = self._api_client.call_agent(
+                        CSS_DESIGNER_PROMPT,
+                        json.dumps({
+                            "file": file_spec,
+                            "project_context": enriched_context
+                        }),
+                        max_tokens=4000
+                    )
+                else:
+                    file_content = self._api_client.generate_code(file_spec, enriched_context)
+                
+                absolute_path = self.file_manager.write_code_to_file(output_path, file_path, file_content)
+                generated_files.append({
+                    "path": file_path,
+                    "absolute_path": absolute_path,
+                    "spec": file_spec
+                })
+            except Exception as e:
+                print(f"Error generating file {file_path}: {str(e)}")
+    
+    def generate_app(self, output_path: str) -> str:
+        """Generate a complete application based on requirements"""
+        # ...existing code...
+        
+        # Remplacer l'appel à _generate_code par _generate_code_batch
+        self._generate_code_batch(output_path, self._architecture)
+        
+        # ...existing code...

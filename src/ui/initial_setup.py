@@ -1,6 +1,8 @@
 import streamlit as st
 import os
 import logging
+import time
+from src.config import constants  # Ajouter l'import du module constants
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +40,13 @@ def show_initial_setup_tab(api_key):
         st.session_state.user_prompt = user_prompt
         st.session_state.output_path = output_path
         
-        handle_generate_button(api_key)
+        handle_analyze_button(api_key)
     else:
         st.info("You've already completed this step. You can go to the Review Requirements tab.")
         if st.button("Reset and start over"):
             st.session_state.generation_step = 'initial'
             st.session_state.reformulated_prompt = ""
+            st.session_state.user_prompt = ""
             st.rerun()
 
 def show_advanced_options():
@@ -75,6 +78,8 @@ def show_advanced_options():
             extended_dep_wait = st.checkbox("Extended dependency installation time", 
                                        value=st.session_state.advanced_options.get('extended_dep_wait', True),
                                        help="Add extra delay after installing dependencies to ensure they are properly installed")
+            enable_agent_team = st.checkbox("Team of AI Agents Verification", value=False, 
+                                            help="If enabled, a team of specialized AI agents will verify and improve the generated code")
     
     # Update session state with advanced options
     st.session_state.advanced_options = {
@@ -85,15 +90,16 @@ def show_advanced_options():
         'use_sample_json': use_sample_json,
         'extended_dep_wait': extended_dep_wait,
         'is_static_website': is_static_website,
-        'ai_generated_everything': True  # Always keep this true
+        'ai_generated_everything': True,  # Always keep this true
+        'enable_agent_team': enable_agent_team  # Add agent team option
     }
 
-def handle_generate_button(api_key):
-    """Handle the Generate Application button"""
+def handle_analyze_button(api_key):
+    """Handle the Analyze Requirements button"""
     from src.generators.app_generator import AppGenerator
     from src.generators.get_reformulated_prompt import get_reformulated_prompt
     
-    if st.button("Generate Application"):
+    if st.button("Analyze Requirements"):
         if not api_key:
             st.error("Please enter your OpenAI API key or set it in the .env file.")
         else:
@@ -124,8 +130,10 @@ def handle_generate_button(api_key):
                         st.session_state.generation_step = 'review'
                         
                         # Force UI update
-                        st.success("✅ Requirements analyzed successfully! Please proceed to the Review tab.")
+                        st.success("✅ Requirements analyzed successfully! Switching to the Review tab...")
                         st.balloons()
+                        time.sleep(1)
+                        st.rerun()  # Remplacer experimental_rerun par rerun
                     except Exception as e:
                         st.error(f"Error reformulating prompt: {str(e)}")
                         logger.exception("Error reformulating prompt")

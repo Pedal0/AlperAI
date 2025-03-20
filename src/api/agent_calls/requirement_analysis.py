@@ -2,35 +2,29 @@ import json
 import logging
 from typing import Dict, Any, Optional
 
-from src.config import API_DESIGNER_PROMPT, MAX_TOKENS_DEFAULT
+from src.config import REQUIREMENTS_ANALYZER_PROMPT, MAX_TOKENS_DEFAULT
 
 logger = logging.getLogger(__name__)
 
-def design_api(api_client, requirements_spec: Dict[str, Any], architecture: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def analyze_requirements(api_client, user_prompt: str) -> Optional[Dict[str, Any]]:
     """
-    Design API interfaces based on requirements and architecture
+    Analyze user prompt to extract requirements
     
     Args:
         api_client: API client instance
-        requirements_spec: Requirements specification dictionary
-        architecture: Architecture specification dictionary
+        user_prompt: User's description of the desired application
         
     Returns:
-        API specification dictionary or None if design failed
+        Requirements specification dictionary or None if analysis failed
     """
-    context = {
-        "requirements": requirements_spec,
-        "architecture": architecture
-    }
-    
     response = api_client.call_agent(
-        API_DESIGNER_PROMPT, 
-        json.dumps(context), 
+        REQUIREMENTS_ANALYZER_PROMPT, 
+        user_prompt, 
         max_tokens=MAX_TOKENS_DEFAULT
     )
     
     if not response:
-        logger.error("No response received for API design")
+        logger.error("No response received for requirements analysis")
         return None
         
     try:
@@ -49,15 +43,15 @@ def design_api(api_client, requirements_spec: Dict[str, Any], architecture: Dict
                 if end != -1:
                     response = response[start:end].strip()
                 
-        api_spec = json.loads(response)
+        requirements = json.loads(response)
         
-        if not isinstance(api_spec, dict):
-            logger.error(f"API design returned invalid format: {type(api_spec)}")
+        if not isinstance(requirements, dict):
+            logger.error(f"Requirements analysis returned invalid format: {type(requirements)}")
             return None
             
-        logger.info("API design successful")
-        return api_spec
+        logger.info("Requirements analysis successful")
+        return requirements
     except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse API specification JSON: {e}")
+        logger.error(f"Failed to parse requirements JSON: {e}")
         logger.error(f"Raw response (first 500 chars): {response[:500]}")
         return None
