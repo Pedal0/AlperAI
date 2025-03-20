@@ -4,7 +4,13 @@ import re
 import os
 from typing import Dict, Any, List, Tuple, Optional
 
-from src.config import MULTI_FILE_GENERATOR_PROMPT, MAX_TOKENS_LARGE, MAX_TOKENS_HUGE
+from src.config import (
+    MULTI_FILE_GENERATOR_PROMPT, 
+    CSS_DESIGNER_PROMPT, 
+    BACKEND_DEVELOPER_PROMPT,
+    MAX_TOKENS_LARGE, 
+    MAX_TOKENS_HUGE
+)
 from src.file_manager.writer import write_code_to_file
 
 logger = logging.getLogger(__name__)
@@ -23,7 +29,37 @@ def generate_multiple_files(api_client, files_spec: List[Dict[str, Any]], projec
     Returns:
         Dictionary mapping file paths to generated content
     """
-    # Prepare context for the API call
+    # Select appropriate prompt based on generation type
+    if generation_type == "frontend":
+        base_prompt = CSS_DESIGNER_PROMPT
+    elif generation_type == "backend":
+        base_prompt = BACKEND_DEVELOPER_PROMPT
+    else:
+        base_prompt = MULTI_FILE_GENERATOR_PROMPT
+    
+    # Customize the prompt for multi-file generation
+    prompt = f"""
+{base_prompt}
+
+IMPORTANT: You need to generate code for MULTIPLE FILES at once.
+Follow these crucial instructions:
+1. Generate complete code for each file
+2. Separate each file with a clear delimiter
+3. Format each file section as:
+
+---FILE:path/to/file.ext---
+// Complete file content goes here
+---END FILE---
+
+Files to generate:
+"""
+    
+    for i, file_spec in enumerate(files_spec):
+        path = file_spec.get("path", f"unknown_file_{i}")
+        file_type = file_spec.get("type", "")
+        purpose = file_spec.get("purpose", "")
+        prompt += f"\n{i+1}. {path} - {file_type}: {purpose}"
+    
     context = {
         "files": files_spec,
         "project_context": project_context,
@@ -43,7 +79,7 @@ def generate_multiple_files(api_client, files_spec: List[Dict[str, Any]], projec
     
     # Make the API call with increased token limit
     response = api_client.call_agent(
-        MULTI_FILE_GENERATOR_PROMPT,
+        prompt,
         json.dumps(context),
         max_tokens=tokens,
         agent_type="code"
