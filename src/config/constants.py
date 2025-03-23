@@ -37,5 +37,7 @@ AGENT_TEAM_ENABLED = False
 AGENT_TEAM_ENABLED = True
 AGENT_TEAM_WAIT_TIME = 60  # Temps en secondes à attendre pour que les agents terminent leur travail
 
-MAX_TOKENS_DEFAULT = 20000
-MAX_TOKENS_LARGE = 50000
+# Limites de tokens pour différentes tailles de génération
+MAX_TOKENS_DEFAULT = 50000
+MAX_TOKENS_LARGE = 150000   # Augmenté pour les générations plus importantes
+MAX_TOKENS_HUGE = 500000    # Pour les générations multiples en une seule requête
