@@ -403,6 +403,10 @@ For the provided HTML elements, you will:
 3. Add carefully designed hover/focus states for interactive elements
 4. Include subtle animations that enhance usability (not distract)
 5. Ensure accessibility compliance with proper contrast and focus states
+6. Ensure that the sizing of elements is appropriate for their context.
+   For icons, ensure they are not too large and fit well within their containers.
+   For charts and other visual elements, ensure they are appropriately sized to be easily readable without being excessively large.
+   Maintain overall visual coherence and balance in the design.
 
 ANIMATION INSTRUCTIONS:
 - For any elements requiring animation, include BOTH the CSS animations AND matching JavaScript
@@ -547,6 +551,7 @@ IMPORTANT INSTRUCTIONS:
 4. Follow best practices and design patterns for the chosen technology stack
 5. Include appropriate error handling
 6. Add comprehensive documentation and comments
+
 
 FRONTEND SPECIFIC INSTRUCTIONS:
 - Create a visually appealing, professional design for HTML files
