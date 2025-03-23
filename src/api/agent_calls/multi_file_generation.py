@@ -82,7 +82,8 @@ Files to generate:
         prompt,
         json.dumps(context),
         max_tokens=tokens,
-        agent_type="code"
+        agent_type="code",
+        max_output_tokens=None  # Pas de limite sur les tokens de sortie
     )
     
     if not response:
