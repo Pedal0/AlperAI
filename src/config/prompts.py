@@ -397,6 +397,13 @@ DEFAULT STYLE: Unless otherwise specified, create a CLEAN, MINIMALIST, and PROFE
 - Subtle animations and transitions for improved user experience
 - Fully responsive design that works perfectly on all device sizes
 
+IMPORTANT LOGO GUIDELINES:
+- ALL logos must be SMALL and compact to ensure proper integration with the design
+- Logo sizes should generally not exceed 40px height in desktop views
+- For mobile views, logos should be even smaller (around 30px height)
+- Ensure logos are properly scaled and don't dominate the design
+- Place logos in appropriate areas (headers, footers) with proper padding
+
 For the provided HTML elements, you will:
 1. Create complete CSS styling for ALL UI components
 2. Implement responsive layouts using flexbox and/or CSS grid
