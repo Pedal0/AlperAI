@@ -149,9 +149,12 @@ class AIAppGeneratorAPI:
         return self._safe_parse_json(response)
     
     def generate_code(self, file_spec: Dict[str, Any], project_context: Dict[str, Any]) -> Optional[str]:
+        # Assurez-vous que le project_context contient requirements et architecture
         context = {
             "file_specification": file_spec,
-            "project_context": project_context
+            "project_context": project_context,
+            "requirements": project_context.get("requirements", {}),
+            "architecture": project_context.get("architecture", {})
         }
         
         return self.call_agent(CODE_GENERATOR_PROMPT, json.dumps(context), max_tokens=MAX_TOKENS_LARGE)
@@ -160,7 +163,9 @@ class AIAppGeneratorAPI:
         context = {
             "file_path": file_path,
             "code_content": code_content,
-            "project_context": project_context
+            "project_context": project_context,
+            "requirements": project_context.get("requirements", {}),
+            "architecture": project_context.get("architecture", {})
         }
         
         return self.call_agent(TEST_GENERATOR_PROMPT, json.dumps(context), max_tokens=MAX_TOKENS_DEFAULT)
@@ -280,3 +285,140 @@ class AIAppGeneratorAPI:
             "status": "success",
             "improvements": ["Code structure improved", "UI components enhanced", "Documentation enriched"]
         }
+        
+    def bulk_code_review(self, files_by_type: Dict[str, Dict[str, str]], project_context: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
+        """
+        Révise l'ensemble du code frontend et backend séparément en utilisant le large contexte de l'IA
+        
+        Args:
+            files_by_type: Dictionnaire organisé par type ("frontend", "backend") contenant les fichiers
+                          où chaque entrée est {chemin_fichier: contenu}
+            project_context: Le contexte complet du projet incluant les requirements et l'architecture
+            
+        Returns:
+            Dictionnaire contenant les corrections par fichier: {chemin_fichier: contenu_modifié}
+        """
+        results = {}
+        
+        # Traiter le frontend et le backend séparément
+        for code_type in ["frontend", "backend"]:
+            if code_type not in files_by_type or not files_by_type[code_type]:
+                logger.info(f"Aucun fichier {code_type} à réviser")
+                continue
+                
+            files = files_by_type[code_type]
+            logger.info(f"Révision en masse des fichiers {code_type}: {len(files)} fichiers")
+            
+            # Créer un contexte étendu avec tous les fichiers du même type
+            bulk_context = {
+                "code_type": code_type,
+                "files": files,
+                "project_context": project_context,
+                "requirements": project_context.get("requirements", {}),
+                "architecture": project_context.get("architecture", {})
+            }
+            
+            # Prompt spécifique pour la revue de code en masse
+            bulk_review_prompt = f"""
+            Tu es un expert en développement logiciel spécialisé dans la révision de code {code_type}.
+            Analyse minutieusement TOUS les fichiers fournis et identifie:
+            1. Les bugs potentiels
+            2. Les problèmes de performance
+            3. Les failles de sécurité
+            4. Les écarts par rapport aux bonnes pratiques
+            5. Les incohérences avec l'architecture du projet
+            
+            Pour chaque problème identifié:
+            1. Indique précisément le fichier concerné
+            2. Localise l'emplacement exact dans le code
+            3. Explique clairement le problème
+            4. Propose une correction concrète
+            
+            Réponds avec un JSON structuré comme suit:
+            {{
+                "file_path": {{
+                    "issues": [
+                        {{
+                            "type": "bug|performance|security|practice|consistency",
+                            "severity": "high|medium|low",
+                            "line": "numéro ou plage de lignes approximatif",
+                            "description": "Description du problème",
+                            "original_code": "Code problématique",
+                            "fixed_code": "Code corrigé"
+                        }}
+                    ],
+                    "improved_content": "Contenu complet du fichier corrigé si nécessaire"
+                }}
+            }}
+            
+            Si un fichier n'a pas de problème, indique simplement "PARFAIT" pour sa valeur.
+            """
+            
+            # Appeler l'agent avec un contexte étendu
+            response = self.call_agent(
+                bulk_review_prompt, 
+                json.dumps(bulk_context),
+                max_tokens=MAX_TOKENS_LARGE
+            )
+            
+            review_results = self._safe_parse_json(response)
+            if not review_results:
+                logger.error(f"Échec de l'analyse en masse des fichiers {code_type}")
+                continue
+                
+            # Fusionner les résultats
+            for file_path, review in review_results.items():
+                if review == "PARFAIT":
+                    results[file_path] = files[file_path]  # Garde le fichier inchangé
+                elif isinstance(review, dict) and "improved_content" in review:
+                    results[file_path] = review["improved_content"]
+                    logger.info(f"Correction appliquée à {file_path}")
+                    
+                    # Log des problèmes trouvés
+                    if "issues" in review and review["issues"]:
+                        for issue in review["issues"]:
+                            logger.info(f"Problème dans {file_path} (L.{issue.get('line')}): {issue.get('description')}")
+        
+        return results
+        
+    def apply_code_improvements(self, files: Dict[str, str], project_context: Dict[str, Any]) -> Dict[str, str]:
+        """
+        Applique des améliorations au code en analysant tous les fichiers ensemble
+        
+        Args:
+            files: Dictionnaire contenant {chemin_fichier: contenu}
+            project_context: Contexte du projet
+            
+        Returns:
+            Dictionnaire des fichiers améliorés {chemin_fichier: contenu_amélioré}
+        """
+        # Séparer les fichiers par type (frontend/backend)
+        files_by_type = {
+            "frontend": {},
+            "backend": {}
+        }
+        
+        for path, content in files.items():
+            if any(ext in path.lower() for ext in ['.js', '.jsx', '.ts', '.tsx', '.vue', '.css', '.html']):
+                files_by_type["frontend"][path] = content
+            elif any(ext in path.lower() for ext in ['.py', '.java', '.go', '.rb', '.php', '.cs']):
+                files_by_type["backend"][path] = content
+            else:
+                # Déterminer le type en fonction du contenu ou de l'emplacement
+                if '/front/' in path or '/client/' in path:
+                    files_by_type["frontend"][path] = content
+                elif '/back/' in path or '/server/' in path or '/api/' in path:
+                    files_by_type["backend"][path] = content
+                else:
+                    # Par défaut, considérer comme backend
+                    files_by_type["backend"][path] = content
+        
+        # Effectuer la révision en masse
+        improved_files = self.bulk_code_review(files_by_type, project_context)
+        
+        # Fusionner les résultats avec les fichiers originaux
+        result = files.copy()
+        for path, improved_content in improved_files.items():
+            result[path] = improved_content
+            
+        return result
