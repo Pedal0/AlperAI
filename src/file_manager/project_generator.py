@@ -50,6 +50,56 @@ class ProjectGenerator:
         # If no name found, generate a default
         return f"app_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
+    def _remove_svg_icons_from_structure(self):
+        """
+        Supprime toute référence aux dossiers d'icônes et fichiers SVG dans la structure du projet.
+        Les icônes seront créées directement dans le code HTML/CSS/JS à la place.
+        """
+        try:
+            # Vérifier que project_structure est chargé
+            if not self.project_structure:
+                return
+                
+            # Analyser la structure si c'est une chaîne JSON
+            structure = json.loads(self.project_structure) if isinstance(self.project_structure, str) else self.project_structure
+            
+            # Filtrer les répertoires - supprimer 'assets/icons' et similaires
+            if "directories" in structure:
+                filtered_dirs = []
+                for directory in structure["directories"]:
+                    path = directory.get("path", "")
+                    # Exclure tout répertoire contenant "icons" dans son chemin
+                    if "icons" not in path.lower():
+                        filtered_dirs.append(directory)
+                    else:
+                        self.update_status(f"Suppression du répertoire d'icônes '{path}' de la structure")
+                
+                structure["directories"] = filtered_dirs
+            
+            # Filtrer les fichiers - supprimer tous les .svg et les références aux icônes
+            if "files" in structure:
+                filtered_files = []
+                for file in structure["files"]:
+                    path = file.get("path", "")
+                    # Exclure tout fichier .svg ou se trouvant dans un dossier d'icônes
+                    if not path.lower().endswith(".svg") and "/icons/" not in path.lower() and "\\icons\\" not in path.lower():
+                        filtered_files.append(file)
+                    else:
+                        self.update_status(f"Suppression du fichier SVG '{path}' de la structure")
+                
+                structure["files"] = filtered_files
+            
+            # Mettre à jour la structure
+            if isinstance(self.project_structure, str):
+                self.project_structure = json.dumps(structure)
+            else:
+                self.project_structure = structure
+                
+            self.update_status("Structure de projet modifiée: les références aux icônes SVG ont été supprimées")
+            
+        except Exception as e:
+            self.update_status(f"Avertissement: Impossible de supprimer les références aux icônes: {str(e)}")
+        
     def create_directory_structure(self, structure_json):
         """Create the directory structure from JSON structure"""
         try:
@@ -102,13 +152,22 @@ class ProjectGenerator:
                 # Update status with current file
                 self.update_status(f"Generating content for {file_path}")
                 
-                # Generate content for the file
-                file_content = generate_file_content(
-                    file_path, 
-                    self.optimized_prompt, 
-                    self.project_structure,
-                    self.element_dictionary
-                )
+                # Modifier pour générer des CSS complets sans éléments TODO ou à remplir
+                if file_path.lower().endswith('.css'):
+                    file_content = self._generate_complete_css(
+                        file_path, 
+                        self.optimized_prompt, 
+                        self.project_structure,
+                        self.element_dictionary
+                    )
+                else:
+                    # Generate content for the file
+                    file_content = generate_file_content(
+                        file_path, 
+                        self.optimized_prompt, 
+                        self.project_structure,
+                        self.element_dictionary
+                    )
                 
                 # Ensure the content doesn't have backticks or code block markers
                 file_content = clean_generated_content(file_content)
@@ -166,6 +225,83 @@ class ProjectGenerator:
         except Exception as e:
             self.update_status(f"Error populating files: {str(e)}")
             return False
+            
+    def _generate_complete_css(self, file_path, optimized_prompt, project_structure, element_dictionary):
+        """
+        Génère un fichier CSS complet et s'assure qu'il n'y a pas d'éléments manquants ou à compléter.
+        
+        Args:
+            file_path: Chemin du fichier CSS
+            optimized_prompt: Prompt optimisé
+            project_structure: Structure du projet
+            element_dictionary: Dictionnaire d'éléments
+            
+        Returns:
+            str: Contenu CSS complet
+        """
+        self.update_status(f"Générant un CSS complet pour {file_path}")
+        
+        # D'abord, générer le contenu normal
+        css_content = generate_file_content(file_path, optimized_prompt, project_structure, element_dictionary)
+        
+        # Vérifier s'il y a des TODOs ou des commentaires de remplissage
+        todo_patterns = [
+            r'/\*\s*TODO.*?\*/', 
+            r'\/\/\s*TODO.*?$',
+            r'/\*\s*À compléter.*?\*/',
+            r'\/\/\s*À compléter.*?$',
+            r'/\*\s*A remplir.*?\*/',
+            r'\/\/\s*A remplir.*?$',
+            r'\/\*\s*FILL ME.*?\*\/',
+            r'\/\/\s*FILL ME.*?$'
+        ]
+        
+        has_todos = any(re.search(pattern, css_content, re.IGNORECASE | re.MULTILINE) for pattern in todo_patterns)
+        
+        # S'il y a des TODOs, on régénère le CSS avec des instructions plus strictes
+        if has_todos:
+            self.update_status(f"Des éléments incomplets détectés dans le CSS, régénération...")
+            
+            # Créer un message système spécifique pour générer un CSS complet
+            from src.api.openrouter import generate_text
+            
+            system_message = """
+            Vous êtes un expert en CSS. Votre tâche est de générer un fichier CSS complet et fonctionnel.
+            IMPORTANT: Ne laissez AUCUN élément "à compléter", "TODO", ou tout autre espace réservé.
+            N'utilisez PAS de commentaires indiquant qu'un élément est "à remplir plus tard".
+            Chaque règle CSS doit être complète, fonctionnelle et appropriée pour l'application.
+            Fournissez TOUS les styles nécessaires pour un site web ou une application entièrement fonctionnel.
+            """
+            
+            # Créer un prompt spécifique
+            prompt = f"""
+            Générez un fichier CSS COMPLET pour : {file_path}
+            
+            Description du projet: 
+            {optimized_prompt}
+            
+            Ce fichier CSS doit:
+            1. Être ENTIÈREMENT fonctionnel et complet sans aucun élément manquant
+            2. Contenir toutes les règles CSS nécessaires pour styler l'application/site
+            3. Ne PAS contenir de TODOs, commentaires "à compléter", ou espaces réservés
+            4. Utiliser des valeurs concrètes pour tous les éléments (couleurs, tailles, etc.)
+            5. Être prêt à l'utilisation immédiate sans modification
+            
+            Le fichier CSS précédemment généré contenait des éléments incomplets. 
+            Veuillez générer un CSS complet qui répond à tous les besoins de l'application.
+            """
+            
+            # Générer le CSS complet
+            css_content = generate_text(prompt, temperature=0.4, system_message=system_message)
+            
+            # Nettoyer le contenu
+            css_content = clean_generated_content(css_content)
+            
+            # Vérification finale pour retirer tout TODO restant
+            for pattern in todo_patterns:
+                css_content = re.sub(pattern, '/* */', css_content, flags=re.IGNORECASE | re.MULTILINE)
+        
+        return css_content
     
     def enhance_code_quality(self):
         """
@@ -264,259 +400,58 @@ class ProjectGenerator:
             f.write(default_html)
     
     def generate_icons(self):
-        """Generate SVG icons based on the element dictionary and application requirements"""
-        try:
-            if not self.element_dictionary:
-                self.update_status("No element dictionary available, skipping icon generation")
-                return False
-                
-            # Parse the element dictionary if it's a string
-            if isinstance(self.element_dictionary, str):
-                try:
-                    element_dict = json.loads(self.element_dictionary)
-                except json.JSONDecodeError:
-                    # Extract JSON from the string if it's wrapped in text
-                    import re
-                    json_match = re.search(r'(\{.*\})', self.element_dictionary, re.DOTALL)
-                    if json_match:
-                        try:
-                            element_dict = json.loads(json_match.group(1))
-                        except:
-                            self.update_status("Failed to parse element dictionary JSON, skipping icon generation")
-                            return False
-                    else:
-                        self.update_status("Could not find JSON in element dictionary, skipping icon generation")
-                        return False
-            else:
-                element_dict = self.element_dictionary
-                
-            # Extract icon definitions
-            icon_definitions = element_dict.get("icons", [])
-            
-            if not icon_definitions:
-                self.update_status("No icon definitions found in element dictionary")
-                return False
-                
-            # Filter icons based on application requirements and usage in HTML/JS files
-            required_icons = self._identify_required_icons(icon_definitions)
-            
-            if not required_icons:
-                self.update_status("No specific icons required for this application")
-                return False
-                
-            self.update_status(f"Identified {len(required_icons)} required icons for the application")
-            
-            # Create SVG generator
-            from src.api.openrouter import OpenRouterAPI
-            api_client = OpenRouterAPI()
-            svg_generator = SVGIconGenerator(api_client)
-            
-            # Generate icons
-            generated_icons = svg_generator.generate_icons_for_project(
-                self.output_dir, 
-                required_icons
-            )
-            
-            # Validate the generated icons
-            valid_icons = self._validate_generated_icons(generated_icons)
-            
-            self.update_status(f"Successfully generated {len(valid_icons)} SVG icons in assets/icons directory")
-            return True
-        except Exception as e:
-            self.update_status(f"Error generating SVG icons: {str(e)}")
-            return False
+        """
+        Désactive complètement la génération d'icônes SVG - aucun dictionnaire n'est préparé.
+        Les icônes seront uniquement générées par le code frontend si nécessaire.
+        """
+        # Supprimer tout dossier d'icônes existant s'il existe déjà
+        icons_dir = os.path.join(self.output_dir, "assets", "icons")
+        if os.path.exists(icons_dir):
+            try:
+                shutil.rmtree(icons_dir)
+                self.update_status("Dossier d'icônes supprimé - les SVG ne seront générés que par le code frontend")
+            except Exception as e:
+                self.update_status(f"Note: Impossible de supprimer le dossier d'icônes: {str(e)}")
+        
+        # Ne crée pas de dictionnaire d'icônes, ne parcours pas les fichiers pour chercher des références
+        self.update_status("Aucun dictionnaire d'icônes préparé - les icônes seront gérées directement par le code frontend")
+        
+        return True
 
     def _identify_required_icons(self, icon_definitions):
         """
-        Identify ONLY icons that are actually referenced in the code.
-        Performs strict matching to ensure only exactly referenced icons are generated.
+        Cette méthode est désactivée - aucun dictionnaire d'icônes n'est créé.
+        Le code frontend est responsable de générer ses propres icônes.
+        
+        Args:
+            icon_definitions: Ignoré
+            
+        Returns:
+            dict: Dictionnaire vide
         """
-        try:
-            # First, extract all possible icons from the definitions for better matching
-            all_possible_icons = {}  # Map icon names to their definitions
-            for icon_def in icon_definitions:
-                icon_name = icon_def.get("name", "").lower()
-                if icon_name:
-                    all_possible_icons[icon_name] = icon_def
-                    
-                    # Also store without "icon-" prefix if the file has it
-                    icon_file = icon_def.get("file", "").lower()
-                    if icon_file.startswith("icon-"):
-                        base_name = icon_file[5:].replace(".svg", "")
-                        all_possible_icons[base_name] = icon_def
+        # Ne crée aucun dictionnaire - retourne un dictionnaire vide
+        return {}
+
+    def get_inline_svg(self, icon_name):
+        """
+        Génère une icône SVG à la demande, uniquement lorsqu'elle est explicitement demandée par le code frontend.
+        
+        Args:
+            icon_name (str): Nom de l'icône à générer
             
-            # Map to keep track of where each icon is referenced
-            icon_references = {}
-            
-            # Map to track actual icon filenames found in the code
-            exact_icon_filenames = set()
-            
-            self.update_status("Scanning files for exact icon references...")
-            
-            # Collect all HTML, CSS, JS files for scanning
-            code_files = []
-            for root, _, files in os.walk(self.output_dir):
-                for file in files:
-                    if file.endswith(('.html', '.js', '.css')):
-                        code_files.append(os.path.join(root, file))
-            
-            # First pass: Look for exact SVG filenames
-            for file_path in code_files:
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        
-                        # Find all .svg references
-                        svg_references = re.findall(r'([a-zA-Z0-9_-]+\.svg)', content)
-                        
-                        for svg_ref in svg_references:
-                            svg_name = svg_ref.lower()
-                            exact_icon_filenames.add(svg_name)
-                            base_name = svg_name.replace('.svg', '')
-                            # Also find without "icon-" prefix if present
-                            if base_name.startswith('icon-'):
-                                base_name = base_name[5:]
-                            
-                            # Check if this matches any defined icon
-                            for icon_name, icon_def in all_possible_icons.items():
-                                if base_name == icon_name or svg_name == icon_def.get("file", "").lower():
-                                    if icon_name not in icon_references:
-                                        icon_references[icon_name] = []
-                                    icon_references[icon_name].append((file_path, svg_ref))
-                except Exception as e:
-                    self.update_status(f"Warning: Error scanning {os.path.basename(file_path)}: {e}")
-            
-            # Second pass: Look for specific patterns indicating icons
-            icon_patterns = [
-                # Common icon pattern formats
-                r'<i[^>]*class="[^"]*(?:fa|icon)[^"]*(?:fa|icon)-([a-z0-9_-]+)[^"]*"[^>]*>',
-                r'<img[^>]*src="[^"]*\/icons\/([^"]+\.svg)"[^>]*>',
-                r'<img[^>]*src="[^"]*\/([^"]+\.svg)"[^>]*>',
-                r'<svg[^>]*class="[^"]*(?:icon|svg)-([a-z0-9_-]+)[^"]*"[^>]*>',
-                r'<use[^>]*xlink:href="[^"]*#icon-([a-z0-9_-]+)[^"]*"[^>]*>',
-                r'"iconName":\s*"([a-z0-9_-]+)"',
-                r'\.icon-([a-z0-9_-]+)\s*{',
-                r'loadIcon\("([a-z0-9_-]+)"\)',
-                r'getIcon\("([a-z0-9_-]+)"\)',
-            ]
-            
-            for file_path in code_files:
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        
-                        # Check all patterns
-                        for pattern in icon_patterns:
-                            matches = re.findall(pattern, content, re.IGNORECASE)
-                            for match in matches:
-                                match_lower = match.lower()
-                                base_name = match_lower.replace('.svg', '')
-                                
-                                # Strip common prefixes that might be in the match
-                                for prefix in ['icon-', 'fa-', 'svg-']:
-                                    if base_name.startswith(prefix):
-                                        base_name = base_name[len(prefix):]
-                                
-                                # Check if this matches any defined icon
-                                for icon_name, icon_def in all_possible_icons.items():
-                                    if base_name == icon_name:
-                                        if icon_name not in icon_references:
-                                            icon_references[icon_name] = []
-                                        icon_references[icon_name].append((file_path, match))
-                except Exception as e:
-                    self.update_status(f"Warning: Error pattern scanning {os.path.basename(file_path)}: {e}")
-            
-            # Special case: Look for specific icon names in comments or text
-            specific_icon_patterns = [
-                # Look for patterns like "XXX.svg - Used for..." or "Uses XXX icon for..."
-                r'([a-z0-9_-]+)\.svg\s*[-–—]\s*[uU]sed for',
-                r'[uU]se(?:s|d)?\s+([a-z0-9_-]+)\s+icon\s+for',
-                r'[uU]se(?:s|d)?\s+([a-z0-9_-]+)\.svg\s+for',
-            ]
-            
-            for file_path in code_files:
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        
-                        for pattern in specific_icon_patterns:
-                            matches = re.findall(pattern, content, re.IGNORECASE)
-                            for match in matches:
-                                match_lower = match.lower()
-                                base_name = match_lower.replace('.svg', '')
-                                
-                                # Check if this matches any defined icon
-                                for icon_name, icon_def in all_possible_icons.items():
-                                    if base_name == icon_name:
-                                        if icon_name not in icon_references:
-                                            icon_references[icon_name] = []
-                                        icon_references[icon_name].append((file_path, f"{match}.svg (from comment)"))
-                except Exception:
-                    pass
-            
-            # Log findings
-            if icon_references:
-                required_icons = list(icon_references.keys())
-                self.update_status(f"Found {len(required_icons)} specific icon references:")
-                
-                for icon_name in required_icons:
-                    references = icon_references[icon_name]
-                    file_refs = [f"{os.path.relpath(ref[0], self.output_dir)} ({ref[1]})" for ref in references]
-                    self.update_status(f"  - {icon_name}: referenced in {', '.join(file_refs)}")
-                    
-                # Check for exact icon filenames that weren't matched to our definitions
-                if exact_icon_filenames:
-                    unmatched = [f for f in exact_icon_filenames if not any(f.replace('.svg', '') == name or f == all_possible_icons.get(name, {}).get('file', '').lower() for name in required_icons)]
-                    if unmatched:
-                        self.update_status(f"Found {len(unmatched)} SVG filenames with no matching definitions:")
-                        for unmatch in unmatched:
-                            self.update_status(f"  - {unmatch} (no matching definition)")
-                        
-                        # Try to find the closest match in our definitions
-                        for unmatch in unmatched:
-                            base_name = unmatch.replace('.svg', '')
-                            
-                            # Look for a similar icon in our definitions
-                            best_match = None
-                            best_score = 0
-                            for name, def_obj in all_possible_icons.items():
-                                # Simple similarity score (number of shared characters)
-                                score = sum(1 for c in base_name if c in name)
-                                if score > best_score:
-                                    best_score = score
-                                    best_match = name
-                            
-                            if best_match and best_score > len(base_name) / 2:  # At least half the characters match
-                                self.update_status(f"  - Using {best_match} as closest match for {unmatch}")
-                                if best_match not in required_icons:
-                                    required_icons.append(best_match)
-                            else:
-                                # Create a custom icon definition for this filename
-                                for icon_def in icon_definitions:
-                                    if base_name == icon_def.get("name", "").lower():
-                                        if base_name not in required_icons:
-                                            required_icons.append(base_name)
-                                        break
-            else:
-                self.update_status("No specific icon references found in code.")
-                required_icons = []
-            
-            # Filter the icon definitions to only those that are actually used
-            filtered_icons = []
-            for icon_def in icon_definitions:
-                icon_name = icon_def.get("name", "").lower()
-                if icon_name in required_icons:
-                    filtered_icons.append(icon_def)
-            
-            if filtered_icons:
-                self.update_status(f"Will generate only the {len(filtered_icons)} icons actually used: {', '.join(icon_def.get('name', '') for icon_def in filtered_icons)}")
-            else:
-                self.update_status("No icons will be generated as none are referenced in the code.")
-            
-            return filtered_icons
-        except Exception as e:
-            self.update_status(f"Warning: Error identifying required icons: {e}")
-            return []
+        Returns:
+            str: Contenu SVG inline
+        """
+        # Si le générateur SVG n'est pas initialisé, le créer
+        if not hasattr(self, 'svg_generator'):
+            from src.api.openrouter import OpenRouterAPI
+            api_client = OpenRouterAPI()
+            from src.generators.svg_generator import SVGIconGenerator
+            self.svg_generator = SVGIconGenerator(api_client)
+        
+        # Génère l'icône à la demande sans utiliser de dictionnaire préétabli
+        icon_description = f"{icon_name} icon"
+        return self.svg_generator.get_inline_svg_content(icon_name, icon_description)
 
     def _validate_generated_icons(self, generated_icons):
         """
@@ -587,11 +522,33 @@ class ProjectGenerator:
             self.update_progress(0.15)
             self.project_structure = generate_project_structure(self.optimized_prompt)
             
+            # Supprimer les références aux icônes SVG dans la structure
+            self._remove_svg_icons_from_structure()
+            
             # Phase 2.5: Generate element dictionary for consistency
             if 'static website' in self.user_prompt.lower() or 'html' in self.user_prompt.lower():
                 self.update_status("Creating element dictionary for consistent naming...")
                 self.update_progress(0.2)
                 self.element_dictionary = generate_element_dictionary(self.optimized_prompt)
+                
+                # Ajouter une instruction pour les icônes SVG inline
+                try:
+                    if isinstance(self.element_dictionary, str):
+                        element_dict = json.loads(self.element_dictionary)
+                        # Ajouter une instruction spéciale pour les icônes
+                        if "instructions" not in element_dict:
+                            element_dict["instructions"] = []
+                        
+                        element_dict["instructions"].append({
+                            "type": "svg_icons",
+                            "message": "Les icônes SVG doivent être intégrées directement dans le code HTML/CSS/JS en dur, sans utiliser de fichiers externes."
+                        })
+                        
+                        # Remise en JSON
+                        self.element_dictionary = json.dumps(element_dict)
+                except Exception as e:
+                    self.update_status(f"Note: Impossible d'ajouter l'instruction pour les icônes SVG: {str(e)}")
+                
                 os.makedirs(self.output_dir, exist_ok=True)
                 # Save the element dictionary to the project
                 with open(os.path.join(self.output_dir, "element-dictionary.json"), 'w', encoding='utf-8') as f:
@@ -610,7 +567,7 @@ class ProjectGenerator:
                     'optimized_prompt': self.optimized_prompt
                 }
             
-            # Phase 4: Populate files - NOUVEAU: Maintenant avant la génération des SVG
+            # Phase 4: Populate files
             self.update_status("Generating code for files...")
             self.update_progress(0.4)
             if not self.populate_files(self.project_structure):
@@ -626,12 +583,6 @@ class ProjectGenerator:
             if 'static website' in self.user_prompt.lower() and not os.path.exists(os.path.join(self.output_dir, 'index.html')):
                 self.update_status("Creating missing index.html...")
                 self.generate_default_index_html()
-            
-            # Phase 4.5: Generate SVG Icons APRÈS la génération des fichiers HTML
-            if self.element_dictionary:
-                self.update_status("Analyzing HTML files and generating required SVG icons...")
-                self.update_progress(0.65)
-                self.generate_icons()
             
             # Phase 5: Validate and enhance code
             self.update_status("Enhancing code quality...")
