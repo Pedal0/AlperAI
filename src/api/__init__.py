@@ -1,1 +1,1 @@
-from .client import AIAppGeneratorAPI
+# API integration package

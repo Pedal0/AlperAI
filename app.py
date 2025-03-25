@@ -1,58 +1,29 @@
 import streamlit as st
-import sys
-import os
-import logging
-from dotenv import load_dotenv
-
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-from src.ui.page import setup_page, show_how_it_works
-from src.ui.common import initialize_session_state, create_tabs, set_active_tab
-from src.ui.initial_setup import show_initial_setup_tab
-from src.ui.review_tab import show_review_tab
-from src.ui.generation_tab import show_generation_tab  # Ajouter l'import pour l'onglet de génération
-
-logger = logging.getLogger(__name__)
-
-logging.basicConfig(level=logging.INFO,
-                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+from src.ui.interface import create_ui
+from src.config.constants import APP_TITLE, APP_DESCRIPTION
 
 def main():
-    """Main Streamlit application function"""
-    load_dotenv()
+    # Set page configuration
+    st.set_page_config(
+        page_title=APP_TITLE,
+        page_icon="🤖",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
     
-    # Set up the main page
-    setup_page()
+    # Load and apply custom CSS
+    try:
+        with open("src/ui/styles.css", "r") as f:
+            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.warning("CSS file not found. Using default styles.")
     
-    # Initialize session state for multi-step process
-    initialize_session_state()
+    # Display app header
+    st.title(APP_TITLE)
+    st.markdown(APP_DESCRIPTION)
     
-    # Get API keys from environment
-    openai_api_key = os.getenv("OPENAI_API_KEY", "")
-    openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "")
-    
-    # Show API key requirements in the UI
-    if not openai_api_key and not openrouter_api_key:
-        st.error("No API keys found. Please add at least one of these to your .env file:")
-        st.code("OPENAI_API_KEY=your_openai_key_here\nOPENROUTER_API_KEY=your_openrouter_key_here")
-    
-    # Créer les onglets
-    tab1, tab2, tab3 = st.tabs(["Definition", "Review", "Generation"])  # Renommer le dernier onglet en "Generation"
-
-    with tab1:
-        show_initial_setup_tab(openai_api_key)
-        
-    with tab2:
-        show_review_tab(openai_api_key)
-        
-    with tab3:
-        show_generation_tab(openai_api_key)  # Utilisez la fonction pour l'onglet de génération
-
-    # Set the active tab based on the current step
-    set_active_tab()
-    
-    # Show the "How it works" section
-    show_how_it_works()
+    # Create the main UI
+    create_ui()
 
 if __name__ == "__main__":
     main()
