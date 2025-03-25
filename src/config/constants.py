@@ -31,6 +31,7 @@ PRECISE_TEMPERATURE = 0.3
 GENERATION_PHASES = [
     "Analyzing requirements",
     "Designing architecture",
+    "Creating element dictionary",
     "Creating file structure",
     "Generating frontend code",
     "Generating backend code",
@@ -41,7 +42,8 @@ GENERATION_PHASES = [
 
 # File generation defaults
 DEFAULT_OUTPUT_DIR = "./generated_app"
-README_TEMPLATE = """# {app_name}
+README_TEMPLATE = """
+# {app_name}
 
 {app_description}
 

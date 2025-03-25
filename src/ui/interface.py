@@ -3,6 +3,7 @@ import streamlit as st
 import time
 import threading
 import queue
+import json
 from src.config.constants import DEFAULT_OUTPUT_DIR, GENERATION_PHASES
 from src.file_manager.project_generator import ProjectGenerator
 from src.api.openrouter import optimize_prompt
@@ -298,6 +299,15 @@ def render_complete_phase():
     st.write("### Application Details")
     st.write(f"**Output Directory:** `{result['output_dir']}`")
     st.write(f"**ZIP File:** `{result['zip_path']}`")
+    
+    # Display element dictionary if available
+    if result.get('element_dictionary'):
+        with st.expander("View Element Dictionary"):
+            try:
+                element_dict = json.loads(result['element_dictionary'])
+                st.json(element_dict)
+            except:
+                st.code(result['element_dictionary'])
     
     # Display the optimized prompt
     with st.expander("View Application Requirements"):
