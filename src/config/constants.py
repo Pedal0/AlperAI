@@ -15,7 +15,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # OpenRouter configuration
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_SITE_URL = "https://ai-application-generator.com"  # Placeholder URL
+OPENROUTER_SITE_URL = "https://ai-application-generator.com"
 OPENROUTER_SITE_NAME = "AI Application Generator"
 OPENROUTER_MODEL = "google/gemini-2.0-flash-001"
 
@@ -23,7 +23,7 @@ OPENROUTER_MODEL = "google/gemini-2.0-flash-001"
 OPENAI_MODEL = "gpt-4o-mini"
 
 # Generation settings
-DEFAULT_TEMPERATURE = 0.7
+DEFAULT_TEMPERATURE = 0.6
 CREATIVE_TEMPERATURE = 0.8
 PRECISE_TEMPERATURE = 0.3
 
@@ -35,6 +35,7 @@ GENERATION_PHASES = [
     "Creating file structure",
     "Generating frontend code",
     "Generating backend code",
+    "Enhancing code quality",
     "Generating configuration files",
     "Finalizing project files",
     "Creating documentation"
