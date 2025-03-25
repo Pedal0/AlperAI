@@ -1,2 +1,1 @@
-from .constants import *
-from .prompts import *
+# Configuration package

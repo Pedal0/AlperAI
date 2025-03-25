@@ -1,38 +1,65 @@
 import os
+from dotenv import load_dotenv
 
-# Default OpenAI model
-API_MODEL = "gpt-4o-mini"
+# Load environment variables
+load_dotenv()
+
+# App configuration
+APP_TITLE = "AI Application Generator"
+APP_DESCRIPTION = "Generate complete, functional applications from text descriptions"
+
+# API configuration
+USE_OPENROUTER = True
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # OpenRouter configuration
-USE_OPENROUTER = True  # Set to True to use OpenRouter, False to use OpenAI directly
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_MODEL = "google/gemini-2.0-flash-001"  # The model to use with OpenRouter
+OPENROUTER_SITE_URL = "https://ai-application-generator.com"
+OPENROUTER_SITE_NAME = "AI Application Generator"
+OPENROUTER_MODEL = "google/gemini-2.0-flash-001"
 
-# Températures par type d'agent
-TEMPERATURES = {
-    "default": 0.5,
-    "requirements": 0.7,     # Plus créatif pour l'analyse des besoins
-    "architecture": 0.6,     # Créatif mais structuré
-    "database": 0.4,         # Plus précis
-    "api": 0.4,              # Plus précis
-    "code": 0.4,             # Très précis pour la génération de code
-    "review": 0.1,           # Extrêmement précis pour la révision
-    "test": 0.3,             # Précis pour les tests
-    "css": 0.8,              # Très créatif pour le design CSS
-    "reformulation": 0.7,    # Créatif pour la reformulation
-    "fixer": 0.2,            # Précis pour la correction d'erreurs
-    "agent_team": 0.5,       # For agent team - always uses OpenAI directly
-    
-    # Températures pour l'équipe d'agents
-    "structure_creator": 0.3,  # Précis pour la structure du projet
-    "frontend_developer": 0.4, # Balance entre créativité et précision pour le frontend
-    "backend_developer": 0.2,  # Très précis pour le backend
-    "project_manager": 0.5     # Équilibré pour la coordination
-}
+# OpenAI fallback configuration
+OPENAI_MODEL = "gpt-4o-mini"
 
-# Configuration pour l'équipe d'agents de vérification
-AGENT_TEAM_ENABLED = True
-AGENT_TEAM_WAIT_TIME = 60  # Temps en secondes à attendre pour que les agents terminent leur travail
+# Generation settings
+DEFAULT_TEMPERATURE = 0.6
+CREATIVE_TEMPERATURE = 0.8
+PRECISE_TEMPERATURE = 0.3
 
-MAX_TOKENS_DEFAULT = 20000
-MAX_TOKENS_LARGE = 50000
+# Generation phases
+GENERATION_PHASES = [
+    "Analyzing requirements",
+    "Designing architecture",
+    "Creating element dictionary",
+    "Creating file structure",
+    "Generating frontend code",
+    "Generating backend code",
+    "Enhancing code quality",
+    "Generating configuration files",
+    "Finalizing project files",
+    "Creating documentation"
+]
+
+# File generation defaults
+DEFAULT_OUTPUT_DIR = "./generated_app"
+README_TEMPLATE = """
+# {app_name}
+
+{app_description}
+
+## Features
+{features}
+
+## Installation
+{installation}
+
+## Usage
+{usage}
+
+## Project Structure
+{structure}
+
+## License
+This project is open source and available under the MIT License.
+"""
