@@ -2,13 +2,15 @@ import os
 import logging
 from pathlib import Path
 import re
+import base64
 
 logger = logging.getLogger(__name__)
 
 class SVGIconGenerator:
     """
-    A generator for SVG icons to be used in web applications.
-    Creates standardized, accessible SVG icons based on provided specifications.
+    A generator for inline SVG icons to be used in web applications.
+    Only generates SVG markup for inline embedding - does NOT create SVG files.
+    The preferred method is to embed SVG icons directly in CSS.
     """
     
     def __init__(self, ai_provider):
@@ -22,7 +24,7 @@ class SVGIconGenerator:
         
     def generate_svg_icon(self, icon_name, icon_description=None, app_type="web"):
         """
-        Generate an SVG icon based on the provided name and description.
+        Generate SVG markup for inline use only - does NOT create files.
         
         Args:
             icon_name (str): The name of the icon to generate
@@ -30,7 +32,7 @@ class SVGIconGenerator:
             app_type (str): The type of application the icon will be used in
             
         Returns:
-            str: The SVG markup for the requested icon
+            str: The SVG markup for the requested icon (for inline use only)
         """
         # If no description provided, create one from the name
         if not icon_description:
@@ -94,7 +96,7 @@ class SVGIconGenerator:
         if icon_name.lower() in common_icons:
             prompt_params["icon_description"] = common_icons[icon_name.lower()]
         
-        # Add explicit instructions for better SVGs
+        # Add explicit instructions for better SVGs and to ensure inline-only usage
         prompt_params["additional_instructions"] = f"""
         IMPORTANT:
         1. Create a SIMPLE, clean SVG icon for '{icon_name}' that matches this description: {icon_description}
@@ -105,6 +107,7 @@ class SVGIconGenerator:
         6. Include only essential elements for recognition
         7. Use minimal paths and shapes
         8. The icon should look professional and consistent with standard icon sets
+        9. ONLY CREATE INLINE SVG CODE - this will NOT be saved as a separate file
         """
         
         try:
@@ -137,59 +140,25 @@ class SVGIconGenerator:
     
     def generate_icons_for_project(self, project_path, icon_definitions):
         """
-        Generate multiple icons for a project and save them to the appropriate directory.
+        COMPLETELY DISABLED - No SVG files will be generated.
+        This method now explicitly logs a warning and returns an empty list.
         
         Args:
-            project_path (str): The root path of the project
-            icon_definitions (list): List of dictionaries containing icon specifications
-                                    Each dict should have 'name', 'file', and 'description' keys
+            project_path (str): Ignored
+            icon_definitions (list): Ignored
         
         Returns:
-            list: Paths to the generated icon files
+            list: Empty list as no files are generated
         """
-        if not icon_definitions:
-            logger.warning("No icon definitions provided, skipping icon generation")
-            return []
-        
-        # Create icons directory if it doesn't exist
-        icons_dir = Path(project_path) / "assets" / "icons"
-        icons_dir.mkdir(parents=True, exist_ok=True)
-        
-        generated_files = []
-        
-        logger.info(f"Generating {len(icon_definitions)} specific icons")
-        
-        for icon_def in icon_definitions:
-            icon_name = icon_def.get("name", "")
-            # Get the exact filename from the definition or construct it with the correct format
-            icon_file = icon_def.get("file", "")
-            if not icon_file:
-                icon_file = f"{icon_name}.svg" if not icon_name.startswith("icon-") else f"{icon_name}.svg"
-            
-            if not icon_file.lower().endswith('.svg'):
-                icon_file += '.svg'
-                
-            icon_description = icon_def.get("description", f"{icon_name} icon")
-            
-            try:
-                logger.info(f"Generating icon: {icon_name} ({icon_file})")
-                svg_content = self.generate_svg_icon(icon_name, icon_description)
-                
-                icon_path = icons_dir / icon_file
-                
-                with open(icon_path, 'w', encoding='utf-8') as f:
-                    f.write(svg_content)
-                
-                generated_files.append(str(icon_path))
-                logger.info(f"Generated icon: {icon_file}")
-            except Exception as e:
-                logger.error(f"Failed to generate icon '{icon_name}': {e}")
-        
-        return generated_files
+        logger.warning(
+            "SVG file generation is explicitly disabled. No SVG files will be created. "
+            "For icons, use inline SVG via get_inline_svg_content() method instead."
+        )
+        return []
     
     def _clean_svg_content(self, svg_content):
         """
-        Clean and optimize the SVG content.
+        Clean and optimize the SVG content for inline use.
         
         Args:
             svg_content (str): The raw SVG content
@@ -258,7 +227,7 @@ class SVGIconGenerator:
             return False
             
         # Check for content within the SVG (at least one shape element)
-        shape_elements = ['path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'ellipse']
+        shape_elements = ['path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'ellipse', 'text']
         has_shape = any(f'<{shape}' in svg_content.lower() for shape in shape_elements)
         if not has_shape:
             return False
@@ -277,12 +246,189 @@ class SVGIconGenerator:
             icon_name (str): The name of the icon
             
         Returns:
-            str: A simple placeholder SVG
+            str: A simple placeholder SVG for inline use
         """
         first_char = icon_name[0].upper() if icon_name else "I"
         
-        return f"""<!-- Placeholder for {icon_name} icon -->
+        return f"""<!-- Placeholder for {icon_name} icon (inline use only) -->
 <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
   <circle cx="12" cy="12" r="10"></circle>
   <text x="12" y="16" text-anchor="middle" fill="currentColor" font-size="12">{first_char}</text>
 </svg>"""
+
+    def get_inline_svg_content(self, icon_name, icon_description=None, app_type="web"):
+        """
+        Get SVG content for inline embedding directly in HTML/JS/CSS files.
+        This is the ONLY supported method for using SVG icons.
+        
+        Args:
+            icon_name (str): The name of the icon to generate
+            icon_description (str): A description of what the icon represents
+            app_type (str): The type of application the icon will be used in
+            
+        Returns:
+            str: The SVG markup for the requested icon (optimized for inline use)
+        """
+        svg_content = self.generate_svg_icon(icon_name, icon_description, app_type)
+        
+        # Optimize the SVG for inline usage
+        # Strip any XML declarations or doctype
+        svg_content = re.sub(r'<\?xml[^>]*\?>', '', svg_content)
+        svg_content = re.sub(r'<!DOCTYPE[^>]*>', '', svg_content)
+        
+        # Minify by removing unnecessary whitespace
+        svg_content = re.sub(r'>\s+<', '><', svg_content)
+        svg_content = re.sub(r'\s{2,}', ' ', svg_content)
+        
+        # Add comment to clarify this is for inline use only
+        if '<!--' not in svg_content:
+            svg_content = f"<!-- {icon_name} icon (inline use only) -->\n{svg_content}"
+        
+        return svg_content.strip()
+    
+    def get_css_svg_content(self, icon_name, icon_description=None, app_type="web", as_data_uri=False):
+        """
+        Get SVG content formatted for embedding directly in CSS files.
+        This is the PREFERRED method for using SVG icons in the application.
+        
+        Args:
+            icon_name (str): The name of the icon to generate
+            icon_description (str): A description of what the icon represents
+            app_type (str): The type of application the icon will be used in
+            as_data_uri (bool): If True, returns a data URI format for background-image
+                               If False, returns CSS for mask-image with the SVG embedded
+            
+        Returns:
+            str: CSS code with the SVG content embedded
+        """
+        svg_content = self.generate_svg_icon(icon_name, icon_description, app_type)
+        
+        # Optimize the SVG for CSS usage
+        svg_content = re.sub(r'<\?xml[^>]*\?>', '', svg_content)
+        svg_content = re.sub(r'<!DOCTYPE[^>]*>', '', svg_content)
+        svg_content = re.sub(r'>\s+<', '><', svg_content)
+        svg_content = re.sub(r'\s{2,}', ' ', svg_content)
+        svg_content = svg_content.strip()
+        
+        # Remove any existing comments
+        svg_content = re.sub(r'<!--.*?-->', '', svg_content)
+        
+        if as_data_uri:
+            # Encode as data URI for background-image
+            # First, ensure the SVG is properly encoded for a URI
+            svg_uri_encoded = svg_content.replace('#', '%23')
+            svg_uri_encoded = svg_uri_encoded.replace('"', "'")
+            
+            css = f"""/* {icon_name} icon */
+.icon-{icon_name.lower().replace(' ', '-')} {{
+    background-image: url("data:image/svg+xml,{svg_uri_encoded}");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+}}"""
+        else:
+            # Use mask-image with embedded SVG (modern approach)
+            css = f"""/* {icon_name} icon */
+.icon-{icon_name.lower().replace(' ', '-')} {{
+    mask-image: url('data:image/svg+xml,{svg_content.replace('"', "'")}');
+    -webkit-mask-image: url('data:image/svg+xml,{svg_content.replace('"', "'")}');
+    mask-size: cover;
+    -webkit-mask-size: cover;
+    mask-repeat: no-repeat;
+    -webkit-mask-repeat: no-repeat;
+    background-color: currentColor;
+}}"""
+            
+        return css
+    
+    def generate_css_icon_library(self, icon_names):
+        """
+        Generate a complete CSS file with all requested icons embedded.
+        This is the recommended way to include SVG icons in projects.
+        
+        Args:
+            icon_names (list): List of icon names to include in the library
+            
+        Returns:
+            str: Complete CSS content with all icons embedded
+        """
+        css_content = [
+            "/* SVG Icon Library - Auto-generated */",
+            "/* Use these classes with a div or span element */",
+            "/* All icons use currentColor for coloring - inherit from parent */",
+            ""
+        ]
+        
+        for icon_name in icon_names:
+            css_content.append(self.get_css_svg_content(icon_name))
+            css_content.append("")
+        
+        # Add helper class for common styling
+        css_content.append("""
+/* Common icon styling */
+.icon {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    vertical-align: middle;
+}
+""")
+        
+        return "\n".join(css_content)
+    
+    def should_ignore_svg_file(self, file_path):
+        """
+        Check if an SVG file in the project structure should be ignored.
+        
+        Args:
+            file_path (str): Path to the potential SVG file
+            
+        Returns:
+            bool: True if the file is an SVG that should be ignored
+        """
+        # Check if this is an SVG file
+        if file_path.lower().endswith('.svg'):
+            logger.warning(f"SVG file detected and will be ignored: {file_path}. Use CSS-embedded SVG icons instead.")
+            return True
+        return False
+    
+    def get_svg_replacement_suggestion(self, svg_filename):
+        """
+        Generate a suggestion for replacing a SVG file reference with CSS-embedded SVG.
+        Used by code reviewers to suggest better practices.
+        
+        Args:
+            svg_filename (str): The name of the SVG file being referenced
+            
+        Returns:
+            str: A suggestion for how to replace the SVG reference
+        """
+        icon_name = os.path.splitext(os.path.basename(svg_filename))[0]
+        
+        suggestion = f"""
+SUGGESTION: Replace the reference to '{svg_filename}' with a CSS class:
+
+1. Add this SVG to your CSS file using the SVGIconGenerator:
+   ```
+   {self.get_css_svg_content(icon_name)}
+   ```
+
+2. Replace the <img> tag with:
+   ```html
+   <span class="icon icon-{icon_name.lower().replace(' ', '-')}"></span>
+   ```
+
+3. Or for background image in CSS, replace:
+   ```css
+   background-image: url('{svg_filename}');
+   ```
+   with:
+   ```css
+   background-color: currentColor;
+   mask-image: url('data:image/svg+xml,...'); /* Use the generator */
+   -webkit-mask-image: url('data:image/svg+xml,...'); /* Use the generator */
+   mask-size: cover;
+   -webkit-mask-size: cover;
+   ```
+"""
+        return suggestion
