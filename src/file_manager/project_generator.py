@@ -12,7 +12,8 @@ from src.api.openrouter import (
     generate_file_content,
     generate_readme,
     clean_generated_content,
-    extract_external_resources
+    extract_external_resources,
+    generate_element_dictionary
 )
 from src.config.constants import DEFAULT_OUTPUT_DIR
 
@@ -24,6 +25,7 @@ class ProjectGenerator:
         self.update_status = update_status or (lambda x: None)
         self.optimized_prompt = None
         self.project_structure = None
+        self.element_dictionary = None
         self.app_name = None
         
     def extract_app_name(self):
@@ -102,7 +104,8 @@ class ProjectGenerator:
                 file_content = generate_file_content(
                     file_path, 
                     self.optimized_prompt, 
-                    self.project_structure
+                    self.project_structure,
+                    self.element_dictionary
                 )
                 
                 # Ensure the content doesn't have backticks or code block markers
@@ -128,7 +131,8 @@ class ProjectGenerator:
                 file_content = generate_file_content(
                     file_path, 
                     self.optimized_prompt, 
-                    self.project_structure
+                    self.project_structure,
+                    self.element_dictionary
                 )
                 
                 # Ensure the content doesn't have backticks or code block markers
@@ -229,12 +233,23 @@ class ProjectGenerator:
             
             # Phase 2: Generate project structure as JSON
             self.update_status("Designing project structure...")
-            self.update_progress(0.2)
+            self.update_progress(0.15)
             self.project_structure = generate_project_structure(self.optimized_prompt)
+            
+            # Phase 2.5: Generate element dictionary for consistency
+            if 'static website' in self.user_prompt.lower() or 'html' in self.user_prompt.lower():
+                self.update_status("Creating element dictionary for consistent naming...")
+                self.update_progress(0.2)
+                self.element_dictionary = generate_element_dictionary(self.optimized_prompt)
+                
+                # Save the element dictionary to the project
+                os.makedirs(self.output_dir, exist_ok=True)
+                with open(os.path.join(self.output_dir, "element-dictionary.json"), 'w', encoding='utf-8') as f:
+                    f.write(self.element_dictionary)
             
             # Phase 3: Create directory structure
             self.update_status("Creating directory structure...")
-            self.update_progress(0.3)
+            self.update_progress(0.25)
             os.makedirs(self.output_dir, exist_ok=True)
             if not self.create_directory_structure(self.project_structure):
                 return {
@@ -282,7 +297,8 @@ class ProjectGenerator:
                 'output_dir': self.output_dir,
                 'zip_path': zip_path,
                 'app_name': self.app_name,
-                'optimized_prompt': self.optimized_prompt
+                'optimized_prompt': self.optimized_prompt,
+                'element_dictionary': self.element_dictionary
             }
         except Exception as e:
             self.update_status(f"Error: {str(e)}")

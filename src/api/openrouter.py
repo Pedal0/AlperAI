@@ -13,6 +13,7 @@ from src.config.constants import (
     USE_OPENROUTER,
     DEFAULT_TEMPERATURE
 )
+from src.api.prompts import SYSTEM_MESSAGES, PROMPTS, FALLBACKS
 
 def get_client():
     """Return the appropriate client based on configuration"""
@@ -96,67 +97,15 @@ def generate_text(prompt, temperature=DEFAULT_TEMPERATURE, system_message=None, 
 
 def optimize_prompt(user_prompt):
     """Optimize user prompt for better results"""
-    system_message = """
-    You are an expert application design assistant. Your task is to take a user's application 
-    description and enhance it by adding structure, clarifying ambiguities, and suggesting 
-    relevant features. Maintain the original intent while making it as clear and detailed as possible.
-    """
-    
-    prompt = f"""
-    Please optimize and enhance the following application description by:
-    1. Clarifying any ambiguous requirements
-    2. Adding appropriate structure
-    3. Suggesting relevant technologies and features
-    4. Organizing the requirements in a logical manner
-
-    Original Description:
-    {user_prompt}
-    
-    Please provide the optimized description in a clear, structured format.
-    """
+    system_message = SYSTEM_MESSAGES["optimize_prompt"]
+    prompt = PROMPTS["optimize_prompt"].format(user_prompt=user_prompt)
     
     return generate_text(prompt, temperature=0.3, system_message=system_message)
 
 def generate_project_structure(optimized_prompt):
     """Generate project structure based on the optimized prompt as JSON"""
-    system_message = """
-    You are an expert software architect. Your task is to design an appropriate project structure
-    for the described application. Consider best practices for the technologies involved and create
-    a logical file organization. You MUST return the structure as a valid JSON object.
-    """
-    
-    prompt = f"""
-    Based on the following application requirements, design a comprehensive project structure
-    with appropriate directories and files. Consider separation of concerns, maintainability,
-    and best practices for the technologies involved.
-
-    Application Requirements:
-    {optimized_prompt}
-    
-    Return a JSON structure representing the project directories and files. Use the following format:
-    {{
-        "directories": [
-            {{
-                "name": "directory_name",
-                "path": "relative/path/to/directory",
-                "description": "Brief description of the directory's purpose"
-            }}
-        ],
-        "files": [
-            {{
-                "name": "filename.ext",
-                "path": "relative/path/to/file",
-                "description": "Brief description of the file's purpose",
-                "type": "code|config|data|documentation|style|test"
-            }}
-        ]
-    }}
-
-    Make sure all paths are correct and consistent. Use proper file extensions based on the content.
-    Don't include '│', '├──', '└──' or similar characters for tree visualization.
-    
-    IMPORTANT: For static websites, ALWAYS include an index.html file at the root level.
-    """
+    system_message = SYSTEM_MESSAGES["project_structure"]
+    prompt = PROMPTS["project_structure"].format(optimized_prompt=optimized_prompt)
     
     try:
         structure_json = generate_text(prompt, temperature=0.4, system_message=system_message, json_mode=True)
@@ -190,13 +139,29 @@ def generate_project_structure(optimized_prompt):
             return structure_json
         except:
             # Return a minimal valid structure if everything fails
-            return json.dumps({
-                "directories": [{"name": "src", "path": "src", "description": "Source code"}],
-                "files": [
-                    {"name": "README.md", "path": "README.md", "description": "Documentation", "type": "documentation"},
-                    {"name": "index.html", "path": "index.html", "description": "Main entry point", "type": "code"}
-                ]
-            })
+            return json.dumps(FALLBACKS["project_structure"])
+
+def generate_element_dictionary(optimized_prompt):
+    """
+    Generate a dictionary of HTML elements, classes, and IDs to use consistently
+    
+    Args:
+        optimized_prompt (str): The optimized prompt
+        
+    Returns:
+        str: JSON string containing element dictionary
+    """
+    system_message = SYSTEM_MESSAGES["element_dictionary"]
+    prompt = PROMPTS["element_dictionary"].format(optimized_prompt=optimized_prompt)
+    
+    try:
+        elements_json = generate_text(prompt, temperature=0.3, system_message=system_message, json_mode=True)
+        # Validate JSON
+        json.loads(elements_json)
+        return elements_json
+    except:
+        # Return a minimal dictionary if generation fails
+        return json.dumps(FALLBACKS["element_dictionary"])
 
 def generate_frontend_code(optimized_prompt, project_structure):
     """Generate frontend code based on the optimized prompt and project structure"""
@@ -244,10 +209,10 @@ def generate_backend_code(optimized_prompt, project_structure):
     
     return generate_text(prompt, temperature=0.5, system_message=system_message)
 
-def generate_file_content(file_path, optimized_prompt, project_structure):
+def generate_file_content(file_path, optimized_prompt, project_structure, element_dictionary=None):
     """Generate content for a specific file based on its path"""
     file_name = os.path.basename(file_path)
-    file_ext = os.path.splitext(file_name)[1]
+    file_ext = os.path.splitext(file_name)[1].lower()
     
     # Parse project structure if it's a JSON string
     structure_info = {}
@@ -264,60 +229,103 @@ def generate_file_content(file_path, optimized_prompt, project_structure):
         # If JSON parsing fails, continue without the additional context
         pass
     
+    # Parse element dictionary if it's a JSON string
+    element_dict_parsed = None
+    try:
+        if element_dictionary:
+            element_dict_parsed = json.loads(element_dictionary) if isinstance(element_dictionary, str) else element_dictionary
+    except:
+        # Continue without element dictionary if parsing fails
+        pass
+        
     # Add specific context about the file's purpose if available
     file_description = structure_info.get("description", f"A {file_ext} file named {file_name}")
     file_type = structure_info.get("type", "code")
     
-    system_message = f"""
-    You are an expert developer specializing in creating {file_ext} files. Your task
-    is to generate clean, functional code for a {file_name} file that meets the application requirements.
+    # Special handling for HTML files
+    if file_ext == '.html':
+        # Extract external resource files from project structure
+        external_resources = extract_external_resources(project_structure)
+        css_files = ', '.join([f'"{css}"' for css in external_resources['css']]) if external_resources['css'] else 'None'
+        js_files = ', '.join([f'"{js}"' for js in external_resources['js']]) if external_resources['js'] else 'None'
+        
+        system_message = SYSTEM_MESSAGES["html_generator"].format(
+            file_name=file_name,
+            file_description=file_description,
+            css_files=css_files,
+            js_files=js_files
+        )
+        
+        prompt = PROMPTS["html_file"].format(
+            file_name=file_name,
+            optimized_prompt=optimized_prompt,
+            file_path=file_path,
+            file_description=file_description,
+            css_files=css_files,
+            js_files=js_files,
+            element_dictionary=json.dumps(element_dict_parsed, indent=2) if element_dict_parsed else 'No element dictionary available, use semantic and consistent naming.'
+        )
+        
+    # Special handling for CSS files
+    elif file_ext == '.css':
+        system_message = SYSTEM_MESSAGES["css_generator"].format(
+            file_name=file_name,
+            file_description=file_description
+        )
+        
+        prompt = PROMPTS["css_file"].format(
+            file_name=file_name,
+            optimized_prompt=optimized_prompt,
+            file_path=file_path,
+            file_description=file_description,
+            element_dictionary=json.dumps(element_dict_parsed, indent=2) if element_dict_parsed else 'No element dictionary available, use semantic and consistent naming.'
+        )
+        
+    # Special handling for JS files
+    elif file_ext == '.js':
+        system_message = SYSTEM_MESSAGES["js_generator"].format(
+            file_name=file_name,
+            file_description=file_description
+        )
+        
+        prompt = PROMPTS["js_file"].format(
+            file_name=file_name,
+            optimized_prompt=optimized_prompt,
+            file_path=file_path,
+            file_description=file_description,
+            element_dictionary=json.dumps(element_dict_parsed, indent=2) if element_dict_parsed else 'No element dictionary available, use semantic and consistent naming.'
+        )
+        
+    else:
+        # Default handling for other file types
+        system_message = SYSTEM_MESSAGES["default_file_generator"].format(
+            file_ext=file_ext,
+            file_name=file_name,
+            file_type=file_type,
+            file_description=file_description
+        )
+        
+        prompt = PROMPTS["default_file"].format(
+            file_name=file_name,
+            file_path=file_path,
+            file_description=file_description,
+            file_type=file_type,
+            optimized_prompt=optimized_prompt,
+            structure_info=json.dumps(structure_info, indent=2) if structure_info else "No specific context available"
+        )
     
-    This file is of type: {file_type}
-    Description: {file_description}
-    
-    Follow best practices for this file type. Generate complete, working code with proper imports and dependencies.
-    Do not include example code markers like ```python or ```javascript - just write the actual file content.
-    """
-    
-    prompt = f"""
-    Generate the content for a file named '{file_name}' based on the following application
-    requirements and project structure. The code should be clean, well-structured, and follow best practices.
-    
-    File Path: {file_path}
-    File Description: {file_description}
-    File Type: {file_type}
-    
-    Application Requirements:
-    {optimized_prompt}
-    
-    File Structure Context:
-    {json.dumps(structure_info, indent=2) if structure_info else "No specific context available"}
-    
-    Please provide only the complete code for this specific file without any explanations or code block markers.
-    """
-    
-    return generate_text(prompt, temperature=0.5, system_message=system_message)
+    content = generate_text(prompt, temperature=0.5, system_message=system_message)
+    return clean_generated_content(content)
 
 def generate_readme(app_name, optimized_prompt, project_structure):
     """Generate a README.md file for the project"""
-    system_message = """
-    You are an expert technical writer. Your task is to create a comprehensive README.md file
-    that clearly explains the application, its features, installation, usage, and structure.
-    """
+    system_message = SYSTEM_MESSAGES["readme_generator"]
     
-    prompt = f"""
-    Create a comprehensive README.md file for a project named '{app_name}' based on the
-    following requirements and structure. Include sections for description, features, installation,
-    usage, project structure, and license.
-    
-    Application Requirements:
-    {optimized_prompt}
-    
-    Project Structure:
-    {project_structure}
-    
-    Please provide a complete, well-formatted markdown document.
-    """
+    prompt = PROMPTS["readme"].format(
+        app_name=app_name,
+        optimized_prompt=optimized_prompt,
+        project_structure=project_structure
+    )
     
     return generate_text(prompt, temperature=0.6, system_message=system_message)
 
