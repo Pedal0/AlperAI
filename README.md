@@ -137,30 +137,30 @@ The system follows these steps to create your application:
 
 ## API Configuration
 
-The application uses AI models for code generation. By default, it's configured to use OpenRouter's API with the `google/gemini-2.0-flash-001` model, but it can also use OpenAI's models (default: `gpt-4o-mini`). 
+The application uses AI models for code generation. By default, it uses OpenRouter's API with the `google/gemini-2.0-flash-001` model, but it can also be configured to use OpenAI's models (default: `gpt-4o-mini`).
 
 You can configure these settings in `src/config/constants.py`:
-- Set `USE_OPENROUTER` to `True` or `False` to switch between OpenRouter and OpenAI
-- Change model names in `OPENROUTER_MODEL` or `API_MODEL`
-- Adjust temperature settings for different generation tasks
+- Set `USE_OPENROUTER` to `True` or `False` to switch between OpenRouter and OpenAI APIs
+- Change model names in `OPENROUTER_MODEL` or `API_MODEL` variables
+- Adjust temperature settings for different generation tasks to control creativity vs precision
 
 ### OpenRouter Integration
 
-The application supports OpenRouter as an alternative to OpenAI's API. This allows you to:
-- Access various AI models from different providers through a single API
-- Potentially reduce costs compared to direct OpenAI API usage
-- Use alternative models like Google's Gemini or Anthropic's Claude
+The application integrates with OpenRouter which provides several advantages:
+- Access to various AI models from different providers through a single unified API
+- Potentially lower costs compared to direct OpenAI API usage
+- Support for alternative models like Google's Gemini, Anthropic's Claude, and others
 
 To use OpenRouter:
-1. Set up an account at [OpenRouter](https://openrouter.ai/)
-2. Get your API key from the OpenRouter dashboard
+1. Create an account at [OpenRouter](https://openrouter.ai/)
+2. Generate your API key from the OpenRouter dashboard
 3. Add it to your `.env` file:
    ```
    OPENROUTER_API_KEY=your_openrouter_api_key
    ```
-4. Ensure `USE_OPENROUTER=True` in your configuration
+4. Ensure `USE_OPENROUTER=True` is set in your configuration
 
-The application will automatically fall back to OpenAI if OpenRouter is enabled but no OpenRouter API key is found.
+The application will automatically fall back to using OpenAI if OpenRouter is enabled but no valid OpenRouter API key is found in the environment variables.
 
 ## License
 
