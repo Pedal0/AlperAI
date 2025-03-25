@@ -8,7 +8,6 @@ This project uses AI to generate complete, functional applications based on user
 - **Multiple Technology Support**: Generates apps in various programming languages and frameworks
 - **Static Website Mode**: Option to create simple HTML/CSS/JS websites
 - **Validation System**: Tests and validates generated applications to ensure they run correctly
-- **AI Agent Team**: Uses a team of specialized AI agents to verify and improve the generated code
 - **Auto-fixing Capabilities**: Automatically fixes common issues in the generated code
 - **File Download**: Download the complete project as a ZIP file
 
@@ -31,10 +30,8 @@ This project uses AI to generate complete, functional applications based on user
 4. Install additional required packages:
 
    ```
-   pipenv install streamlit openai python-dotenv agno duckduckgo-search
+   pipenv install streamlit openai python-dotenv duckduckgo-search
    ```
-   
-   Note: The `agno` package is required for the AI agent team that verifies and improves the generated code.
 
 5. Create a `.env` file at the project's root and add your OpenAI API key:
 
@@ -103,16 +100,6 @@ For best results, try to be specific in your descriptions. Here are some example
 - **Use Sample JSON Data**: Uses JSON files for data storage instead of a database.
 - **Extended Dependency Wait**: Adds extra delay after installing dependencies to ensure they are properly installed.
 
-## AI Agent Team Verification
-
-The application uses a team of specialized AI agents to verify and improve the generated code:
-
-1. **Project Manager Agent**: Coordinates the validation process and ensures overall project quality.
-2. **Frontend Developer Agent**: Focuses on improving UI/UX, HTML, CSS, and JavaScript code.
-3. **Backend Developer Agent**: Validates server-side code, APIs, and business logic.
-
-The agent team runs in the background after code generation and creates a `verification_complete.txt` file in the project directory when finished.
-
 ## Generation Process
 
 The system follows these steps to create your application:
@@ -123,17 +110,15 @@ The system follows these steps to create your application:
 5. Code Generation: Writes all necessary code files
 6. Validation: Tests the generated application for errors
 7. Auto-fixing: Automatically corrects common issues
-8. Agent Team Verification: Uses specialized AI agents to further improve the code
 
 ## Troubleshooting
 
 - **API Key Issues**: Make sure your OpenAI API key is correctly set in the `.env` file.
 - **Dependency Errors**: If you encounter any dependency errors, try installing them manually:
   ```
-  pip install streamlit openai python-dotenv agno duckduckgo-search
+  pip install streamlit openai python-dotenv duckduckgo-search
   ```
 - **Generation Failures**: For complex applications, try breaking down your request into smaller, more specific parts.
-- **Agent Team Errors**: If the agent team verification fails, you can still download and use the generated code.
 
 ## API Configuration
 
@@ -173,4 +158,3 @@ This project is licensed under the Creative Commons Attribution-NonCommercial 4.
 - The quality of the generated application depends on the clarity and detail in your description.
 - More complex applications may require additional dependencies to be installed manually.
 - Static website generation produces pure HTML/CSS/JS files that can be hosted on any web server.
-- The AI agent team will continue to work in the background after generation is complete to improve the code.
