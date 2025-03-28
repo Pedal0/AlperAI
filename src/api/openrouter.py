@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import time
 from openai import OpenAI
 from src.config.constants import (
     OPENROUTER_BASE_URL, 
@@ -11,7 +12,12 @@ from src.config.constants import (
     OPENROUTER_MODEL,
     OPENAI_MODEL,
     USE_OPENROUTER,
-    DEFAULT_TEMPERATURE
+    DEFAULT_TEMPERATURE,
+    apply_rate_limit_if_needed,
+    update_last_successful_response_time,
+    extract_retry_delay_from_error,
+    is_free_model,
+    MIN_RETRY_DELAY
 )
 from src.api.prompts import SYSTEM_MESSAGES, PROMPTS, FALLBACKS
 
@@ -52,7 +58,7 @@ def clean_generated_content(content):
     
     return content
 
-def generate_text(prompt, temperature=DEFAULT_TEMPERATURE, system_message=None, json_mode=False):
+def generate_text(prompt, temperature=DEFAULT_TEMPERATURE, system_message=None, json_mode=False, max_retries=3):
     """
     Generate text using the configured AI model
     
@@ -61,12 +67,16 @@ def generate_text(prompt, temperature=DEFAULT_TEMPERATURE, system_message=None, 
         temperature (float): The temperature for generation
         system_message (str): Optional system message
         json_mode (bool): Whether to request JSON output
+        max_retries (int): Maximum number of retry attempts for rate limit errors
         
     Returns:
         str: The generated response
     """
     client = get_client()
     model = get_model_name()
+    
+    # Apply rate limiting if using a free model
+    apply_rate_limit_if_needed(model)
     
     messages = []
     if system_message:
@@ -86,14 +96,101 @@ def generate_text(prompt, temperature=DEFAULT_TEMPERATURE, system_message=None, 
     if json_mode:
         extra_args["response_format"] = {"type": "json_object"}
     
-    completion = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        temperature=temperature,
-        **extra_args
-    )
+    retry_count = 0
     
-    return clean_generated_content(completion.choices[0].message.content)
+    while retry_count < max_retries:
+        try:
+            completion = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                **extra_args
+            )
+            
+            # Check if completion is valid
+            if completion and hasattr(completion, 'choices') and completion.choices and hasattr(completion.choices[0], 'message'):
+                # Update the last successful response time
+                update_last_successful_response_time()
+                return clean_generated_content(completion.choices[0].message.content)
+            else:
+                print(f"Warning: Received invalid response from model {model}: {completion}")
+                
+                # Extract error data if available
+                error_data = None
+                if hasattr(completion, 'error'):
+                    error_data = completion.error
+                
+                # Likely a rate limit issue with free model
+                retry_count += 1
+                
+                # Extract suggested retry delay from error if available
+                retry_delay = MIN_RETRY_DELAY
+                if error_data:
+                    retry_delay = extract_retry_delay_from_error(error_data)
+                
+                print(f"Rate limit likely exceeded. Retrying in {retry_delay} seconds (attempt {retry_count}/{max_retries})...")
+                time.sleep(retry_delay)
+                continue
+                
+        except Exception as e:
+            error_message = str(e).lower()
+            print(f"Error generating text: {error_message}")
+            
+            # Check for rate limit errors
+            if "rate limit" in error_message or "rate_limit" in error_message or "too many requests" in error_message or "429" in error_message:
+                retry_count += 1
+                retry_delay = MIN_RETRY_DELAY  # Default minimum retry delay
+                
+                # Try to extract rate limit retry information from the error
+                if hasattr(e, 'response') and hasattr(e.response, 'json'):
+                    try:
+                        error_data = e.response.json()
+                        retry_delay = extract_retry_delay_from_error(error_data)
+                    except:
+                        pass
+                
+                print(f"Rate limit exceeded. Retrying in {retry_delay} seconds (attempt {retry_count}/{max_retries})...")
+                time.sleep(retry_delay)
+                continue
+                
+            # If not a rate limit error or we've exceeded retries, try the fallback
+            if USE_OPENROUTER and OPENAI_API_KEY:
+                try:
+                    print(f"Error with {model}, falling back to OpenAI model: {OPENAI_MODEL}")
+                    fallback_client = OpenAI(api_key=OPENAI_API_KEY)
+                    fallback_completion = fallback_client.chat.completions.create(
+                        model=OPENAI_MODEL,
+                        messages=messages,
+                        temperature=temperature
+                    )
+                    
+                    # Update the last successful response time
+                    update_last_successful_response_time()
+                    return clean_generated_content(fallback_completion.choices[0].message.content)
+                except Exception as fallback_error:
+                    print(f"Fallback also failed: {str(fallback_error)}")
+                    return "I encountered an issue connecting to the AI service. Please try again later."
+            else:
+                return "I encountered an issue connecting to the AI service. Please try again later."
+                
+    # If we've run out of retries, try the fallback
+    if retry_count >= max_retries and USE_OPENROUTER and OPENAI_API_KEY:
+        try:
+            print(f"Max retries reached, falling back to OpenAI model: {OPENAI_MODEL}")
+            fallback_client = OpenAI(api_key=OPENAI_API_KEY)
+            fallback_completion = fallback_client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=messages,
+                temperature=temperature
+            )
+            
+            # Update the last successful response time
+            update_last_successful_response_time()
+            return clean_generated_content(fallback_completion.choices[0].message.content)
+        except Exception as fallback_error:
+            print(f"Fallback also failed: {str(fallback_error)}")
+    
+    return "I encountered persistent rate limit issues. Please try again later or switch to a paid model."
 
 def optimize_prompt(user_prompt):
     """Optimize user prompt for better results"""
