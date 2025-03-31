@@ -11,3 +11,7 @@ from .openrouter import (
 )
 
 from .prompts import SYSTEM_MESSAGES, PROMPTS, FALLBACKS
+
+# Include the agent calls modules
+from .agent_calls.large_file_handler import LargeFileHandler
+from .agent_calls.svg_detector import SVGDetector

@@ -31,6 +31,15 @@ SYSTEM_MESSAGES = {
     for the described application. Consider best practices for the technologies involved and create
     a logical file organization. You MUST return the structure as a valid JSON object.
     
+    IMPORTANT: Create a simple, clear structure with minimal fragmentation. Favor fewer, well-organized files over
+    many small files. For example:
+    - Use a single CSS file (e.g., styles.css) unless there's a compelling reason to split them
+    - Use a single JavaScript file per functional area unless the application is very complex
+    - Organize code logically within files rather than creating too many separate files
+    
+    Only create multiple files of the same type (CSS, JS, etc.) when it clearly improves maintainability
+    or when separation is a best practice for the specific technology stack.
+    
     For web applications, be sure to include an "assets/icons" directory to store SVG icons
     that will be used throughout the application. Common icons like navigation, social media,
     and UI controls should be included in the structure.
@@ -171,6 +180,15 @@ PROMPTS = {
     Based on the following application requirements, design a comprehensive project structure
     with appropriate directories and files. Consider separation of concerns, maintainability,
     and best practices for the technologies involved.
+
+    IMPORTANT: Create a simple, clear structure with minimal fragmentation. Favor fewer, well-organized files over
+    many small files. For example:
+    - Use a single CSS file (e.g., styles.css) unless there's a compelling reason to split them
+    - Use a single JavaScript file per functional area unless the application is very complex
+    - Organize code logically within files rather than creating too many separate files
+    
+    Only create multiple files of the same type (CSS, JS, etc.) when it clearly improves maintainability
+    or when separation is a best practice for the specific technology stack.
 
     Application Requirements:
     {optimized_prompt}
