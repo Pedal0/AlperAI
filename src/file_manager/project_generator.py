@@ -320,7 +320,13 @@ class ProjectGenerator:
                 self.element_dictionary
             )
             
-            # Validate frontend files (HTML, CSS, JS) first
+            # First check for any incomplete files, especially large JS files
+            self.update_status("Checking for incomplete files...")
+            completion_results = validator.check_for_incomplete_files()
+            if completion_results["completed_files"] > 0:
+                self.update_status(f"Completed {completion_results['completed_files']} files that were cut off during generation")
+            
+            # Then validate frontend files (HTML, CSS, JS)
             self.update_status("Enhancing frontend files...")
             frontend_results = validator.validate_frontend_files(apply_improvements=True)
             self.update_status(f"Enhanced {frontend_results['improved_files']} frontend files")
@@ -330,6 +336,8 @@ class ProjectGenerator:
             
             # Write a summary of improvements
             improvements_summary = {
+                "completion_checks": completion_results["checked_files"],
+                "completed_files": completion_results["completed_files"],
                 "validated_files": frontend_results["validated_files"],
                 "improved_files": frontend_results["improved_files"],
                 "timestamp": datetime.now().isoformat()
@@ -589,6 +597,11 @@ class ProjectGenerator:
             self.update_progress(0.85)
             self.enhance_code_quality()
             
+            # Phase 5.5: Detect and generate SVG files referenced in code
+            self.update_status("Detecting and generating SVG icons referenced in code...")
+            self.update_progress(0.88)
+            self.generate_referenced_svg_files()
+            
             # Phase 6: Generate README
             self.update_status("Creating documentation...")
             self.update_progress(0.9)
@@ -620,3 +633,36 @@ class ProjectGenerator:
                 'app_name': getattr(self, 'app_name', 'generated_application'),
                 'optimized_prompt': getattr(self, 'optimized_prompt', self.user_prompt)
             }
+
+    def generate_referenced_svg_files(self):
+        """
+        Détecte et génère les fichiers SVG référencés dans le code.
+        """
+        try:
+            from src.api.agent_calls.svg_detector import SVGDetector
+            
+            # Créer le détecteur SVG
+            svg_detector = SVGDetector(self.output_dir)
+            
+            # Scanner le projet pour les références SVG
+            self.update_status("Recherche de références aux fichiers SVG dans le code...")
+            detected_svgs = svg_detector.scan_project_for_svg_references()
+            
+            if not detected_svgs:
+                self.update_status("Aucune référence à des fichiers SVG trouvée dans le code.")
+                return 0
+            
+            # Générer les fichiers SVG
+            self.update_status(f"Génération de {len(detected_svgs)} fichiers SVG référencés...")
+            generated_files = svg_detector.generate_svg_files()
+            
+            for file_path in generated_files:
+                rel_path = os.path.relpath(file_path, self.output_dir)
+                self.update_status(f"SVG généré: {rel_path}")
+            
+            self.update_status(f"{len(generated_files)} fichiers SVG générés avec succès.")
+            return len(generated_files)
+            
+        except Exception as e:
+            self.update_status(f"Avertissement: Erreur lors de la génération des fichiers SVG: {str(e)}")
+            return 0

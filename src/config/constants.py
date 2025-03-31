@@ -19,8 +19,8 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_SITE_URL = "https://ai-application-generator.com"
 OPENROUTER_SITE_NAME = "AI Application Generator"
-OPENROUTER_MODEL = "google/gemini-2.5-pro-exp-03-25:free"
 # OPENROUTER_MODEL = "google/gemini-2.5-pro-exp-03-25:free"
+OPENROUTER_MODEL = "google/gemini-2.0-flash-001"
 
 # Free model rate limiting
 FREE_MODEL_SUFFIX = ":free"
@@ -79,7 +79,7 @@ def extract_retry_delay_from_error(error_data):
         return MIN_RETRY_DELAY
 
 # OpenAI fallback configuration
-OPENAI_MODEL = "gpt-4o-mini"
+OPENAI_MODEL = "google/gemini-2.0-flash-001"
 
 # Generation settings
 DEFAULT_TEMPERATURE = 0.4
