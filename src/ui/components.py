@@ -4,6 +4,7 @@ Contains functions for rendering different parts of the UI.
 """
 import streamlit as st
 from src.config.constants import DEFAULT_MODEL, RATE_LIMIT_DELAY_SECONDS
+from src.utils.env_utils import get_openrouter_api_key
 
 def setup_page_config():
     """Set up the Streamlit page configuration."""
@@ -18,10 +19,31 @@ def render_sidebar():
     Returns:
         tuple: (api_key, selected_model)
     """
+    # Get API key from environment variable if available
+    env_api_key = get_openrouter_api_key()
+    api_key_help = "Votre clé API OpenRouter. Elle ne sera pas stockée."
+    
+    if env_api_key:
+        api_key_help += " (Pré-rempli depuis le fichier .env)"
+    
     with st.sidebar:
         st.header("⚙️ Configuration")
-        api_key = st.text_input("Clé API OpenRouter", type="password", help="Votre clé API OpenRouter. Elle ne sera pas stockée.")
-        selected_model = st.text_input("Modèle OpenRouter", value=DEFAULT_MODEL, help=f"Ex: {DEFAULT_MODEL}, meta-llama/llama-3-70b-instruct, etc.")
+        api_key = st.text_input(
+            "Clé API OpenRouter", 
+            value=env_api_key,
+            type="password", 
+            help=api_key_help
+        )
+        
+        selected_model = st.text_input(
+            "Modèle OpenRouter", 
+            value=DEFAULT_MODEL, 
+            help=f"Ex: {DEFAULT_MODEL}, meta-llama/llama-3-70b-instruct, etc."
+        )
+        
+        if env_api_key:
+            st.success("✅ Clé API détectée dans le fichier .env")
+            
         st.caption(f"Utilise l'API OpenRouter. Délai de {RATE_LIMIT_DELAY_SECONDS}s appliqué si modèle ':free' ou Gemini Flash détecté.")
     
     return api_key, selected_model
