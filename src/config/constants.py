@@ -20,7 +20,7 @@ OPENROUTER_MODEL = DEFAULT_MODEL
 
 # Temperature settings
 STRUCTURE_TEMPERATURE = 0.6  # More structured output
-CODE_TEMPERATURE = 0.6  # Less creative, more precise code generation
+CODE_TEMPERATURE = 0.4  # Less creative, more precise code generation
 
 # Other constants
 MAX_RETRIES = 2  # Maximum number of API call retries
