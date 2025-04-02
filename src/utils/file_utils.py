@@ -147,6 +147,26 @@ def create_project_structure(base_path, structure_lines):
         return None
 
 
+def clean_code_block(code_block):
+    """
+    Remove markdown code block markers from the beginning and end of code blocks.
+    
+    Args:
+        code_block (str): The code block to clean
+        
+    Returns:
+        str: Cleaned code block without markdown markers
+    """
+    # Pattern for beginning: ```language or ```
+    start_pattern = r'^```(?:\w+)?\n'
+    # Pattern for end: ```
+    end_pattern = r'\n```$'
+    # Remove both patterns
+    code_block = re.sub(start_pattern, '', code_block)
+    code_block = re.sub(end_pattern, '', code_block)
+    return code_block
+
+
 def parse_and_write_code(base_path, code_response_text):
     """
     Parse code response and write each block to the corresponding file.
@@ -215,6 +235,9 @@ def parse_and_write_code(base_path, code_response_text):
 
             # S'assurer que le dossier parent existe (créé à l'étape 2, mais sécurité)
             target_file_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Nettoyer le bloc de code avant de l'écrire
+            code_block = clean_code_block(code_block)
 
             # Écrire le code dans le fichier
             with open(target_file_path, 'w', encoding='utf-8') as f:
