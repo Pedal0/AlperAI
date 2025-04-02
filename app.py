@@ -5,10 +5,14 @@ import time
 # Import from restructured modules
 from src.config.constants import RATE_LIMIT_DELAY_SECONDS
 from src.utils.model_utils import is_free_model
+from src.utils.env_utils import load_env_vars  # Add import for env variables loading
 from src.api.openrouter_api import call_openrouter_api
 from src.utils.file_utils import parse_structure_and_prompt, create_project_structure, parse_and_write_code
 from src.utils.prompt_utils import prompt_mentions_design
 from src.ui.components import setup_page_config, render_sidebar, render_input_columns, show_response_expander
+
+# Load environment variables at startup
+load_env_vars()
 
 # --- Interface Streamlit ---
 
