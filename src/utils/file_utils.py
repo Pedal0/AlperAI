@@ -20,62 +20,62 @@ def parse_structure_and_prompt(response_text):
     cleaned_structure_lines = []
 
     try:
-        # Recherche des marqueurs principaux
+        # Search for main markers
         prompt_match = re.search(r"###\s*REFORMULATED PROMPT\s*###\s*(.*?)\s*###\s*STRUCTURE\s*###", response_text, re.DOTALL | re.IGNORECASE)
         structure_match = re.search(r"###\s*STRUCTURE\s*###\s*(.*)", response_text, re.DOTALL | re.IGNORECASE)
 
         if prompt_match:
             reformulated_prompt = prompt_match.group(1).strip()
         else:
-            # Tentative de trouver le prompt même sans le marqueur structure après
+            # Try to find prompt even without the structure marker after it
             prompt_match_alt = re.search(r"###\s*REFORMULATED PROMPT\s*###\s*(.*)", response_text, re.DOTALL | re.IGNORECASE)
             if prompt_match_alt:
                  reformulated_prompt = prompt_match_alt.group(1).strip()
 
         if structure_match:
             structure_block = structure_match.group(1).strip()
-            # Nettoyage du bloc structure : enlever les ``` et les commentaires #
-            structure_block_cleaned = structure_block.strip().strip('`') # Enlève les ``` au début/fin
+            # Clean structure block: remove ``` and # comments
+            structure_block_cleaned = structure_block.strip().strip('`') # Remove ``` at beginning/end
             potential_lines = structure_block_cleaned.split('\n')
 
             for line in potential_lines:
                 line = line.strip()
-                # Ignorer lignes vides ou marqueurs de code seuls
+                # Ignore empty lines or lone code markers
                 if not line or line == '```':
                     continue
-                # Supprimer les commentaires inline (tout ce qui suit #)
-                # Garder la partie avant le #, puis re-strip au cas où il y a des espaces avant #
+                # Remove inline comments (everything after #)
+                # Keep part before #, then re-strip in case there are spaces before #
                 if '#' in line:
                     line = line.split('#', 1)[0].strip()
-                # Ajouter seulement si la ligne n'est pas vide après nettoyage
+                # Add only if line is not empty after cleaning
                 if line:
                     cleaned_structure_lines.append(line)
-            structure_lines = cleaned_structure_lines # Utiliser la liste nettoyée
+            structure_lines = cleaned_structure_lines # Use cleaned list
         else:
-            # Si structure_match échoue, on ne peut pas extraire la structure
-             st.warning("Marqueur '### STRUCTURE ###' non trouvé.")
+            # If structure_match fails, we can't extract structure
+             st.warning("'### STRUCTURE ###' marker not found.")
 
-        # --- Gestion des cas où les marqueurs ne sont pas trouvés ou vides ---
+        # --- Handle cases where markers are not found or empty ---
         if not reformulated_prompt and not structure_lines:
-             st.error("Impossible d'extraire le prompt reformulé ET la structure. Vérifiez le format de réponse de l'IA.")
+             st.error("Unable to extract both reformulated prompt AND structure. Check AI response format.")
              st.code(response_text)
              return None, []
         elif not reformulated_prompt:
-             st.warning("Prompt reformulé non trouvé, mais structure trouvée. Tentative de continuer.")
-             # On pourrait essayer d'utiliser le prompt original comme fallback, mais c'est risqué
-             # Pour l'instant, on retourne None pour le prompt, ce qui causera une erreur plus tard (ce qui est ok)
+             st.warning("Reformulated prompt not found, but structure found. Attempting to continue.")
+             # Could try using original prompt as fallback, but risky
+             # For now, return None for prompt, which will cause error later (which is ok)
              return None, structure_lines
         elif not structure_lines:
-             st.warning("Structure non trouvée, mais prompt reformulé trouvé. Impossible de créer les fichiers.")
+             st.warning("Structure not found, but reformulated prompt found. Unable to create files.")
              return reformulated_prompt, []
 
     except Exception as e:
-        st.error(f"Erreur lors de l'analyse de la réponse de l'IA (structure/prompt) : {e}")
-        st.code(response_text) # Afficher la réponse brute
+        st.error(f"Error analyzing AI response (structure/prompt): {e}")
+        st.code(response_text) # Display raw response
         return None, []
 
-    # Afficher la structure nettoyée pour le debug
-    st.write("Structure détectée et nettoyée :")
+    # Display cleaned structure for debugging
+    st.write("Detected and cleaned structure:")
     st.code("\n".join(structure_lines), language='text')
 
     return reformulated_prompt, structure_lines
@@ -93,57 +93,57 @@ def create_project_structure(base_path, structure_lines):
         list: List of created paths or None on error
     """
     created_paths = []
-    base_path = Path(base_path).resolve() # Obtenir le chemin absolu et normalisé
-    st.info(f"Tentative de création de la structure dans : {base_path}")
+    base_path = Path(base_path).resolve() # Get absolute and normalized path
+    st.info(f"Attempting to create structure in: {base_path}")
 
     if not base_path.is_dir():
-        st.error(f"Le chemin de base '{base_path}' n'est pas un dossier valide ou n'existe pas.")
+        st.error(f"Base path '{base_path}' is not a valid folder or does not exist.")
         return None
 
     if not structure_lines:
-        st.warning("Aucune ligne de structure fournie à créer.")
-        return [] # Retourner une liste vide, ce n'est pas une erreur fatale
+        st.warning("No structure lines provided to create.")
+        return [] # Return empty list, not a fatal error
 
     try:
         for line in structure_lines:
-            line = line.strip() # Re-nettoyer au cas où
-            if not line: continue # Ignorer lignes vides
+            line = line.strip() # Re-clean just in case
+            if not line: continue # Ignore empty lines
 
-            # Sécurité: Vérifier la présence de '..' dans les composants du chemin
+            # Security: Check for '..' in path components
             relative_path = Path(line)
             if ".." in relative_path.parts:
-                 st.warning(f"⚠️ Chemin contenant '..' ignoré (sécurité) : '{line}'")
+                 st.warning(f"⚠️ Path containing '..' ignored (security): '{line}'")
                  continue
 
             item_path = base_path / relative_path
 
             try:
-                # Déterminer si c'est un dossier ou un fichier
-                # Path() supprime le '/' final, donc on se fie à la ligne originale
+                # Determine if it's a folder or file
+                # Path() removes the trailing '/', so we rely on the original line
                 is_dir = line.endswith('/')
 
                 if is_dir:
-                    # Créer le dossier
+                    # Create folder
                     item_path.mkdir(parents=True, exist_ok=True)
-                    st.write(f" ✅ Dossier créé/vérifié : {item_path}")
+                    st.write(f" ✅ Folder created/verified: {item_path}")
                     created_paths.append(item_path)
                 else:
-                    # C'est un fichier: Créer les dossiers parents si nécessaire
+                    # It's a file: Create parent folders if needed
                     item_path.parent.mkdir(parents=True, exist_ok=True)
-                    # Créer le fichier vide (ou le vider s'il existe)
+                    # Create empty file (or empty it if it exists)
                     item_path.touch(exist_ok=True)
-                    st.write(f" ✅ Fichier créé/vérifié : {item_path}")
+                    st.write(f" ✅ File created/verified: {item_path}")
                     created_paths.append(item_path)
 
             except OSError as e:
-                 st.error(f"❌ Erreur OS lors de la création de '{item_path}' depuis la ligne '{line}': {e}")
-                 # Continuer avec les autres si possible
+                 st.error(f"❌ OS error creating '{item_path}' from line '{line}': {e}")
+                 # Continue with others if possible
             except Exception as e:
-                 st.error(f"❌ Erreur inattendue pour '{item_path}' depuis la ligne '{line}': {e}")
+                 st.error(f"❌ Unexpected error for '{item_path}' from line '{line}': {e}")
 
         return created_paths
     except Exception as e:
-        st.error(f"Erreur majeure lors du traitement de la structure du projet : {e}")
+        st.error(f"Major error processing project structure: {e}")
         return None
 
 
@@ -183,79 +183,79 @@ def parse_and_write_code(base_path, code_response_text):
     errors = []
     generation_incomplete = False
 
-    # Vérifier d'abord si la réponse se termine par le marqueur d'incomplétude
+    # First check if the response ends with the incompleteness marker
     if code_response_text.strip().endswith("GENERATION_INCOMPLETE"):
         generation_incomplete = True
-        st.warning("⚠️ L'IA a indiqué que la génération de code est incomplète (limite de tokens probablement atteinte).")
-        # Retirer le marqueur pour ne pas interférer avec le parsing du dernier fichier
+        st.warning("⚠️ AI indicated that code generation is incomplete (likely token limit reached).")
+        # Remove marker to avoid interfering with parsing the last file
         code_response_text = code_response_text.strip()[:-len("GENERATION_INCOMPLETE")].strip()
 
-    # Regex pour trouver les blocs de code marqués par --- FILE: path/to/file ---
-    # Utiliser re.split pour séparer par le marqueur, en capturant le chemin
-    # Le `?` après `.*` le rend non-greedy, important si des marqueurs sont proches
+    # Regex to find code blocks marked by --- FILE: path/to/file ---
+    # Use re.split to separate by marker, capturing the path
+    # The `?` after `.*` makes it non-greedy, important if markers are close
     parts = re.split(r'(---\s*FILE:\s*(.*?)\s*---)', code_response_text, flags=re.IGNORECASE)
 
     if len(parts) <= 1:
-        st.warning("Aucun marqueur '--- FILE: ... ---' trouvé dans la réponse de génération de code.")
-        st.info("Tentative d'écriture de toute la réponse dans un fichier 'generated_code.txt'")
+        st.warning("No '--- FILE: ... ---' markers found in code generation response.")
+        st.info("Attempting to write entire response to 'generated_code.txt'")
         output_file = base_path / "generated_code.txt"
         try:
             output_file.parent.mkdir(parents=True, exist_ok=True)
             with open(output_file, 'w', encoding='utf-8') as f:
                 f.write(code_response_text)
             files_written.append(str(output_file))
-            st.write(f" ✅ Code brut écrit dans : {output_file}")
+            st.write(f" ✅ Raw code written to: {output_file}")
         except Exception as e:
-             errors.append(f"❌ Impossible d'écrire dans '{output_file}': {e}")
-        # On ne peut pas savoir si c'est incomplet dans ce cas sans le marqueur
+             errors.append(f"❌ Unable to write to '{output_file}': {e}")
+        # Can't tell if it's incomplete in this case without marker
         return files_written, errors, generation_incomplete
 
-    # Itérer sur les blocs capturés (ignore la première partie avant le premier marqueur)
-    # Structure de parts: ['', marker1, path1, code1, marker2, path2, code2, ...]
+    # Iterate over captured blocks (ignore first part before first marker)
+    # Parts structure: ['', marker1, path1, code1, marker2, path2, code2, ...]
     for i in range(1, len(parts), 3):
         try:
-            # marker = parts[i] # Le marqueur complet (e.g., '--- FILE: src/main.py ---')
-            file_path_str = parts[i+1].strip() # Le chemin du fichier extrait
-            code_block = parts[i+2].strip()    # Le bloc de code (peut être vide si fin abrupte)
+            # marker = parts[i] # Full marker (e.g., '--- FILE: src/main.py ---')
+            file_path_str = parts[i+1].strip() # Extracted file path
+            code_block = parts[i+2].strip()    # Code block (may be empty if abrupt end)
 
             if not file_path_str:
-                st.warning(f"Marqueur trouvé mais chemin de fichier vide ou invalide, bloc ignoré.")
+                st.warning(f"Marker found but empty or invalid file path, block ignored.")
                 continue
 
-            # Nettoyage et validation du chemin
+            # Clean and validate path
             file_path_str = file_path_str.replace('\r', '').strip()
-            if not file_path_str: continue # Ignorer si vide après nettoyage
+            if not file_path_str: continue # Ignore if empty after cleaning
 
             relative_path = Path(file_path_str)
-            if ".." in relative_path.parts: # Sécurité: Vérification de '..'
-                 st.warning(f"⚠️ Chemin de fichier '{file_path_str}' contient '..', ignoré pour la sécurité.")
+            if ".." in relative_path.parts: # Security: Check for '..'
+                 st.warning(f"⚠️ File path '{file_path_str}' contains '..', ignored for security.")
                  continue
 
             target_file_path = base_path / relative_path
 
-            # S'assurer que le dossier parent existe (créé à l'étape 2, mais sécurité)
+            # Ensure parent folder exists (created in step 2, but for safety)
             target_file_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Nettoyer le bloc de code avant de l'écrire
+            # Clean code block before writing
             code_block = clean_code_block(code_block)
 
-            # Écrire le code dans le fichier
+            # Write code to file
             with open(target_file_path, 'w', encoding='utf-8') as f:
                 f.write(code_block)
 
             files_written.append(str(target_file_path))
-            # st.write(f"   Code écrit dans : {target_file_path}") # Peut être verbeux
+            # st.write(f"   Code written to: {target_file_path}") # Can be verbose
 
         except IndexError:
-             # Si la réponse se termine juste après un marqueur sans code
-             st.warning(f"Fin de réponse inattendue après le marqueur pour '{parts[i+1].strip() if i+1 < len(parts) else 'dernier fichier'}'. Fichier potentiellement vide ou manquant.")
+             # If response ends just after a marker without code
+             st.warning(f"Unexpected end of response after marker for '{parts[i+1].strip() if i+1 < len(parts) else 'last file'}'. File potentially empty or missing.")
              continue
         except OSError as e:
-            error_msg = f"❌ Erreur d'écriture dans le fichier '{file_path_str}': {e}"
+            error_msg = f"❌ Error writing to file '{file_path_str}': {e}"
             st.error(error_msg)
             errors.append(error_msg)
         except Exception as e:
-            error_msg = f"❌ Erreur inattendue lors du traitement du fichier '{file_path_str}': {e}"
+            error_msg = f"❌ Unexpected error processing file '{file_path_str}': {e}"
             st.error(error_msg)
             errors.append(error_msg)
 
