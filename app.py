@@ -7,7 +7,13 @@ from src.config.constants import RATE_LIMIT_DELAY_SECONDS
 from src.utils.model_utils import is_free_model
 from src.utils.env_utils import load_env_vars  # Add import for env variables loading
 from src.api.openrouter_api import call_openrouter_api
-from src.utils.file_utils import parse_structure_and_prompt, create_project_structure, parse_and_write_code
+from src.utils.file_utils import (
+    parse_structure_and_prompt, 
+    create_project_structure, 
+    parse_and_write_code,
+    identify_empty_files,  # Add new import
+    generate_missing_code  # Add new import
+)
 from src.utils.prompt_utils import prompt_mentions_design
 from src.ui.components import setup_page_config, render_sidebar, render_input_columns, show_response_expander
 
@@ -200,17 +206,72 @@ if generate_button and not st.session_state.process_running:
                             for err in errors:
                                 st.error(f"   ❌ {err}")
 
-                            if not errors and not generation_incomplete:
+                            # == STEP 5: Check for Empty Files and Generate Missing Code ==
+                            empty_files_check = st.checkbox("Check for empty files and generate their code", value=True)
+                            
+                            if empty_files_check and not errors and (files_written or generation_incomplete):
+                                st.info("▶️ Step 5: Checking for empty files and generating missing code...")
+                                status_placeholder_step5 = st.empty()
+                                
+                                with st.spinner("Identifying empty files..."):
+                                    empty_files = identify_empty_files(target_directory, st.session_state.project_structure)
+                                
+                                if empty_files:
+                                    status_placeholder_step5.warning(f"Found {len(empty_files)} empty files that need code generation.")
+                                    st.write("Empty files:")
+                                    for ef in empty_files:
+                                        st.info(f"   📄 Empty file: {ef}")
+                                    
+                                    # Check rate limit before calling API again
+                                    if is_free_model(selected_model):
+                                        current_time = time.time()
+                                        time_since_last_call = current_time - st.session_state.get('last_api_call_time', 0)
+                                        if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
+                                            wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
+                                            st.warning(f"⏳ Free model detected. Waiting {wait_time:.1f} seconds before generating missing code...")
+                                            time.sleep(wait_time)
+                                    
+                                    with st.spinner("Generating code for empty files..."):
+                                        additional_files, additional_errors = generate_missing_code(
+                                            api_key, 
+                                            selected_model, 
+                                            empty_files, 
+                                            st.session_state.reformulated_prompt, 
+                                            st.session_state.project_structure,
+                                            st.session_state.last_code_generation_response,
+                                            target_directory
+                                        )
+                                        st.session_state.last_api_call_time = time.time()
+                                    
+                                    if additional_files:
+                                        status_placeholder_step5.success(f"✅ Successfully generated code for {len(additional_files)} empty files.")
+                                        st.subheader("Additional files filled:")
+                                        for f in additional_files:
+                                            st.success(f"   📄 File filled: {Path(f).relative_to(Path(target_directory))}")
+                                        
+                                        # Add to main file list
+                                        files_written.extend(additional_files)
+                                    
+                                    if additional_errors:
+                                        for err in additional_errors:
+                                            st.error(f"   ❌ {err}")
+                                        
+                                        # Add to main error list
+                                        errors.extend(additional_errors)
+                                else:
+                                    status_placeholder_step5.success("✅ No empty files found - all files contain code.")
+                            
+                            # Final success message
+                            if not errors:
                                 st.success("🎉 Application generated successfully!")
                                 st.balloons()
-                            elif generation_incomplete:
-                                 st.warning("⚠️ Generation is incomplete. Generated code so far has been written. You may need to write the rest manually.")
-                            elif errors:
-                                st.error("❗️ Errors occurred while writing some files.")
+                            elif len(errors) < len(files_written) / 2:  # If errors are less than half the files
+                                st.warning("🎯 Application generated with some errors. Check the error messages above.")
+                            else:
+                                st.error("❗️ Several errors occurred during application generation.")
 
                         else:
                              status_placeholder_step4.error("❌ Step 4 failed: No files could be written.")
-
 
                     else:
                         status_placeholder_step3.error("❌ Step 3 failed: Code generation retrieval failed.")

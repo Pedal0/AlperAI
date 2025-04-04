@@ -260,3 +260,155 @@ def parse_and_write_code(base_path, code_response_text):
             errors.append(error_msg)
 
     return files_written, errors, generation_incomplete
+
+
+def identify_empty_files(base_path, structure_lines):
+    """
+    Identify empty files in the project structure.
+    
+    Args:
+        base_path (str): Base directory path
+        structure_lines (list): List of file/directory paths
+        
+    Returns:
+        list: List of empty file paths (relative to base_path)
+    """
+    empty_files = []
+    base_path = Path(base_path).resolve()
+    
+    for line in structure_lines:
+        line = line.strip()
+        if not line or line.endswith('/'): 
+            continue  # Skip empty lines and directories
+            
+        # Security check for '..'
+        relative_path = Path(line)
+        if ".." in relative_path.parts:
+            continue
+            
+        file_path = base_path / relative_path
+        
+        # Check if file exists and is empty
+        if file_path.exists() and file_path.is_file() and file_path.stat().st_size == 0:
+            empty_files.append(str(relative_path))
+            
+    return empty_files
+
+
+def generate_missing_code(api_key, model, empty_files, reformulated_prompt, structure_lines, generated_code, target_directory):
+    """
+    Generate code for empty files by providing the LLM with context about the project.
+    
+    Args:
+        api_key (str): OpenRouter API key
+        model (str): Model name to use
+        empty_files (list): List of empty file paths
+        reformulated_prompt (str): The reformulated project description
+        structure_lines (list): The project structure
+        generated_code (str): Previously generated code
+        target_directory (str): Target directory path
+        
+    Returns:
+        tuple: (files_written, errors)
+    """
+    from src.api.openrouter_api import call_openrouter_api
+    
+    files_written = []
+    errors = []
+    
+    if not empty_files:
+        return files_written, errors
+    
+    st.info(f"Attempting to generate code for {len(empty_files)} empty files...")
+    
+    # Prepare a condensed version of the previously generated code
+    # Only include the FILE markers and a brief indicator of content
+    condensed_code = ""
+    parts = re.split(r'(---\s*FILE:\s*(.*?)\s*---)', generated_code, flags=re.IGNORECASE)
+    for i in range(1, len(parts), 3):
+        if i+1 < len(parts):
+            file_path = parts[i+1].strip()
+            content_preview = parts[i+2].strip()[:100] + "..." if parts[i+2].strip() else "[Empty]"
+            condensed_code += f"--- FILE: {file_path} --- (Content length: {len(parts[i+2].strip())} chars)\n"
+    
+    # Build the prompt for generating missing code
+    prompt = f"""
+    You need to complete code for files that were left empty in a previous generation.
+    
+    **Project Description:**
+    {reformulated_prompt}
+    
+    **Complete Project Structure:**
+    ```
+    {chr(10).join(structure_lines)}
+    ```
+    
+    **Previously Generated Files (summary):**
+    {condensed_code}
+    
+    **Files to Complete:**
+    {chr(10).join([f"- {f}" for f in empty_files])}
+    
+    **Instructions:**
+    1. Generate ONLY the code for the files listed under "Files to Complete".
+    2. Use the EXACT format `--- FILE: path/to/filename ---` on a line by itself before each file's code.
+    3. Ensure your code is consistent with the rest of the project structure and functionality.
+    4. Use appropriate imports, error handling, and comments.
+    5. DO NOT generate code for files not listed in "Files to Complete".
+    
+    Generate code for the missing files now:
+    """
+    
+    messages = [{"role": "user", "content": prompt}]
+    response = call_openrouter_api(api_key, model, messages, temperature=0.4, max_retries=2)
+    
+    if response and response.get("choices"):
+        response_text = response["choices"][0]["message"]["content"]
+        
+        # Parse the response and write files
+        base_path = Path(target_directory).resolve()
+        
+        parts = re.split(r'(---\s*FILE:\s*(.*?)\s*---)', response_text, flags=re.IGNORECASE)
+        
+        for i in range(1, len(parts), 3):
+            try:
+                if i+1 >= len(parts):
+                    continue
+                    
+                file_path_str = parts[i+1].strip()
+                code_block = parts[i+2].strip()
+                
+                if not file_path_str or not code_block:
+                    continue
+                
+                # Clean paths
+                file_path_str = file_path_str.replace('\r', '').strip()
+                relative_path = Path(file_path_str)
+                
+                # Security check
+                if ".." in relative_path.parts:
+                    errors.append(f"⚠️ File path '{file_path_str}' contains '..', ignored for security.")
+                    continue
+                
+                target_file_path = base_path / relative_path
+                
+                # Ensure parent folder exists
+                target_file_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                # Clean code before writing
+                code_block = clean_code_block(code_block)
+                
+                # Write code to file
+                with open(target_file_path, 'w', encoding='utf-8') as f:
+                    f.write(code_block)
+                
+                files_written.append(str(target_file_path))
+                
+            except Exception as e:
+                error_msg = f"❌ Error processing file '{file_path_str if 'file_path_str' in locals() else 'unknown'}': {e}"
+                errors.append(error_msg)
+        
+        return files_written, errors
+    else:
+        errors.append("Failed to generate code for empty files: No valid response from API")
+        return files_written, errors
