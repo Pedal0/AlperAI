@@ -1,1 +1,1 @@
-# User interface package
+"""UI components package for the application."""
