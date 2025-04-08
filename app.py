@@ -1,6 +1,8 @@
 import streamlit as st
 from pathlib import Path
 import time
+import asyncio
+import json
 
 # Import from restructured modules
 from src.config.constants import RATE_LIMIT_DELAY_SECONDS
@@ -11,11 +13,24 @@ from src.utils.file_utils import (
     parse_structure_and_prompt, 
     create_project_structure, 
     parse_and_write_code,
-    identify_empty_files,  # Add new import
-    generate_missing_code  # Add new import
+    identify_empty_files,
+    generate_missing_code
 )
 from src.utils.prompt_utils import prompt_mentions_design
 from src.ui.components import setup_page_config, render_sidebar, render_input_columns, show_response_expander
+
+# Import MCP tools
+from src.mcp.clients import SimpleMCPClient
+from src.mcp.tool_utils import get_default_tools
+from src.mcp.handlers import handle_tool_results
+
+# Import frontend resources
+from src.config.frontend_resources import (
+    UI_LIBRARIES,
+    COMPONENT_LIBRARIES,
+    ANIMATION_RESOURCES,
+    TEMPLATE_WEBSITES
+)
 
 # Load environment variables at startup
 load_env_vars()
@@ -36,15 +51,45 @@ if 'project_structure' not in st.session_state:
     st.session_state.project_structure = []
 if 'process_running' not in st.session_state:
     st.session_state.process_running = False
+if 'mcp_client' not in st.session_state:
+    st.session_state.mcp_client = None
+if 'tool_results' not in st.session_state:
+    st.session_state.tool_results = {}
 
 # Render the UI components
 api_key, selected_model = render_sidebar()
 user_prompt, target_directory = render_input_columns()
 
+# Add MCP Tools toggle in sidebar
+with st.sidebar:
+    st.subheader("🛠️ Advanced Options")
+    use_mcp_tools = st.checkbox("Enable MCP Tools for enhanced generation", value=True, 
+                                help="Use Model Context Protocol tools for web search, documentation lookup, and frontend components")
+    
+    if use_mcp_tools:
+        st.subheader("🎨 Frontend Resources")
+        frontend_framework = st.selectbox(
+            "Preferred UI Framework",
+            options=["Auto-detect", "Bootstrap", "Tailwind CSS", "Bulma", "Material Design"],
+            index=0,
+            help="Select a preferred frontend framework, or let the AI choose"
+        )
+        
+        include_animations = st.checkbox(
+            "Include Animations",
+            value=True,
+            help="Add CSS animations and transitions to make the UI more engaging"
+        )
+
 # Main generation button
 generate_button = st.button("🚀 Generate Application", type="primary", disabled=st.session_state.process_running)
 
 st.markdown("---") # Visual separator
+
+# Utility function to handle async operations
+async def run_mcp_query(client, query, context=None):
+    result = await client.process_query(query, context)
+    return result
 
 # --- Main Logic ---
 if generate_button and not st.session_state.process_running:
@@ -67,6 +112,12 @@ if generate_button and not st.session_state.process_running:
         st.session_state.last_code_generation_response = "" # Reset state
         st.session_state.reformulated_prompt = ""
         st.session_state.project_structure = []
+        st.session_state.tool_results = {}
+        
+        # Initialize MCP client if tools are enabled
+        if use_mcp_tools:
+            st.session_state.mcp_client = SimpleMCPClient(api_key, selected_model)
+            st.info("🔌 MCP Tools enabled: Web search, documentation lookup, and frontend components available.")
 
         # == STEP 1: Reformulation and Structure ==
         st.info("▶️ Step 1: Prompt Reformulation and Structure Definition...")
@@ -82,6 +133,50 @@ if generate_button and not st.session_state.process_running:
                     status_placeholder_step1.warning(f"⏳ Free model detected. Waiting {wait_time:.1f} seconds (rate limit)...")
                     time.sleep(wait_time)
 
+            # If MCP tools enabled, use them to enhance the prompt
+            additional_context = ""
+            if use_mcp_tools and st.session_state.mcp_client:
+                status_placeholder_step1.info("🔍 Using MCP tools to analyze your request and gather information...")
+                
+                # Add frontend preferences to analysis query
+                frontend_preferences = ""
+                if frontend_framework != "Auto-detect":
+                    frontend_preferences = f"For frontend, use {frontend_framework}. "
+                if include_animations:
+                    frontend_preferences += "Include CSS animations and transitions to make the UI engaging. "
+                
+                analysis_query = f"""
+                Analyze this request for application development: "{user_prompt}"
+                
+                1. What kind of application is being requested?
+                2. What frameworks or libraries might be needed?
+                3. Do I need to search for any documentation to help with implementation?
+                4. Would any frontend components be useful for this project?
+                5. What kind of template would fit this application best?
+                
+                {frontend_preferences}
+                
+                Only use tools if necessary to clarify technical details or find specific components.
+                """
+                
+                # Run the MCP query asynchronously
+                mcp_result = asyncio.run(run_mcp_query(st.session_state.mcp_client, analysis_query))
+                
+                if mcp_result and "tool_calls" in mcp_result and mcp_result["tool_calls"]:
+                    status_placeholder_step1.success("✅ Tools used to gather additional context for your project.")
+                    
+                    # Process and store tool results
+                    for tool_call in mcp_result["tool_calls"]:
+                        tool_name = tool_call.get("tool")
+                        if tool_name:
+                            st.session_state.tool_results[tool_name] = tool_call
+                    
+                    # Add this context to our prompt
+                    additional_context = f"""
+                    Additional context for generating this application:
+                    {mcp_result.get('text', '')}
+                    """
+                
             # Building prompt for the first step
             prompt_step1 = f"""
             Analyze the user's request below. Your tasks are:
@@ -90,6 +185,8 @@ if generate_button and not st.session_state.process_running:
 
             User's Request:
             "{user_prompt}"
+            
+            {additional_context if additional_context else ""}
 
             Output format MUST be exactly as follows, starting immediately with the first marker:
 
@@ -155,13 +252,26 @@ if generate_button and not st.session_state.process_running:
                                  "to make the user interface feel modern, fluid, and engaging. Prioritize usability and avoid overly distracting animations."
                              )
                              st.info("ℹ️ No design instructions detected, adding request for fluid animations.")
-
-                        # Building prompt for code generation
+                        
+                        # Add tool results if available
+                        tool_results_text = ""
+                        if use_mcp_tools and st.session_state.tool_results:
+                            tool_results_text = "\n**Tool Results:** The following information was gathered to help with development:\n"
+                            for tool_name, tool_info in st.session_state.tool_results.items():
+                                st.write(f"**{tool_name}**")
+                                st.write(f"Arguments: {tool_info.get('args', {})}")
+                                if 'result' in tool_info:
+                                    with st.expander(f"View {tool_name} results"):
+                                        st.code(tool_info['result'])
+                        
+                        # Building prompt for code generation with MCP tool results
                         prompt_step2 = f"""
                         Generate the *complete* code for the application based on the prompt and structure below.
 
                         **Detailed Prompt:**
                         {st.session_state.reformulated_prompt}
+                        
+                        {tool_results_text if tool_results_text else ""}
 
                         **Project Structure (for reference only):**
                         ```
@@ -180,12 +290,105 @@ if generate_button and not st.session_state.process_running:
                         """
                         messages_step2 = [{"role": "user", "content": prompt_step2}]
 
-                        # Use lower temperature for code generation for less creativity/errors
-                        response_step2 = call_openrouter_api(api_key, selected_model, messages_step2, temperature=0.4, max_retries=2)
+                        # Use tools for code generation if enabled
+                        if use_mcp_tools:
+                            response_step2 = call_openrouter_api(
+                                api_key, 
+                                selected_model, 
+                                messages_step2, 
+                                temperature=0.4, 
+                                max_retries=2,
+                                tools=get_default_tools()
+                            )
+                        else:
+                            # Use lower temperature for code generation for less creativity/errors
+                            response_step2 = call_openrouter_api(
+                                api_key, 
+                                selected_model, 
+                                messages_step2, 
+                                temperature=0.4, 
+                                max_retries=2
+                            )
                         st.session_state.last_api_call_time = time.time()
 
                     if response_step2 and response_step2.get("choices"):
                         code_response_text = response_step2["choices"][0]["message"]["content"]
+                        
+                        # Check for tool calls
+                        if use_mcp_tools and response_step2["choices"][0]["message"].get("tool_calls"):
+                            status_placeholder_step3.info("🔍 AI is using tools to enhance code generation...")
+                            
+                            # Process each tool call
+                            tool_calls = response_step2["choices"][0]["message"]["tool_calls"]
+                            for tool_call in tool_calls:
+                                function_info = tool_call.get("function", {})
+                                tool_name = function_info.get("name")
+                                tool_args_str = function_info.get("arguments", "{}")
+                                
+                                try:
+                                    tool_args = json.loads(tool_args_str)
+                                    
+                                    # Execute the tool via MCP client
+                                    tool_query = f"Execute {tool_name} with {tool_args}"
+                                    tool_result = asyncio.run(run_mcp_query(st.session_state.mcp_client, tool_query))
+                                    
+                                    if tool_result:
+                                        # Store the tool results
+                                        st.session_state.tool_results[tool_name] = {
+                                            "args": tool_args,
+                                            "result": tool_result.get("text", "")
+                                        }
+                                        
+                                        # Build a follow-up prompt with the tool results
+                                        processed_result = handle_tool_results(tool_name, tool_result.get("text", ""))
+                                        
+                                        follow_up_prompt = f"""
+                                        I've used {tool_name} to gather additional information for the code generation.
+                                        
+                                        The tool returned this information:
+                                        
+                                        {processed_result}
+                                        
+                                        Please use this additional information to improve the code generation.
+                                        Continue generating the code using the same format:
+                                        `--- FILE: path/to/filename ---`
+                                        
+                                        And remember to include all files from the structure.
+                                        """
+                                        
+                                        # Make another API call with the follow-up prompt
+                                        follow_up_messages = messages_step2 + [
+                                            {"role": "assistant", "content": code_response_text},
+                                            {"role": "user", "content": follow_up_prompt}
+                                        ]
+                                        
+                                        status_placeholder_step3.info(f"🔍 Using information from {tool_name} to enhance code...")
+                                        
+                                        # Check rate limit
+                                        if is_free_model(selected_model):
+                                            current_time = time.time()
+                                            time_since_last_call = time.time() - st.session_state.get('last_api_call_time', 0)
+                                            if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
+                                                wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
+                                                st.warning(f"⏳ Waiting {wait_time:.1f}s before continuing...")
+                                                time.sleep(wait_time)
+                                        
+                                        # Make the follow-up call
+                                        follow_up_response = call_openrouter_api(
+                                            api_key, 
+                                            selected_model, 
+                                            follow_up_messages, 
+                                            temperature=0.4
+                                        )
+                                        st.session_state.last_api_call_time = time.time()
+                                        
+                                        if follow_up_response and follow_up_response.get("choices"):
+                                            # Update the code response with the enhanced version
+                                            enhanced_code = follow_up_response["choices"][0]["message"]["content"]
+                                            code_response_text = enhanced_code
+                                except Exception as e:
+                                    st.warning(f"Error processing tool {tool_name}: {e}")
+                        
                         st.session_state.last_code_generation_response = code_response_text # Store for display
                         status_placeholder_step3.success("✅ Step 3 completed: Code generation response received.")
 
@@ -225,7 +428,7 @@ if generate_button and not st.session_state.process_running:
                                     # Check rate limit before calling API again
                                     if is_free_model(selected_model):
                                         current_time = time.time()
-                                        time_since_last_call = current_time - st.session_state.get('last_api_call_time', 0)
+                                        time_since_last_call = time.time() - st.session_state.get('last_api_call_time', 0)
                                         if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
                                             wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
                                             st.warning(f"⏳ Free model detected. Waiting {wait_time:.1f} seconds before generating missing code...")
@@ -260,6 +463,17 @@ if generate_button and not st.session_state.process_running:
                                         errors.extend(additional_errors)
                                 else:
                                     status_placeholder_step5.success("✅ No empty files found - all files contain code.")
+                            
+                            # Show tool results if any were used
+                            if use_mcp_tools and st.session_state.tool_results:
+                                with st.expander("View MCP Tool Results"):
+                                    st.subheader("🔍 Tool Results Used")
+                                    for tool_name, tool_info in st.session_state.tool_results.items():
+                                        st.write(f"**{tool_name}**")
+                                        st.write(f"Arguments: {tool_info.get('args', {})}")
+                                        if 'result' in tool_info:
+                                            with st.expander(f"View {tool_name} results"):
+                                                st.code(tool_info['result'])
                             
                             # Final success message
                             if not errors:

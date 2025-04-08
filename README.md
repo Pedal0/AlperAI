@@ -43,7 +43,32 @@ This project uses AI to generate complete, functional applications based on user
    streamlit run app.py
    ```
 
-3. Click **"Proceed with Generation"** to begin creating your application.
+3. Enable MCP Tools in the sidebar for enhanced generation (enabled by default).
+
+4. Click **"Generate Application"** to begin creating your application.
+
+## MCP Tools Enhancement
+
+This application now includes Model Context Protocol (MCP) tools integration to enhance code generation:
+
+- **Web Search Tool**: Searches the web for information relevant to your project
+- **Documentation Search Tool**: Retrieves documentation for specific technologies and frameworks
+- **Frontend Component Tool**: Finds and suggests UI components and patterns for frontend development
+- **Frontend Templates Tool**: Locates templates and design inspirations for various application types
+- **Animation Resources Tool**: Provides CSS animations and transitions for more engaging UI
+
+These tools allow the AI to access external information when needed, resulting in more accurate and feature-rich code generation.
+
+### Frontend Resource Integration
+
+The application includes a curated collection of frontend resources:
+
+- **UI Frameworks**: Bootstrap, Tailwind CSS, Bulma, Material Design
+- **Component Libraries**: Navigation bars, cards, forms, buttons, modals, and tables
+- **Animation Libraries**: Animate.css, Hover.css, AOS (Animate On Scroll)
+- **Template Websites**: Resources for portfolios, landing pages, dashboards, and e-commerce sites
+
+You can select your preferred UI framework in the sidebar options, or let the AI choose the most appropriate one for your project.
 
 ## Example Prompts
 
@@ -71,7 +96,7 @@ For best results, try to be specific in your descriptions. Here are some example
 - **API Key Issues**: Make sure your OpenRouter API key is correctly set in the `.env` file.
 - **Dependency Errors**: If you encounter any dependency errors, try installing them manually:
   ```
-  pienv install streamlit openai python-dotenv
+  pienv install streamlit openai python-dotenv asyncio
   ```
 
 ## API Configuration
@@ -94,3 +119,4 @@ This project is licensed under the Creative Commons Attribution-NonCommercial 4.
 - The quality of the generated application depends on the clarity and detail in your description.
 - More complex applications may require additional dependencies to be installed manually.
 - Static website generation produces pure HTML/CSS/JS files that can be hosted on any web server.
+- MCP tools enhance generation but may require internet access to function properly.
