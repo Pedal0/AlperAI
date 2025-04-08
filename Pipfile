@@ -6,9 +6,7 @@ name = "pypi"
 [packages]
 streamlit = "*"
 python-dotenv = "*"
-agno = "*"
 openai = "*"
-duckduckgo-search = "*"
 
 [dev-packages]
 
