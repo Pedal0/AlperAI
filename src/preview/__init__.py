@@ -1,0 +1,1 @@
+"""Module de prévisualisation des applications générées."""
