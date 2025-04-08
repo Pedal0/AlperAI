@@ -2,7 +2,6 @@
 
 This project uses AI to generate complete, functional applications based on user descriptions. It leverages the OpenRouter API to design, generate, and validate application code. The Streamlit interface provides an intuitive way to create applications without writing code.
 
-
 ## Prerequisites
 
 - Python 3.8 or higher
@@ -44,25 +43,7 @@ This project uses AI to generate complete, functional applications based on user
    streamlit run app.py
    ```
 
-3. In the web interface that opens:
-
-   - Enter your OpenRouter API key in the sidebar (if not already in your .env file)
-   - Describe the application you want to build in the text area
-   - Set the output directory where you want the application to be generated
-   - Configure advanced options if needed:
-     - Static website generation (HTML/CSS/JS only)
-     - Test generation
-     - Docker configuration
-     - CI/CD configuration
-     - Use sample JSON data instead of a database
-     - Extended dependency installation time
-   - Click **"Generate Application"** to start the process.
-
-4. Review the AI-reformulated requirements in the next tab and make any needed changes.
-
-5. Click **"Proceed with Generation"** to begin creating your application.
-
-6. When generation is complete, you can download the entire application as a ZIP file.
+3. Click **"Proceed with Generation"** to begin creating your application.
 
 ## Example Prompts
 
