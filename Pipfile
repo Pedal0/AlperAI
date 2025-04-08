@@ -7,6 +7,10 @@ name = "pypi"
 streamlit = "*"
 python-dotenv = "*"
 openai = "*"
+requests = "*"
+asyncio = "*"
+duckduckgo-search = "*"
+beautifulsoup4 = "*"
 
 [dev-packages]
 

@@ -10,7 +10,7 @@ import streamlit as st
 from src.config.constants import OPENROUTER_API_URL
 from src.utils.model_utils import is_free_model
 
-def call_openrouter_api(api_key, model, messages, temperature=0.7, stream=False, max_retries=1):
+def call_openrouter_api(api_key, model, messages, temperature=0.7, stream=False, max_retries=1, tools=None):
     """
     Call the OpenRouter API and handle basic errors.
     
@@ -21,6 +21,7 @@ def call_openrouter_api(api_key, model, messages, temperature=0.7, stream=False,
         temperature (float): Temperature parameter for generation
         stream (bool): Whether to stream the response
         max_retries (int): Maximum number of retries on failure
+        tools (list, optional): List of tool definitions to include in the request
         
     Returns:
         dict: JSON response or None on error
@@ -36,6 +37,11 @@ def call_openrouter_api(api_key, model, messages, temperature=0.7, stream=False,
         "temperature": temperature,
         "stream": stream
     }
+    
+    # Add tools if provided
+    if tools:
+        data["tools"] = tools
+    
     response = None # Initialize response to None
     
     for retry_attempt in range(max_retries + 1):  # +1 to include initial attempt
