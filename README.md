@@ -2,14 +2,6 @@
 
 This project uses AI to generate complete, functional applications based on user descriptions. It leverages the OpenRouter API to design, generate, and validate application code. The Streamlit interface provides an intuitive way to create applications without writing code.
 
-## Features
-
-- **Complete Application Generation**: Creates fully functional applications from text descriptions
-- **Multiple Technology Support**: Generates apps in various programming languages and frameworks
-- **Static Website Mode**: Option to create simple HTML/CSS/JS websites
-- **Validation System**: Tests and validates generated applications to ensure they run correctly
-- **Auto-fixing Capabilities**: Automatically fixes common issues in the generated code
-- **File Download**: Download the complete project as a ZIP file
 
 ## Prerequisites
 
@@ -22,7 +14,7 @@ This project uses AI to generate complete, functional applications based on user
 1. Clone the repository:
 
    ```
-   git clone https://github.com/yourusername/bot-project-creator.git
+   git clone https://github.com/Pedal0/bot-project-creator
    cd bot-project-creator
    ```
 
