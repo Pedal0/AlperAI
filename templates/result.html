@@ -1,0 +1,357 @@
+{% extends "layout.html" %}
+
+{% block title %}Résultats de la génération{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="success-banner animate__animated animate__fadeInUp">
+            <div class="text-center">
+                <i class="fas fa-check-circle success-icon mb-3"></i>
+                <h1 class="mb-3">Application générée avec succès !</h1>
+                <p class="lead">Votre application a été créée dans le répertoire spécifié.</p>
+            </div>
+        </div>
+        
+        <div class="card result-card mt-5">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" id="resultTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary" 
+                                type="button" role="tab" aria-controls="summary" aria-selected="true">
+                            <i class="fas fa-info-circle me-2"></i>Résumé
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="structure-tab" data-bs-toggle="tab" data-bs-target="#structure" 
+                                type="button" role="tab" aria-controls="structure" aria-selected="false">
+                            <i class="fas fa-sitemap me-2"></i>Structure
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tools-tab" data-bs-toggle="tab" data-bs-target="#tools" 
+                                type="button" role="tab" aria-controls="tools" aria-selected="false">
+                            <i class="fas fa-tools me-2"></i>Outils utilisés
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="iterate-tab" data-bs-toggle="tab" data-bs-target="#iterate" 
+                                type="button" role="tab" aria-controls="iterate" aria-selected="false">
+                            <i class="fas fa-sync-alt me-2"></i>Itération
+                        </button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content" id="resultTabsContent">
+                    <!-- Summary Tab -->
+                    <div class="tab-pane fade show active" id="summary" role="tabpanel" aria-labelledby="summary-tab">
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <h4><i class="fas fa-folder-open me-2"></i>Emplacement</h4>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" value="{{ target_dir }}" readonly>
+                                    <button class="btn btn-outline-secondary copy-btn" type="button" data-value="{{ target_dir }}">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                                <div class="mt-2">
+                                    <button class="btn btn-sm btn-primary open-folder-btn" data-path="{{ target_dir }}">
+                                        <i class="fas fa-external-link-alt me-1"></i> Ouvrir le dossier
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h4><i class="fas fa-clock me-2"></i>Date de création</h4>
+                                <p class="mb-0">{{ now().strftime('%d/%m/%Y à %H:%M:%S') }}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h4><i class="fas fa-pencil-alt me-2"></i>Description de l'application</h4>
+                            <div class="border rounded p-3 bg-light">
+                                <p class="mb-0">{{ prompt }}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-4 action-buttons">
+                            <div class="col-md-4 text-center">
+                                <div class="action-button">
+                                    <a href="{{ url_for('preview') }}" class="btn btn-lg btn-outline-primary rounded-circle">
+                                        <i class="fas fa-play"></i>
+                                    </a>
+                                    <h5 class="mt-2">Prévisualiser</h5>
+                                    <p class="text-muted small">Voir l'application en action</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-center">
+                                <div class="action-button">
+                                    <a href="{{ url_for('index') }}" class="btn btn-lg btn-outline-success rounded-circle">
+                                        <i class="fas fa-plus"></i>
+                                    </a>
+                                    <h5 class="mt-2">Nouveau projet</h5>
+                                    <p class="text-muted small">Créer une autre application</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-center">
+                                <div class="action-button">
+                                    <button class="btn btn-lg btn-outline-info rounded-circle" id="downloadBtn">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                    <h5 class="mt-2">Télécharger</h5>
+                                    <p class="text-muted small">Obtenir une archive du code</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Structure Tab -->
+                    <div class="tab-pane fade" id="structure" role="tabpanel" aria-labelledby="structure-tab">
+                        <h4 class="mb-3">Structure du projet</h4>
+                        <div class="directory-tree">
+                            <ul id="directoryTree" class="file-tree">
+                                <li><i class="fas fa-spinner fa-spin"></i> Chargement de la structure...</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Tools Tab -->
+                    <div class="tab-pane fade" id="tools" role="tabpanel" aria-labelledby="tools-tab">
+                        <h4 class="mb-4">Outils MCP utilisés</h4>
+                        <div class="tools-list">
+                            <div class="tool-item mb-4">
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="tool-icon">
+                                        <i class="fas fa-search"></i>
+                                    </div>
+                                    <h5 class="mb-0 ms-3">Recherche Web</h5>
+                                </div>
+                                <p>Recherche d'informations pertinentes sur le web pour la génération de code.</p>
+                            </div>
+                            
+                            <div class="tool-item mb-4">
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="tool-icon">
+                                        <i class="fas fa-book"></i>
+                                    </div>
+                                    <h5 class="mb-0 ms-3">Documentation</h5>
+                                </div>
+                                <p>Consultation de documentation technique pour les technologies et frameworks.</p>
+                            </div>
+                            
+                            <div class="tool-item mb-4">
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="tool-icon">
+                                        <i class="fas fa-laptop-code"></i>
+                                    </div>
+                                    <h5 class="mb-0 ms-3">Composants Frontend</h5>
+                                </div>
+                                <p>Recherche et intégration de composants UI pour le frontend de l'application.</p>
+                            </div>
+                            
+                            <div class="tool-item">
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="tool-icon">
+                                        <i class="fas fa-paint-brush"></i>
+                                    </div>
+                                    <h5 class="mb-0 ms-3">Animations</h5>
+                                </div>
+                                <p>Intégration d'animations CSS et transitions pour améliorer l'interface utilisateur.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Iterate Tab -->
+                    <div class="tab-pane fade" id="iterate" role="tabpanel" aria-labelledby="iterate-tab">
+                        <h4 class="mb-4">Améliorer votre application</h4>
+                        <p class="mb-4">Vous pouvez demander des améliorations spécifiques pour votre application générée. Décrivez ce que vous souhaitez améliorer, et le système effectuera une nouvelle itération de génération.</p>
+                        
+                        <form id="iterationForm" action="{{ url_for('continue_iteration') }}" method="post">
+                            <input type="hidden" name="project_dir" value="{{ target_dir }}">
+                            <div class="mb-3">
+                                <label for="iterationFeedback" class="form-label">Quelles améliorations souhaitez-vous?</label>
+                                <textarea class="form-control" id="iterationFeedback" name="feedback" rows="5" 
+                                          placeholder="Ex: Ajouter une fonctionnalité de recherche, améliorer le design, optimiser les performances..."></textarea>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="keepCurrentCode" name="keep_current" checked>
+                                <label class="form-check-label" for="keepCurrentCode">
+                                    Conserver le code existant (décoché = régénération complète)
+                                </label>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-sync-alt me-2"></i>Lancer l'itération
+                            </button>
+                        </form>
+                        
+                        <div class="mt-5" id="previousIterations">
+                            <h5 class="mb-3">Historique des itérations</h5>
+                            {% if iterations %}
+                                <div class="list-group">
+                                    {% for iteration in iterations %}
+                                        <div class="list-group-item">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1">Itération #{{ iteration.number }}</h6>
+                                                <small>{{ iteration.date }}</small>
+                                            </div>
+                                            <p class="mb-1">{{ iteration.feedback }}</p>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-muted">Aucune itération précédente.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Copy to clipboard functionality
+        document.querySelectorAll('.copy-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const value = this.getAttribute('data-value');
+                navigator.clipboard.writeText(value).then(() => {
+                    // Change button to show copied status
+                    const icon = this.querySelector('i');
+                    icon.classList.remove('fa-copy');
+                    icon.classList.add('fa-check');
+                    setTimeout(() => {
+                        icon.classList.remove('fa-check');
+                        icon.classList.add('fa-copy');
+                    }, 2000);
+                });
+            });
+        });
+        
+        // Charger la structure réelle du projet
+        function loadProjectStructure() {
+            const directoryTree = document.getElementById('directoryTree');
+            directoryTree.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin me-2"></i>Chargement de la structure...</div>';
+            
+            // Appel à l'API pour récupérer la structure du projet
+            fetch('/get_project_structure', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    project_dir: '{{ target_dir }}'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success' && data.structure) {
+                    // Effacer le contenu actuel
+                    directoryTree.innerHTML = '';
+                    
+                    // Fonction récursive pour construire l'arborescence
+                    function buildTreeHTML(items, parentElement) {
+                        const ul = document.createElement('ul');
+                        
+                        items.forEach(item => {
+                            const li = document.createElement('li');
+                            
+                            if (item.type === 'folder') {
+                                li.className = 'folder-item';
+                                li.innerHTML = `<i class="fas fa-folder"></i> <span>${item.name}/</span>`;
+                                
+                                // Ajouter les enfants du dossier
+                                if (item.children && item.children.length > 0) {
+                                    buildTreeHTML(item.children, li);
+                                } else {
+                                    // Dossier vide
+                                    const emptyUl = document.createElement('ul');
+                                    const emptyLi = document.createElement('li');
+                                    emptyLi.className = 'text-muted small';
+                                    emptyLi.innerHTML = '<i class="fas fa-info-circle"></i> Dossier vide';
+                                    emptyUl.appendChild(emptyLi);
+                                    li.appendChild(emptyUl);
+                                }
+                            } else {
+                                // C'est un fichier
+                                li.className = 'file-item';
+                                
+                                // Déterminer l'icône en fonction de l'extension
+                                let fileIcon = 'fa-file';
+                                const extension = item.name.split('.').pop().toLowerCase();
+                                
+                                if (['html', 'htm', 'jsx', 'tsx', 'xml'].includes(extension)) {
+                                    fileIcon = 'fa-file-code';
+                                } else if (['js', 'ts', 'py', 'java', 'c', 'cpp', 'cs', 'go', 'php', 'rb'].includes(extension)) {
+                                    fileIcon = 'fa-file-code';
+                                } else if (['css', 'scss', 'sass', 'less'].includes(extension)) {
+                                    fileIcon = 'fa-file-code';
+                                } else if (['json', 'yaml', 'yml', 'toml'].includes(extension)) {
+                                    fileIcon = 'fa-file-code';
+                                } else if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(extension)) {
+                                    fileIcon = 'fa-file-image';
+                                } else if (['pdf'].includes(extension)) {
+                                    fileIcon = 'fa-file-pdf';
+                                } else if (['md', 'txt', 'rtf'].includes(extension)) {
+                                    fileIcon = 'fa-file-alt';
+                                }
+                                
+                                li.innerHTML = `<i class="fas ${fileIcon}"></i> <span>${item.name}</span>`;
+                            }
+                            
+                            ul.appendChild(li);
+                        });
+                        
+                        parentElement.appendChild(ul);
+                    }
+                    
+                    // Construire l'arborescence
+                    buildTreeHTML(data.structure, directoryTree);
+                    
+                    // Ajouter les écouteurs d'événements pour les dossiers
+                    document.querySelectorAll('.folder-item > span').forEach(folderLabel => {
+                        folderLabel.addEventListener('click', function() {
+                            this.parentElement.classList.toggle('collapsed');
+                        });
+                    });
+                } else {
+                    directoryTree.innerHTML = `
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Impossible de charger la structure du projet: ${data.message || 'Erreur inconnue'}
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Erreur lors du chargement de la structure:', error);
+                directoryTree.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Erreur lors de la récupération de la structure: ${error.message}
+                    </div>
+                `;
+            });
+        }
+        
+        // Charger la structure du projet lorsque l'onglet structure est affiché
+        document.getElementById('structure-tab').addEventListener('shown.bs.tab', function(e) {
+            loadProjectStructure();
+        });
+        
+        // Download button functionality
+        document.getElementById('downloadBtn').addEventListener('click', function() {
+            alert("Fonctionnalité de téléchargement à implémenter. Cette action créerait un fichier ZIP de votre projet.");
+        });
+        
+        // Open folder button (this would require backend support in a real implementation)
+        document.querySelectorAll('.open-folder-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                alert("Cette fonctionnalité ouvrirait le dossier du projet dans l'explorateur de fichiers.");
+            });
+        });
+    });
+</script>
+{% endblock %}

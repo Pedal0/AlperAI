@@ -1,0 +1,1 @@
+"""Module de génération d'applications."""

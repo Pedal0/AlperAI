@@ -2,7 +2,7 @@
 Utility functions for file operations, structure parsing, and code writing.
 """
 import re
-import streamlit as st
+import logging
 from pathlib import Path
 
 def parse_structure_and_prompt(response_text):
@@ -53,30 +53,30 @@ def parse_structure_and_prompt(response_text):
             structure_lines = cleaned_structure_lines # Use cleaned list
         else:
             # If structure_match fails, we can't extract structure
-             st.warning("'### STRUCTURE ###' marker not found.")
+             logging.warning("'### STRUCTURE ###' marker not found.")
 
         # --- Handle cases where markers are not found or empty ---
         if not reformulated_prompt and not structure_lines:
-             st.error("Unable to extract both reformulated prompt AND structure. Check AI response format.")
-             st.code(response_text)
+             logging.error("Unable to extract both reformulated prompt AND structure. Check AI response format.")
+             logging.debug(response_text)
              return None, []
         elif not reformulated_prompt:
-             st.warning("Reformulated prompt not found, but structure found. Attempting to continue.")
+             logging.warning("Reformulated prompt not found, but structure found. Attempting to continue.")
              # Could try using original prompt as fallback, but risky
              # For now, return None for prompt, which will cause error later (which is ok)
              return None, structure_lines
         elif not structure_lines:
-             st.warning("Structure not found, but reformulated prompt found. Unable to create files.")
+             logging.warning("Structure not found, but reformulated prompt found. Unable to create files.")
              return reformulated_prompt, []
 
     except Exception as e:
-        st.error(f"Error analyzing AI response (structure/prompt): {e}")
-        st.code(response_text) # Display raw response
+        logging.error(f"Error analyzing AI response (structure/prompt): {e}")
+        logging.debug(response_text) # Display raw response
         return None, []
 
-    # Display cleaned structure for debugging
-    st.write("Detected and cleaned structure:")
-    st.code("\n".join(structure_lines), language='text')
+    # Log cleaned structure for debugging
+    logging.info("Detected and cleaned structure:")
+    logging.debug("\n".join(structure_lines))
 
     return reformulated_prompt, structure_lines
 
@@ -94,14 +94,14 @@ def create_project_structure(base_path, structure_lines):
     """
     created_paths = []
     base_path = Path(base_path).resolve() # Get absolute and normalized path
-    st.info(f"Attempting to create structure in: {base_path}")
+    logging.info(f"Attempting to create structure in: {base_path}")
 
     if not base_path.is_dir():
-        st.error(f"Base path '{base_path}' is not a valid folder or does not exist.")
+        logging.error(f"Base path '{base_path}' is not a valid folder or does not exist.")
         return None
 
     if not structure_lines:
-        st.warning("No structure lines provided to create.")
+        logging.warning("No structure lines provided to create.")
         return [] # Return empty list, not a fatal error
 
     try:
@@ -112,7 +112,7 @@ def create_project_structure(base_path, structure_lines):
             # Security: Check for '..' in path components
             relative_path = Path(line)
             if ".." in relative_path.parts:
-                 st.warning(f"⚠️ Path containing '..' ignored (security): '{line}'")
+                 logging.warning(f"⚠️ Path containing '..' ignored (security): '{line}'")
                  continue
 
             item_path = base_path / relative_path
@@ -125,25 +125,25 @@ def create_project_structure(base_path, structure_lines):
                 if is_dir:
                     # Create folder
                     item_path.mkdir(parents=True, exist_ok=True)
-                    st.write(f" ✅ Folder created/verified: {item_path}")
+                    logging.info(f" ✅ Folder created/verified: {item_path}")
                     created_paths.append(item_path)
                 else:
                     # It's a file: Create parent folders if needed
                     item_path.parent.mkdir(parents=True, exist_ok=True)
                     # Create empty file (or empty it if it exists)
                     item_path.touch(exist_ok=True)
-                    st.write(f" ✅ File created/verified: {item_path}")
+                    logging.info(f" ✅ File created/verified: {item_path}")
                     created_paths.append(item_path)
 
             except OSError as e:
-                 st.error(f"❌ OS error creating '{item_path}' from line '{line}': {e}")
+                 logging.error(f"❌ OS error creating '{item_path}' from line '{line}': {e}")
                  # Continue with others if possible
             except Exception as e:
-                 st.error(f"❌ Unexpected error for '{item_path}' from line '{line}': {e}")
+                 logging.error(f"❌ Unexpected error for '{item_path}' from line '{line}': {e}")
 
         return created_paths
     except Exception as e:
-        st.error(f"Major error processing project structure: {e}")
+        logging.error(f"Major error processing project structure: {e}")
         return None
 
 
@@ -186,7 +186,7 @@ def parse_and_write_code(base_path, code_response_text):
     # First check if the response ends with the incompleteness marker
     if code_response_text.strip().endswith("GENERATION_INCOMPLETE"):
         generation_incomplete = True
-        st.warning("⚠️ AI indicated that code generation is incomplete (likely token limit reached).")
+        logging.warning("⚠️ AI indicated that code generation is incomplete (likely token limit reached).")
         # Remove marker to avoid interfering with parsing the last file
         code_response_text = code_response_text.strip()[:-len("GENERATION_INCOMPLETE")].strip()
 
@@ -196,15 +196,15 @@ def parse_and_write_code(base_path, code_response_text):
     parts = re.split(r'(---\s*FILE:\s*(.*?)\s*---)', code_response_text, flags=re.IGNORECASE)
 
     if len(parts) <= 1:
-        st.warning("No '--- FILE: ... ---' markers found in code generation response.")
-        st.info("Attempting to write entire response to 'generated_code.txt'")
+        logging.warning("No '--- FILE: ... ---' markers found in code generation response.")
+        logging.info("Attempting to write entire response to 'generated_code.txt'")
         output_file = base_path / "generated_code.txt"
         try:
             output_file.parent.mkdir(parents=True, exist_ok=True)
             with open(output_file, 'w', encoding='utf-8') as f:
                 f.write(code_response_text)
             files_written.append(str(output_file))
-            st.write(f" ✅ Raw code written to: {output_file}")
+            logging.info(f" ✅ Raw code written to: {output_file}")
         except Exception as e:
              errors.append(f"❌ Unable to write to '{output_file}': {e}")
         # Can't tell if it's incomplete in this case without marker
@@ -219,7 +219,7 @@ def parse_and_write_code(base_path, code_response_text):
             code_block = parts[i+2].strip()    # Code block (may be empty if abrupt end)
 
             if not file_path_str:
-                st.warning(f"Marker found but empty or invalid file path, block ignored.")
+                logging.warning(f"Marker found but empty or invalid file path, block ignored.")
                 continue
 
             # Clean and validate path
@@ -228,7 +228,7 @@ def parse_and_write_code(base_path, code_response_text):
 
             relative_path = Path(file_path_str)
             if ".." in relative_path.parts: # Security: Check for '..'
-                 st.warning(f"⚠️ File path '{file_path_str}' contains '..', ignored for security.")
+                 logging.warning(f"⚠️ File path '{file_path_str}' contains '..', ignored for security.")
                  continue
 
             target_file_path = base_path / relative_path
@@ -244,19 +244,19 @@ def parse_and_write_code(base_path, code_response_text):
                 f.write(code_block)
 
             files_written.append(str(target_file_path))
-            # st.write(f"   Code written to: {target_file_path}") # Can be verbose
+            # logging.info(f"   Code written to: {target_file_path}") # Can be verbose
 
         except IndexError:
              # If response ends just after a marker without code
-             st.warning(f"Unexpected end of response after marker for '{parts[i+1].strip() if i+1 < len(parts) else 'last file'}'. File potentially empty or missing.")
+             logging.warning(f"Unexpected end of response after marker for '{parts[i+1].strip() if i+1 < len(parts) else 'last file'}'. File potentially empty or missing.")
              continue
         except OSError as e:
             error_msg = f"❌ Error writing to file '{file_path_str}': {e}"
-            st.error(error_msg)
+            logging.error(error_msg)
             errors.append(error_msg)
         except Exception as e:
             error_msg = f"❌ Unexpected error processing file '{file_path_str}': {e}"
-            st.error(error_msg)
+            logging.error(error_msg)
             errors.append(error_msg)
 
     return files_written, errors, generation_incomplete
@@ -319,7 +319,7 @@ def generate_missing_code(api_key, model, empty_files, reformulated_prompt, stru
     if not empty_files:
         return files_written, errors
     
-    st.info(f"Attempting to generate code for {len(empty_files)} empty files...")
+    logging.info(f"Attempting to generate code for {len(empty_files)} empty files...")
     
     # Prepare a condensed version of the previously generated code
     # Only include the FILE markers and a brief indicator of content
