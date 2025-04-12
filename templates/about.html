@@ -1,0 +1,153 @@
+{% extends "layout.html" %}
+
+{% block title %}À propos{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card about-card">
+            <div class="card-body p-5">
+                <h1 class="mb-4 text-center">
+                    <span class="gradient-text">À propos du Générateur d'Applications IA</span>
+                </h1>
+                
+                <div class="mb-5">
+                    <h3><i class="fas fa-info-circle me-2"></i>Présentation du projet</h3>
+                    <p>
+                        Ce projet utilise l'IA pour générer des applications complètes et fonctionnelles basées sur les descriptions des utilisateurs. 
+                        Il s'appuie sur l'API OpenRouter pour concevoir, générer et valider le code d'application. 
+                        L'interface Flask offre un moyen intuitif de créer des applications sans écrire de code.
+                    </p>
+                </div>
+                
+                <div class="mb-5">
+                    <h3><i class="fas fa-cogs me-2"></i>Prérequis</h3>
+                    <ul class="feature-list">
+                        <li>
+                            <span class="feature-icon"><i class="fab fa-python"></i></span>
+                            <div>
+                                <h5>Python 3.8 ou supérieur</h5>
+                                <p>L'environnement d'exécution principal pour le générateur d'applications</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><i class="fas fa-box"></i></span>
+                            <div>
+                                <h5>Pipenv</h5>
+                                <p>Outil de gestion d'environnement virtuel et de dépendances</p>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="feature-icon"><i class="fas fa-key"></i></span>
+                            <div>
+                                <h5>Clé API OpenRouter</h5>
+                                <p>Nécessaire pour accéder aux modèles d'IA (<a href="https://openrouter.ai/" target="_blank">Obtenir une clé</a>)</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="mb-5">
+                    <h3><i class="fas fa-tools me-2"></i>Fonctionnalités MCP</h3>
+                    <p>
+                        Cette application inclut désormais l'intégration d'outils Model Context Protocol (MCP) pour améliorer la génération de code :
+                    </p>
+                    <div class="row mt-4">
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100 feature-card">
+                                <div class="card-body">
+                                    <h5 class="card-title"><i class="fas fa-search me-2"></i>Recherche Web</h5>
+                                    <p class="card-text">Recherche des informations pertinentes pour votre projet sur le web</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100 feature-card">
+                                <div class="card-body">
+                                    <h5 class="card-title"><i class="fas fa-book me-2"></i>Recherche de Documentation</h5>
+                                    <p class="card-text">Récupère la documentation pour des technologies et frameworks spécifiques</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100 feature-card">
+                                <div class="card-body">
+                                    <h5 class="card-title"><i class="fas fa-laptop-code me-2"></i>Composants Frontend</h5>
+                                    <p class="card-text">Trouve et suggère des composants UI pour le développement frontend</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100 feature-card">
+                                <div class="card-body">
+                                    <h5 class="card-title"><i class="fas fa-paint-brush me-2"></i>Ressources d'Animation</h5>
+                                    <p class="card-text">Fournit des animations CSS et des transitions pour une UI plus attrayante</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-5">
+                    <h3><i class="fas fa-code me-2"></i>Exemples d'utilisation</h3>
+                    <p>Pour de meilleurs résultats, essayez d'être spécifique dans vos descriptions. Voici quelques exemples :</p>
+                    
+                    <div class="accordion mt-3" id="examplesAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#example1">
+                                    Site web statique
+                                </button>
+                            </h2>
+                            <div id="example1" class="accordion-collapse collapse show" data-bs-parent="#examplesAccordion">
+                                <div class="accordion-body">
+                                    <div class="example-prompt">
+                                        <pre>Créer un site web portfolio statique pour un photographe avec une page d'accueil, galerie, à propos et contact. Inclure un design responsive au look moderne.</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#example2">
+                                    Application Web
+                                </button>
+                            </h2>
+                            <div id="example2" class="accordion-collapse collapse" data-bs-parent="#examplesAccordion">
+                                <div class="accordion-body">
+                                    <div class="example-prompt">
+                                        <pre>Construire une application de gestion de tâches avec authentification utilisateur. Les utilisateurs doivent pouvoir créer, modifier et supprimer des tâches, définir des dates d'échéance et marquer les tâches comme terminées.</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#example3">
+                                    Service API
+                                </button>
+                            </h2>
+                            <div id="example3" class="accordion-collapse collapse" data-bs-parent="#examplesAccordion">
+                                <div class="accordion-body">
+                                    <div class="example-prompt">
+                                        <pre>Créer une API RESTful pour une plateforme de blog avec des endpoints pour les articles, commentaires et utilisateurs. Inclure l'authentification et la gestion appropriée des erreurs.</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-5">
+                    <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-rocket me-2"></i>Commencer à générer
+                    </a>
+                    <a href="https://github.com/Pedal0/bot-project-creator" target="_blank" class="btn btn-outline-dark btn-lg ms-3">
+                        <i class="fab fa-github me-2"></i>GitHub
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

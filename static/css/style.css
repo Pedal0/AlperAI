@@ -1,0 +1,553 @@
+/* 
+   Variables de couleurs pour thème moderne
+   Base chromatique : Gradients bleu-violet avec accents
+*/
+:root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --primary-light: #818cf8;
+    --secondary: #14b8a6;
+    --secondary-dark: #0d9488;
+    --accent: #f43f5e;
+    --accent-light: #fb7185;
+    --background: #f8fafc;
+    --surface: #ffffff;
+    --surface-2: #f1f5f9;
+    --surface-3: #e2e8f0;
+    --text: #0f172a;
+    --text-secondary: #475569;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --success: #10b981;
+    --info: #3b82f6;
+}
+
+/* Styles globaux */
+body {
+    font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--background);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Gradient de texte pour titres spéciaux */
+.gradient-text {
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 700;
+}
+
+/* Navbar */
+.navbar {
+    background: linear-gradient(90deg, var(--primary-dark), var(--primary));
+    padding: 1rem 0;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+}
+
+.navbar .navbar-brand {
+    font-weight: 700;
+    font-size: 1.4rem;
+}
+
+.navbar .nav-link {
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 5px;
+    transition: all 0.3s ease;
+}
+
+.navbar .nav-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.navbar .nav-link.active {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Main card styles */
+.main-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    margin-bottom: 2rem;
+}
+
+.config-panel {
+    background: var(--surface-2);
+    border-right: 1px solid var(--surface-3);
+}
+
+.input-panel {
+    background: var(--surface);
+}
+
+/* Form elements */
+.form-control, .form-select {
+    border-radius: 6px;
+    padding: 0.6rem 1rem;
+    border: 1px solid var(--surface-3);
+    transition: all 0.2s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+textarea.form-control {
+    min-height: 120px;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.6rem 1.2rem;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    box-shadow: 0 4px 6px rgba(99, 102, 241, 0.1);
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark);
+    border-color: var(--primary-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 10px rgba(99, 102, 241, 0.15);
+}
+
+.btn-outline-secondary {
+    color: var(--text-secondary);
+    border-color: var(--surface-3);
+}
+
+.btn-outline-secondary:hover {
+    background: var(--surface-2);
+    color: var(--text);
+    border-color: var(--surface-3);
+}
+
+/* Hero section */
+.hero-section {
+    padding: 2rem 0;
+    text-align: center;
+}
+
+.hero-section h1 {
+    font-size: 2.8rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+}
+
+/* Result page styles */
+.success-banner {
+    background: linear-gradient(120deg, var(--primary-light), var(--secondary));
+    color: white;
+    padding: 3rem 2rem;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.2);
+    margin-bottom: 2rem;
+}
+
+.success-icon {
+    font-size: 4rem;
+    color: white;
+    display: block;
+}
+
+.result-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.05);
+}
+
+.action-buttons .action-button {
+    padding: 1rem;
+    transition: all 0.3s ease;
+}
+
+.action-buttons .btn {
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.action-buttons .btn:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* About page styles */
+.about-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+}
+
+.feature-list {
+    list-style: none;
+    padding: 0;
+}
+
+.feature-list li {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--surface-2);
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.feature-list li:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+.feature-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 50px;
+    height: 50px;
+    background: var(--primary);
+    color: white;
+    border-radius: 10px;
+    margin-right: 1rem;
+    font-size: 1.5rem;
+}
+
+.feature-card {
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    border: 1px solid var(--surface-3);
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.example-prompt {
+    background: var(--surface-2);
+    border-radius: 6px;
+    padding: 1rem;
+    font-family: monospace;
+    margin-bottom: 0;
+}
+
+.example-prompt pre {
+    margin-bottom: 0;
+    white-space: pre-wrap;
+}
+
+/* File tree styles */
+.file-tree {
+    list-style: none;
+    padding-left: 0.5rem;
+}
+
+.file-tree ul {
+    list-style: none;
+    padding-left: 1.5rem;
+}
+
+.file-tree li {
+    margin: 0.3rem 0;
+}
+
+.folder-item {
+    cursor: pointer;
+}
+
+.folder-item.collapsed > ul {
+    display: none;
+}
+
+.folder-item > span, .file-item > span {
+    margin-left: 5px;
+}
+
+/* Tool styles */
+.tool-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--primary);
+    color: white;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+/* Preview page styles */
+.preview-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+}
+
+.preview-toolbar {
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--surface-3);
+}
+
+.app-url {
+    font-family: monospace;
+    color: var(--text-secondary);
+}
+
+.preview-frame-container {
+    position: relative;
+    height: 600px;
+}
+
+.preview-frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: 0 0 12px 12px;
+    background: white;
+    transition: opacity 0.3s ease;
+}
+
+.logs-container {
+    height: 600px;
+    overflow-y: auto;
+}
+
+.logs-content {
+    font-family: monospace;
+    font-size: 0.9rem;
+    overflow-y: auto;
+    height: 550px;
+}
+
+.log-line {
+    margin: 0;
+    padding: 3px 0;
+    font-family: monospace;
+}
+
+.timestamp {
+    color: #a1a1aa;
+    margin-right: 10px;
+}
+
+.log-info {
+    color: #60a5fa;
+}
+
+.log-warning {
+    color: #fbbf24;
+}
+
+.log-error {
+    color: #ef4444;
+}
+
+/* Progress bar styling */
+.progress {
+    height: 0.8rem;
+    border-radius: 1rem;
+    background-color: var(--surface-2);
+}
+
+.progress-bar {
+    background-color: var(--primary);
+}
+
+/* Accordion styling */
+.accordion-button:not(.collapsed) {
+    background-color: rgba(99, 102, 241, 0.05);
+    color: var(--primary);
+}
+
+.accordion-button:focus {
+    box-shadow: 0 0 0 0.25rem rgba(99, 102, 241, 0.1);
+    border-color: var(--primary-light);
+}
+
+/* Footer styling */
+.footer {
+    margin-top: auto;
+    padding: 2rem 0;
+    background-color: var(--surface-2);
+    border-top: 1px solid var(--surface-3);
+}
+
+.footer a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.footer a:hover {
+    text-decoration: underline;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .config-panel {
+        border-right: none;
+        border-bottom: 1px solid var(--surface-3);
+    }
+    
+    .hero-section h1 {
+        font-size: 2rem;
+    }
+    
+    .action-buttons .btn {
+        width: 60px;
+        height: 60px;
+        font-size: 1.2rem;
+    }
+}
+
+/* 
+   Ajout des styles pour les pages d'erreur et quelques améliorations esthétiques
+*/
+
+/* Styles pour la page d'erreur */
+.error-container {
+    padding: 3rem 0;
+}
+
+.error-code {
+    font-size: 8rem;
+    font-weight: 800;
+    background: linear-gradient(45deg, var(--primary), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 1rem;
+    line-height: 1;
+}
+
+.error-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.error-description {
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* Améliorations pour les cartes et conteneurs */
+.card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* Style pour les badges */
+.badge {
+    font-weight: 500;
+    padding: 0.4em 0.7em;
+    border-radius: 6px;
+}
+
+/* Style pour les alertes */
+.alert {
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* Animations personnalisées pour les éléments */
+.fade-in-up {
+    animation: fadeInUp 0.5s ease forwards;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Améliorations pour les formulaires */
+.form-control:focus, .form-select:focus, .btn:focus {
+    box-shadow: 0 0 0 0.25rem rgba(99, 102, 241, 0.25);
+}
+
+/* Style pour les boutons d'action circulaires */
+.btn-circle {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.btn-circle.btn-lg {
+    width: 4rem;
+    height: 4rem;
+    font-size: 1.25rem;
+}
+
+/* Style pour les sections de fonctionnalités */
+.feature-section {
+    border-radius: 12px;
+    overflow: hidden;
+    background: linear-gradient(135deg, var(--surface), var(--surface-2));
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
+    transition: transform 0.3s ease;
+}
+
+.feature-section:hover {
+    transform: translateY(-5px);
+}
+
+.feature-header {
+    background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+    color: white;
+    padding: 1.5rem;
+}
+
+.feature-content {
+    padding: 1.5rem;
+}
+
+/* Style amélioré pour l'iframe de prévisualisation */
+.preview-frame {
+    border-radius: 0 0 12px 12px;
+    background: white;
+    transition: opacity 0.3s ease;
+}
+
+/* Effet d'ombrage pour le texte en 3D */
+.text-3d {
+    text-shadow: 0px 1px 0px rgba(255, 255, 255, 0.5),
+                 0px 2px 0px rgba(255, 255, 255, 0.2),
+                 0px 3px 0px rgba(255, 255, 255, 0.1),
+                 0px 4px 0px rgba(0, 0, 0, 0.1),
+                 0px 5px 5px rgba(0, 0, 0, 0.2);
+}

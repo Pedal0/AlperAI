@@ -1,0 +1,920 @@
+{% extends "layout.html" %}
+
+{% block title %}Prévisualisation{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-11">
+        <div class="preview-header mb-4">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="gradient-text">Prévisualisation de l'application</h1>
+                    <p class="lead">
+                        Votre application est maintenant prête à être testée.
+                    </p>
+                    <p class="text-muted">
+                        <i class="fas fa-folder-open me-1"></i> Répertoire: <code id="project-path">{{ target_dir }}</code>
+                    </p>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <a href="{{ url_for('result') }}" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-arrow-left me-1"></i> Retour aux résultats
+                    </a>
+                    <a href="{{ url_for('index') }}" class="btn btn-primary">
+                        <i class="fas fa-home me-1"></i> Accueil
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card preview-card">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" id="previewTabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="application-tab" data-bs-toggle="tab" href="#application">
+                            <i class="fas fa-play-circle me-1"></i> Application
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="config-tab" data-bs-toggle="tab" href="#config">
+                            <i class="fas fa-cogs me-1"></i> Configuration
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="logs-tab" data-bs-toggle="tab" href="#logs">
+                            <i class="fas fa-terminal me-1"></i> Logs
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body p-0">
+                <div class="tab-content">
+                    <!-- Application Preview Tab -->
+                    <div class="tab-pane fade show active" id="application">
+                        <div class="d-flex justify-content-between align-items-center p-3 preview-toolbar">
+                            <div>
+                                <span class="badge bg-secondary me-2" id="app-status-badge">Non démarré</span>
+                                <span class="app-url" id="app-url">Adresse non disponible</span>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary me-2" id="refreshPreviewBtn">
+                                    <i class="fas fa-sync-alt me-1"></i> Actualiser
+                                </button>
+                                <button class="btn btn-sm btn-outline-primary" id="openInNewTab" disabled>
+                                    <i class="fas fa-external-link-alt me-1"></i> Ouvrir dans un nouvel onglet
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="preview-frame-container">
+                            <div class="text-center py-5 loading-spinner">
+                                <div class="spinner-border text-primary mb-3 d-none" id="loading-spinner" role="status">
+                                    <span class="visually-hidden">Chargement de l'application...</span>
+                                </div>
+                                <p id="loading-message">Application non démarrée</p>
+                                <p class="text-muted small">Utilisez les boutons ci-dessous pour lancer l'application.</p>
+                            </div>
+                            
+                            <iframe id="previewFrame" class="preview-frame d-none" src="about:blank" frameborder="0"></iframe>
+                            
+                            <div class="application-error d-none" id="application-error">
+                                <div class="text-center py-5">
+                                    <i class="fas fa-exclamation-triangle text-warning mb-3" style="font-size: 3rem;"></i>
+                                    <h3>Impossible de lancer l'application</h3>
+                                    <p>L'application n'a pas pu être démarrée correctement.</p>
+                                    <div class="error-details bg-light p-3 mt-3 text-start">
+                                        <pre id="errorDetails">Erreur non spécifiée</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Configuration Tab -->
+                    <div class="tab-pane fade p-4" id="config">
+                        <h4 class="mb-4">Configuration de l'application</h4>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informations générales</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <table class="table">
+                                            <tbody>
+                                                <tr>
+                                                    <th scope="row">Répertoire</th>
+                                                    <td>{{ target_dir }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">Type d'application</th>
+                                                    <td id="project-type">Non détecté</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">Port</th>
+                                                    <td id="app-port">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">URL</th>
+                                                    <td id="app-url-config">-</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="card mb-4" id="files-card">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="fas fa-file-code me-2"></i>Fichiers principaux</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="list-group" id="main-files-list">
+                                            <div class="text-center py-3 text-muted">
+                                                <i class="fas fa-spinner fa-spin me-2"></i> Chargement des fichiers...
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Commandes de gestion</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Commande de démarrage</h6>
+                                        <div class="input-group mb-3">
+                                            <input type="text" class="form-control" id="start-command" value="..." readonly>
+                                            <button class="btn btn-outline-secondary copy-btn" type="button" data-target="start-command">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Installation des dépendances</h6>
+                                        <div class="input-group mb-3">
+                                            <input type="text" class="form-control" id="deps-command" value="..." readonly>
+                                            <button class="btn btn-outline-secondary copy-btn" type="button" data-target="deps-command">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-flex mt-3">
+                                    <button class="btn btn-success me-2" id="startAppBtn">
+                                        <i class="fas fa-play me-1"></i> Démarrer l'application
+                                    </button>
+                                    <button class="btn btn-danger me-2" id="stopAppBtn" disabled>
+                                        <i class="fas fa-stop me-1"></i> Arrêter l'application
+                                    </button>
+                                    <button class="btn btn-warning" id="restartAppBtn" disabled>
+                                        <i class="fas fa-sync-alt me-1"></i> Redémarrer l'application
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Logs Tab -->
+                    <div class="tab-pane fade" id="logs">
+                        <div class="logs-toolbar d-flex justify-content-between align-items-center p-2 bg-light border-bottom">
+                            <div class="d-flex align-items-center">
+                                <span class="badge bg-secondary me-2" id="logs-status">Logs inactifs</span>
+                                <select class="form-select form-select-sm log-level" style="width: auto;">
+                                    <option value="all">Tous les niveaux</option>
+                                    <option value="INFO">Info</option>
+                                    <option value="WARNING">Warning</option>
+                                    <option value="ERROR">Error</option>
+                                </select>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary me-2" id="clearLogs">
+                                    <i class="fas fa-trash-alt me-1"></i> Effacer
+                                </button>
+                                <button class="btn btn-sm btn-outline-primary" id="downloadLogs">
+                                    <i class="fas fa-download me-1"></i> Télécharger
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="logs-container p-3">
+                            <div class="logs-content bg-dark text-light p-3 rounded" id="logsContent">
+                                <div class="text-center text-muted py-3">
+                                    <i class="fas fa-terminal mb-2"></i>
+                                    <p>Les logs apparaîtront ici lorsque l'application sera démarrée.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Control Panel -->
+        <div class="card mt-4 mb-4">
+            <div class="card-header">
+                <h4 class="mb-0"><i class="fas fa-tools me-2"></i>Panneau de contrôle</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5 class="mb-3">Outils de développement</h5>
+                        <div class="d-flex flex-wrap">
+                            <button class="btn btn-outline-primary me-2 mb-2" id="openFolderBtn">
+                                <i class="fas fa-folder-open me-1"></i> Ouvrir le dossier
+                            </button>
+                            <button class="btn btn-outline-info me-2 mb-2" id="copyPathBtn">
+                                <i class="fas fa-copy me-1"></i> Copier le chemin
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h5 class="mb-3">Actions</h5>
+                        <div class="d-flex flex-wrap">
+                            <button class="btn btn-outline-secondary me-2 mb-2" id="improveWithAIBtn">
+                                <i class="fas fa-magic me-1"></i> Améliorer avec l'IA
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- App Loading Progress Modal -->
+<div class="modal fade" id="appLoadingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center p-4">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Chargement...</span>
+                </div>
+                <h4>Démarrage de l'application...</h4>
+                <p>Veuillez patienter pendant le démarrage du serveur et l'initialisation de l'application.</p>
+                <div class="progress mt-3">
+                    <div id="appLoadingProgress" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+                </div>
+                <p class="mt-2"><span id="loadingStatusText">Initialisation...</span></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Session ID (hidden) -->
+<input type="hidden" id="preview-session-id" value="{{ preview_session_id }}">
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Variables globales
+        const previewFrame = document.getElementById('previewFrame');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const loadingMessage = document.getElementById('loading-message');
+        const appStatusBadge = document.getElementById('app-status-badge');
+        const appError = document.getElementById('application-error');
+        const errorDetails = document.getElementById('errorDetails');
+        const previewSessionId = document.getElementById('preview-session-id').value;
+        const startAppBtn = document.getElementById('startAppBtn');
+        const stopAppBtn = document.getElementById('stopAppBtn');
+        const restartAppBtn = document.getElementById('restartAppBtn');
+        const refreshPreviewBtn = document.getElementById('refreshPreviewBtn');
+        const openInNewTabBtn = document.getElementById('openInNewTab');
+        const projectPath = document.getElementById('project-path').textContent;
+        const logsContent = document.getElementById('logsContent');
+        const logLevelSelect = document.querySelector('.log-level');
+        const logsStatusBadge = document.getElementById('logs-status');
+        const mainFilesList = document.getElementById('main-files-list');
+        const projectTypeEl = document.getElementById('project-type');
+        const appPortEl = document.getElementById('app-port');
+        const appUrlEl = document.getElementById('app-url');
+        const appUrlConfigEl = document.getElementById('app-url-config');
+        const startCommandEl = document.getElementById('start-command');
+        const depsCommandEl = document.getElementById('deps-command');
+
+        // État de l'application
+        let appStatus = {
+            running: false,
+            url: null,
+            projectType: null,
+            logs: []
+        };
+
+        // Statut de sondage
+        let statusPollInterval = null;
+
+        // Fonctions utilitaires
+        function showError(message) {
+            appError.classList.remove('d-none');
+            errorDetails.textContent = message;
+            loadingSpinner.classList.add('d-none');
+            previewFrame.classList.add('d-none');
+            appStatusBadge.textContent = 'Erreur';
+            appStatusBadge.className = 'badge bg-danger me-2';
+            loadingMessage.textContent = 'Erreur lors du démarrage';
+        }
+
+        function updateAppStatus(status) {
+            appStatus = status;
+            
+            // Mettre à jour l'interface en fonction du statut
+            if (status.running) {
+                // Application en cours d'exécution
+                appStatusBadge.textContent = 'En cours d\'exécution';
+                appStatusBadge.className = 'badge bg-success me-2';
+                logsStatusBadge.textContent = 'Logs actifs';
+                logsStatusBadge.className = 'badge bg-success me-2';
+                
+                // Activer/désactiver les boutons
+                startAppBtn.disabled = true;
+                stopAppBtn.disabled = false;
+                restartAppBtn.disabled = false;
+                refreshPreviewBtn.disabled = false;
+                openInNewTabBtn.disabled = false;
+                
+                // Afficher l'iframe
+                loadingSpinner.classList.add('d-none');
+                appError.classList.add('d-none');
+                previewFrame.classList.remove('d-none');
+                
+                // Masquer le message de chargement
+                document.querySelector('.loading-spinner').classList.add('d-none');
+                
+                // Mettre à jour l'URL
+                if (status.url) {
+                    appUrlEl.textContent = status.url;
+                    appUrlConfigEl.textContent = status.url;
+                    
+                    // Mettre à jour le port
+                    const urlObj = new URL(status.url);
+                    appPortEl.textContent = urlObj.port || (urlObj.protocol === 'https:' ? '443' : '80');
+                    
+                    // Charger l'application dans l'iframe
+                    if (previewFrame.src !== status.url) {
+                        previewFrame.src = status.url;
+                    }
+                }
+                
+                // Mettre à jour le type de projet
+                if (status.project_type) {
+                    const projectTypeMap = {
+                        'flask': 'Application Web Flask',
+                        'express': 'Application Node.js Express',
+                        'react': 'Application React',
+                        'vue': 'Application Vue.js',
+                        'angular': 'Application Angular',
+                        'static': 'Site Web Statique',
+                        'unknown': 'Type Inconnu'
+                    };
+                    
+                    projectTypeEl.textContent = projectTypeMap[status.project_type] || status.project_type;
+                    
+                    // Mettre à jour les commandes en fonction du type de projet
+                    updateCommandsForProjectType(status.project_type);
+                }
+            } else {
+                // Application arrêtée
+                appStatusBadge.textContent = 'Arrêtée';
+                appStatusBadge.className = 'badge bg-secondary me-2';
+                logsStatusBadge.textContent = 'Logs inactifs';
+                logsStatusBadge.className = 'badge bg-secondary me-2';
+                
+                // Activer/désactiver les boutons
+                startAppBtn.disabled = false;
+                stopAppBtn.disabled = true;
+                restartAppBtn.disabled = true;
+                refreshPreviewBtn.disabled = true;
+                openInNewTabBtn.disabled = true;
+                
+                // Masquer l'iframe
+                previewFrame.classList.add('d-none');
+                loadingSpinner.classList.remove('d-none');
+                loadingMessage.textContent = 'Application arrêtée';
+                
+                // Si erreur de sortie du processus
+                if (status.exit_code !== undefined && status.exit_code !== 0) {
+                    appError.classList.remove('d-none');
+                    errorDetails.textContent = `Le processus s'est terminé avec le code d'erreur: ${status.exit_code}`;
+                    loadingMessage.textContent = 'Erreur lors de l\'exécution';
+                }
+            }
+            
+            // Mettre à jour les logs
+            updateLogs(status.logs || []);
+        }
+
+        function updateCommandsForProjectType(projectType) {
+            if (projectType === 'flask') {
+                startCommandEl.value = 'python app.py';
+                depsCommandEl.value = 'pip install -r requirements.txt';
+            } else if (projectType === 'express' || projectType === 'react' || projectType === 'vue' || projectType === 'angular') {
+                startCommandEl.value = 'npm start';
+                depsCommandEl.value = 'npm install';
+            } else if (projectType === 'static') {
+                startCommandEl.value = 'npx serve -s .';
+                depsCommandEl.value = 'npm install -g serve';
+            } else {
+                startCommandEl.value = 'python app.py';
+                depsCommandEl.value = 'pip install -r requirements.txt';
+            }
+        }
+
+        function updateLogs(logs) {
+            // Filtrer les logs selon le niveau sélectionné
+            const level = logLevelSelect.value;
+            let filteredLogs = logs;
+            
+            if (level !== 'all') {
+                filteredLogs = logs.filter(log => log.level === level);
+            }
+            
+            // Vider le conteneur de logs
+            logsContent.innerHTML = '';
+            
+            // Si aucun log, afficher un message
+            if (filteredLogs.length === 0) {
+                logsContent.innerHTML = `
+                    <div class="text-center text-muted py-3">
+                        <i class="fas fa-terminal mb-2"></i>
+                        <p>Aucun log disponible pour le moment.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Ajouter les logs au conteneur
+            filteredLogs.forEach(log => {
+                const logLine = document.createElement('pre');
+                logLine.className = 'log-line';
+                
+                // Déterminer la classe CSS en fonction du niveau
+                let levelClass = 'log-info';
+                if (log.level === 'WARNING') levelClass = 'log-warning';
+                if (log.level === 'ERROR') levelClass = 'log-error';
+                
+                logLine.innerHTML = `<span class="timestamp">${log.timestamp}</span> <span class="${levelClass}">[${log.level}]</span> ${log.message}`;
+                logsContent.appendChild(logLine);
+            });
+            
+            // Faire défiler vers le bas
+            logsContent.scrollTop = logsContent.scrollHeight;
+        }
+
+        function startApp() {
+            // Montrer le modal de chargement
+            const loadingModal = new bootstrap.Modal(document.getElementById('appLoadingModal'));
+            loadingModal.show();
+            
+            // Démarrer l'animation de la barre de progression
+            const progressBar = document.getElementById('appLoadingProgress');
+            const statusText = document.getElementById('loadingStatusText');
+            let progress = 0;
+            
+            // Mettre à jour le UI
+            loadingSpinner.classList.remove('d-none');
+            loadingMessage.textContent = "Démarrage de l'application...";
+            
+            // Appel API pour démarrer l'application
+            fetch('/preview/start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    session_id: previewSessionId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Fermer le modal après quelques secondes
+                setTimeout(() => {
+                    loadingModal.hide();
+                    
+                    if (data.status === 'success') {
+                        // Mettre à jour le statut
+                        updateAppStatus({
+                            running: true,
+                            url: data.url,
+                            project_type: data.project_type,
+                            logs: data.logs || []
+                        });
+                        
+                        // Démarrer le sondage régulier
+                        startStatusPolling();
+                    } else {
+                        // Afficher l'erreur
+                        showError(data.message);
+                        
+                        // Mettre à jour les logs même en cas d'erreur
+                        updateLogs(data.logs || []);
+                    }
+                }, 2000);
+                
+                // Simuler la progression
+                const progressInterval = setInterval(() => {
+                    progress += 5;
+                    progressBar.style.width = progress + '%';
+                    
+                    if (progress === 20) {
+                        statusText.textContent = "Détection du type de projet...";
+                    } else if (progress === 40) {
+                        statusText.textContent = "Installation des dépendances...";
+                    } else if (progress === 60) {
+                        statusText.textContent = "Démarrage du serveur...";
+                    } else if (progress === 80) {
+                        statusText.textContent = "Configuration de l'application...";
+                    } else if (progress >= 100) {
+                        clearInterval(progressInterval);
+                        statusText.textContent = "Application prête !";
+                    }
+                }, 100);
+            })
+            .catch(error => {
+                loadingModal.hide();
+                showError('Erreur lors du démarrage de l\'application: ' + error.message);
+            });
+        }
+
+        function stopApp() {
+            // Mettre à jour le UI
+            loadingSpinner.classList.remove('d-none');
+            loadingMessage.textContent = 'Arrêt de l\'application...';
+            previewFrame.classList.add('d-none');
+            
+            // Appel API pour arrêter l'application
+            fetch('/preview/stop', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Arrêter le sondage
+                    stopStatusPolling();
+                    
+                    // Mettre à jour le statut
+                    updateAppStatus({
+                        running: false
+                    });
+                    
+                    loadingMessage.textContent = 'Application arrêtée';
+                } else {
+                    showError(data.message);
+                }
+            })
+            .catch(error => {
+                showError('Erreur lors de l\'arrêt de l\'application: ' + error.message);
+            });
+        }
+
+        function restartApp() {
+            // Mettre à jour le UI
+            loadingSpinner.classList.remove('d-none');
+            loadingMessage.textContent = 'Redémarrage de l\'application...';
+            previewFrame.classList.add('d-none');
+            
+            // Appel API pour redémarrer l'application
+            fetch('/preview/restart', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Mettre à jour le statut
+                    updateAppStatus({
+                        running: true,
+                        url: data.url,
+                        project_type: data.project_type,
+                        logs: data.logs || []
+                    });
+                } else {
+                    showError(data.message);
+                    
+                    // Mettre à jour les logs même en cas d'erreur
+                    updateLogs(data.logs || []);
+                }
+            })
+            .catch(error => {
+                showError('Erreur lors du redémarrage de l\'application: ' + error.message);
+            });
+        }
+
+        function startStatusPolling() {
+            // Arrêter tout sondage existant
+            stopStatusPolling();
+            
+            // Mémoriser l'URL actuelle pour éviter les rechargements inutiles
+            let lastUrl = appStatus.url;
+            let lastFrameSrc = previewFrame.src;
+            let frameLoaded = false;
+            
+            // Indiquer que l'iframe s'est chargée
+            previewFrame.onload = function() {
+                frameLoaded = true;
+            };
+            
+            // Démarrer un nouveau sondage avec une fréquence plus basse pour économiser les ressources
+            statusPollInterval = setInterval(() => {
+                fetch('/preview/status')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            // Mettre à jour les logs et informations de statut
+                            const newStatus = {
+                                running: data.running,
+                                url: data.url,
+                                project_type: data.project_type,
+                                logs: data.logs || [],
+                                exit_code: data.exit_code
+                            };
+                            
+                            // Ne plus mettre à jour automatiquement l'iframe - désactivé pour permettre à l'utilisateur de naviguer sans interruption
+                            // L'utilisateur peut utiliser le bouton "Actualiser" pour rafraîchir manuellement
+                            
+                            // Mettre à jour l'état de l'application
+                            updateAppStatus(newStatus);
+                            
+                            // Si l'application n'est plus en cours d'exécution, arrêter le sondage
+                            if (!data.running) {
+                                stopStatusPolling();
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erreur lors du sondage:', error);
+                    });
+            }, 5000); // Toutes les 5 secondes au lieu de 3
+        }
+
+        function stopStatusPolling() {
+            if (statusPollInterval) {
+                clearInterval(statusPollInterval);
+                statusPollInterval = null;
+            }
+        }
+        
+        // Initialiser l'interface à partir du chemin du projet
+        function initializeFilesList() {
+            // Liste des types de fichiers et leur badge
+            const fileTypeBadges = {
+                '.py': { icon: 'fa-file-code', badge: 'Python' },
+                '.js': { icon: 'fa-file-code', badge: 'JavaScript' },
+                '.html': { icon: 'fa-file-code', badge: 'HTML' },
+                '.css': { icon: 'fa-file-code', badge: 'CSS' },
+                '.json': { icon: 'fa-file-code', badge: 'JSON' },
+                '.md': { icon: 'fa-file-alt', badge: 'Documentation' },
+                '.txt': { icon: 'fa-file-alt', badge: 'Texte' },
+                'requirements.txt': { icon: 'fa-file-alt', badge: 'Dépendances' },
+                'package.json': { icon: 'fa-file-alt', badge: 'Dépendances' },
+                'app.py': { icon: 'fa-file-code', badge: 'Principal' },
+                'main.py': { icon: 'fa-file-code', badge: 'Principal' },
+                'server.js': { icon: 'fa-file-code', badge: 'Principal' },
+                'index.js': { icon: 'fa-file-code', badge: 'Principal' },
+                'README.md': { icon: 'fa-file-alt', badge: 'Documentation' }
+            };
+            
+            // Scanner le répertoire du projet (via l'API)
+            fetch(`/list_files?directory=${encodeURIComponent(projectPath)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success' && data.files) {
+                        mainFilesList.innerHTML = '';
+                        
+                        // Filtrer pour ne garder que les fichiers principaux
+                        const importantFiles = data.files.filter(file => {
+                            // Vérifier si le fichier est dans la liste des types importants
+                            const ext = '.' + file.split('.').pop();
+                            return (ext in fileTypeBadges) || (file in fileTypeBadges);
+                        });
+                        
+                        if (importantFiles.length === 0) {
+                            mainFilesList.innerHTML = '<div class="text-center py-3 text-muted">Aucun fichier principal détecté</div>';
+                            return;
+                        }
+                        
+                        // Ajouter les fichiers à la liste
+                        importantFiles.forEach(file => {
+                            const ext = '.' + file.split('.').pop();
+                            const fileInfo = fileTypeBadges[file] || fileTypeBadges[ext] || { icon: 'fa-file', badge: 'Fichier' };
+                            
+                            const listItem = document.createElement('a');
+                            listItem.href = '#';
+                            listItem.className = 'list-group-item list-group-item-action';
+                            listItem.innerHTML = `
+                                <i class="fas ${fileInfo.icon} me-2"></i>${file} 
+                                <span class="badge bg-${fileInfo.badge === 'Principal' ? 'primary' : 'secondary'} ms-1">${fileInfo.badge}</span>
+                            `;
+                            
+                            mainFilesList.appendChild(listItem);
+                        });
+                    } else {
+                        mainFilesList.innerHTML = '<div class="text-center py-3 text-muted">Impossible de lister les fichiers</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur lors de la récupération des fichiers:', error);
+                    mainFilesList.innerHTML = '<div class="text-center py-3 text-muted">Erreur lors de la récupération des fichiers</div>';
+                });
+        }
+
+        // Event Listeners
+        startAppBtn.addEventListener('click', startApp);
+        stopAppBtn.addEventListener('click', stopApp);
+        restartAppBtn.addEventListener('click', restartApp);
+        
+        // Améliorer avec l'IA
+        document.getElementById('improveWithAIBtn').addEventListener('click', function() {
+            // Redirection vers la page d'itération avec les paramètres nécessaires
+            window.location.href = '{{ url_for("result") }}#iteration-section';
+        });
+        
+        refreshPreviewBtn.addEventListener('click', function() {
+            // Mettre à jour le texte du bouton pour indiquer le rafraîchissement
+            const originalText = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Rafraîchissement...';
+            this.disabled = true;
+            
+            // Plutôt que d'essayer de recharger l'iframe directement (ce qui provoque l'erreur cross-origin)
+            // Nous allons recharger l'iframe en modifiant sa source
+            const currentSrc = previewFrame.src;
+            
+            // Appeler l'API pour rafraîchir manuellement
+            fetch('/preview/refresh', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Rafraîchir l'iframe en modifiant sa source
+                previewFrame.src = 'about:blank';
+                
+                // Réaffecter l'URL d'origine après un court délai
+                setTimeout(() => {
+                    previewFrame.src = currentSrc;
+                    
+                    // Restaurer le texte original après le rafraîchissement
+                    setTimeout(() => {
+                        this.innerHTML = originalText;
+                        this.disabled = false;
+                    }, 1000);
+                }, 100);
+            })
+            .catch(error => {
+                console.error('Erreur lors du rafraîchissement:', error);
+                this.innerHTML = originalText;
+                this.disabled = false;
+            });
+        });
+        
+        openInNewTabBtn.addEventListener('click', function() {
+            if (appStatus.url) {
+                window.open(appStatus.url, '_blank');
+            }
+        });
+        
+        // Ouvrir le dossier
+        document.getElementById('openFolderBtn').addEventListener('click', function() {
+            // Montrer un indicateur de chargement
+            const originalText = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Ouverture...';
+            
+            // Appeler l'API pour ouvrir le dossier
+            fetch('/open_folder', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    folder_path: projectPath
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    this.innerHTML = '<i class="fas fa-check me-1"></i> Dossier ouvert!';
+                } else {
+                    this.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> Erreur';
+                    console.error('Erreur lors de l\'ouverture du dossier:', data.message);
+                }
+                
+                // Restaurer le texte original après 2 secondes
+                setTimeout(() => {
+                    this.innerHTML = originalText;
+                }, 2000);
+            })
+            .catch(error => {
+                console.error('Erreur lors de l\'ouverture du dossier:', error);
+                this.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> Erreur';
+                
+                // Restaurer le texte original après 2 secondes
+                setTimeout(() => {
+                    this.innerHTML = originalText;
+                }, 2000);
+            });
+        });
+
+        // Filtre des logs par niveau
+        logLevelSelect.addEventListener('change', function() {
+            updateLogs(appStatus.logs || []);
+        });
+        
+        // Effacer les logs
+        document.getElementById('clearLogs').addEventListener('click', function() {
+            logsContent.innerHTML = '<div class="text-center text-muted py-3"><p>Logs effacés.</p></div>';
+        });
+        
+        // Télécharger les logs
+        document.getElementById('downloadLogs').addEventListener('click', function() {
+            const logsText = appStatus.logs.map(log => 
+                `${log.timestamp} [${log.level}] ${log.message}`
+            ).join('\n');
+            
+            const blob = new Blob([logsText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'application-logs.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+        
+        // Copier le chemin
+        document.getElementById('copyPathBtn').addEventListener('click', function() {
+            navigator.clipboard.writeText(projectPath).then(() => {
+                this.innerHTML = '<i class="fas fa-check me-1"></i> Copié!';
+                setTimeout(() => {
+                    this.innerHTML = '<i class="fas fa-copy me-1"></i> Copier le chemin';
+                }, 2000);
+            });
+        });
+        
+        // Boutons de copie
+        document.querySelectorAll('.copy-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const targetEl = document.getElementById(targetId);
+                
+                if (targetEl) {
+                    navigator.clipboard.writeText(targetEl.value).then(() => {
+                        const icon = this.querySelector('i');
+                        icon.classList.remove('fa-copy');
+                        icon.classList.add('fa-check');
+                        setTimeout(() => {
+                            icon.classList.remove('fa-check');
+                            icon.classList.add('fa-copy');
+                        }, 2000);
+                    });
+                }
+            });
+        });
+        
+        // Vérifier le statut initial de l'application et démarrer automatiquement
+        fetch('/preview/status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    updateAppStatus({
+                        running: data.running,
+                        url: data.url,
+                        project_type: data.project_type,
+                        logs: data.logs || [],
+                        exit_code: data.exit_code
+                    });
+                    
+                    // Si l'application est en cours d'exécution, démarrer le sondage
+                    if (data.running) {
+                        startStatusPolling();
+                    } else {
+                        // Démarrer automatiquement l'application si elle n'est pas en cours d'exécution
+                        startApp();
+                    }
+                }
+                
+                // Initialiser la liste des fichiers
+                initializeFilesList();
+            })
+            .catch(error => {
+                console.error('Erreur lors de la vérification du statut initial:', error);
+                // Tenter de démarrer l'application malgré l'erreur
+                startApp();
+            });
+    });
+</script>
+{% endblock %}

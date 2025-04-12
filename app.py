@@ -1,513 +1,955 @@
-import streamlit as st
-from pathlib import Path
-import time
-import asyncio
+import os
+import sys
+import uuid
 import json
+import time
+import secrets
+import threading
+import traceback
+from pathlib import Path
+from functools import wraps
+from threading import Thread
+from typing import Dict, List, Union, Optional, Any
+
+import requests
+from flask import (
+    Flask, render_template, request, jsonify, redirect, 
+    url_for, session, flash, send_file, abort, Response
+)
+from werkzeug.utils import secure_filename
+
+from datetime import datetime
+import subprocess
+import tempfile
 
 # Import from restructured modules
 from src.config.constants import RATE_LIMIT_DELAY_SECONDS
-from src.utils.model_utils import is_free_model
-from src.utils.env_utils import load_env_vars  # Add import for env variables loading
-from src.api.openrouter_api import call_openrouter_api
-from src.utils.file_utils import (
-    parse_structure_and_prompt, 
-    create_project_structure, 
-    parse_and_write_code,
-    identify_empty_files,
-    generate_missing_code
-)
-from src.utils.prompt_utils import prompt_mentions_design
-from src.ui.components import setup_page_config, render_sidebar, render_input_columns, show_response_expander
-
-# Import MCP tools
-from src.mcp.clients import SimpleMCPClient
+from src.utils.env_utils import load_env_vars, get_openrouter_api_key
+from src.generation.generation_flow import generate_application, process_urls
+from src.utils.prompt_utils import extract_urls_from_prompt, prompt_mentions_design
 from src.mcp.tool_utils import get_default_tools
-from src.mcp.handlers import handle_tool_results
+from src.api.openrouter_api import generate_code_with_openrouter
 
-# Import frontend resources
-from src.config.frontend_resources import (
-    UI_LIBRARIES,
-    COMPONENT_LIBRARIES,
-    ANIMATION_RESOURCES,
-    TEMPLATE_WEBSITES
-)
+# Create Flask app
+app = Flask(__name__)
+app.secret_key = secrets.token_hex(16)  # Generate a secure secret key
+app.config['SESSION_TYPE'] = 'filesystem'
+
+# Dictionnaire global pour stocker l'état de progression des tâches de génération
+generation_tasks = {}
 
 # Load environment variables at startup
 load_env_vars()
 
-# --- Interface Streamlit ---
-
-# Setup page configuration
-setup_page_config()
-
-# Initialize session state variables
-if 'last_api_call_time' not in st.session_state:
-    st.session_state.last_api_call_time = 0
-if 'last_code_generation_response' not in st.session_state:
-    st.session_state.last_code_generation_response = ""
-if 'reformulated_prompt' not in st.session_state:
-    st.session_state.reformulated_prompt = ""
-if 'project_structure' not in st.session_state:
-    st.session_state.project_structure = []
-if 'process_running' not in st.session_state:
-    st.session_state.process_running = False
-if 'mcp_client' not in st.session_state:
-    st.session_state.mcp_client = None
-if 'tool_results' not in st.session_state:
-    st.session_state.tool_results = {}
-
-# Render the UI components
-api_key, selected_model = render_sidebar()
-user_prompt, target_directory = render_input_columns()
-
-# Add MCP Tools toggle in sidebar
-with st.sidebar:
-    st.subheader("🛠️ Advanced Options")
-    use_mcp_tools = st.checkbox("Enable MCP Tools for enhanced generation", value=True, 
-                                help="Use Model Context Protocol tools for web search, documentation lookup, and frontend components")
+# Modifier le contexte Jinja2 pour ajouter des fonctions utiles
+@app.context_processor
+def utility_processor():
+    def now():
+        return datetime.now()
     
-    if use_mcp_tools:
-        st.subheader("🎨 Frontend Resources")
-        frontend_framework = st.selectbox(
-            "Preferred UI Framework",
-            options=["Auto-detect", "Bootstrap", "Tailwind CSS", "Bulma", "Material Design"],
-            index=0,
-            help="Select a preferred frontend framework, or let the AI choose"
-        )
+    return dict(now=now)
+
+# Routes principales
+@app.route('/')
+def index():
+    """Render the main page"""
+    return render_template('index.html', api_key=get_openrouter_api_key())
+
+@app.route('/about')
+def about():
+    """About page"""
+    return render_template('about.html')
+
+@app.route('/get_directory_path', methods=['POST'])
+def get_directory_path():
+    """Récupérer le chemin complet d'un dossier à partir de son nom"""
+    try:
+        directory_name = request.form.get('directory_name', '')
+        use_selected_path = request.form.get('use_selected_path', 'false') == 'true'
+        file_path = request.form.get('file_path', '')
+        directory_path = request.form.get('directory_path', '')
         
-        include_animations = st.checkbox(
-            "Include Animations",
-            value=True,
-            help="Add CSS animations and transitions to make the UI more engaging"
-        )
-
-# Main generation button
-generate_button = st.button("🚀 Generate Application", type="primary", disabled=st.session_state.process_running)
-
-st.markdown("---") # Visual separator
-
-# Utility function to handle async operations
-async def run_mcp_query(client, query, context=None):
-    result = await client.process_query(query, context)
-    return result
-
-# --- Main Logic ---
-if generate_button and not st.session_state.process_running:
-    st.session_state.process_running = True # Prevent double-click
-    valid_input = True
-    if not api_key:
-        st.error("Please enter your OpenRouter API key in the sidebar.")
-        valid_input = False
-    if not user_prompt:
-        st.error("Please describe the application you want to generate.")
-        valid_input = False
-    if not target_directory:
-        st.error("Please specify the destination folder path.")
-        valid_input = False
-    elif not Path(target_directory).is_dir(): # Check if the path is a valid folder
-         st.error(f"The specified path '{target_directory}' is not a valid folder or does not exist.")
-         valid_input = False
-
-    if valid_input:
-        st.session_state.last_code_generation_response = "" # Reset state
-        st.session_state.reformulated_prompt = ""
-        st.session_state.project_structure = []
-        st.session_state.tool_results = {}
+        if not directory_name:
+            return jsonify({"error": "Nom de dossier manquant"}), 400
         
-        # Initialize MCP client if tools are enabled
-        if use_mcp_tools:
-            st.session_state.mcp_client = SimpleMCPClient(api_key, selected_model)
-            st.info("🔌 MCP Tools enabled: Web search, documentation lookup, and frontend components available.")
-
-        # == STEP 1: Reformulation and Structure ==
-        st.info("▶️ Step 1: Prompt Reformulation and Structure Definition...")
-        status_placeholder_step1 = st.empty() # To display status
-        with st.spinner("Calling AI to reformulate and define structure..."):
-
-            # Check rate limit for free models
-            if is_free_model(selected_model):
-                current_time = time.time()
-                time_since_last_call = current_time - st.session_state.get('last_api_call_time', 0)
-                if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
-                    wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
-                    status_placeholder_step1.warning(f"⏳ Free model detected. Waiting {wait_time:.1f} seconds (rate limit)...")
-                    time.sleep(wait_time)
-
-            # If MCP tools enabled, use them to enhance the prompt
-            additional_context = ""
-            if use_mcp_tools and st.session_state.mcp_client:
-                status_placeholder_step1.info("🔍 Using MCP tools to analyze your request and gather information...")
+        # Si l'utilisateur demande explicitement d'utiliser le chemin sélectionné
+        if use_selected_path:
+            # Obtenir le chemin complet à partir du dossier parent du fichier sélectionné
+            try:
+                # Si un chemin de fichier ou de dossier a été fourni, l'utiliser pour construire le chemin complet
+                if file_path:
+                    # Pour les sélecteurs de fichiers traditionnels qui renvoient un chemin relatif
+                    # Récupérer le dossier de l'utilisateur et ajouter le nom du dossier sélectionné
+                    user_dir = os.path.expanduser("~")
+                    # Vérifier si le chemin existe déjà, sinon le créer
+                    target_path = os.path.join(user_dir, directory_name)
+                    if not os.path.exists(target_path):
+                        os.makedirs(target_path)
+                    return jsonify({"path": target_path})
                 
-                # Add frontend preferences to analysis query
-                frontend_preferences = ""
-                if frontend_framework != "Auto-detect":
-                    frontend_preferences = f"For frontend, use {frontend_framework}. "
-                if include_animations:
-                    frontend_preferences += "Include CSS animations and transitions to make the UI engaging. "
-                
-                analysis_query = f"""
-                Analyze this request for application development: "{user_prompt}"
-                
-                1. What kind of application is being requested?
-                2. What frameworks or libraries might be needed?
-                3. Do I need to search for any documentation to help with implementation?
-                4. Would any frontend components be useful for this project?
-                5. What kind of template would fit this application best?
-                
-                {frontend_preferences}
-                
-                Only use tools if necessary to clarify technical details or find specific components.
-                """
-                
-                # Run the MCP query asynchronously
-                mcp_result = asyncio.run(run_mcp_query(st.session_state.mcp_client, analysis_query))
-                
-                if mcp_result and "tool_calls" in mcp_result and mcp_result["tool_calls"]:
-                    status_placeholder_step1.success("✅ Tools used to gather additional context for your project.")
+                # Si aucun chemin n'est fourni, utiliser le dossier de l'utilisateur mais laisser 
+                # la possibilité à l'utilisateur de changer manuellement
+                user_dir = os.path.expanduser("~")
+                return jsonify({"path": os.path.join(user_dir, directory_name)})
+            except Exception as e:
+                app.logger.error(f"Erreur lors du traitement du chemin: {str(e)}")
+                # Fallback en cas d'erreur
+                user_dir = os.path.expanduser("~")
+                return jsonify({"path": os.path.join(user_dir, directory_name)})
+        
+        # Si nous avons reçu le chemin du dossier directement de l'API File System Access
+        elif directory_path:
+            # Créer le dossier s'il n'existe pas encore
+            full_path = os.path.dirname(directory_path)
+            if not os.path.exists(full_path):
+                os.makedirs(full_path)
+            return jsonify({"path": full_path})
+        
+        # Méthode par défaut: permettre à l'utilisateur de créer ou choisir un dossier
+        # au lieu d'imposer un chemin par défaut
+        else:
+            # Sur Windows, revenir au dossier Documents de l'utilisateur comme suggestion
+            if os.name == 'nt':
+                # Obtenir le chemin du dossier Documents
+                import subprocess
+                try:
+                    # Essayer d'obtenir le dossier Documents avec PowerShell
+                    docs_dir = subprocess.check_output(
+                        ["powershell", "-command", "[Environment]::GetFolderPath('MyDocuments')"], 
+                        universal_newlines=True
+                    ).strip()
                     
-                    # Process and store tool results
-                    for tool_call in mcp_result["tool_calls"]:
-                        tool_name = tool_call.get("tool")
-                        if tool_name:
-                            st.session_state.tool_results[tool_name] = tool_call
+                    # Si le répertoire Documents existe, renvoyer un chemin suggéré
+                    if os.path.exists(docs_dir):
+                        suggested_path = os.path.join(docs_dir, directory_name)
+                        return jsonify({"path": suggested_path})
                     
-                    # Add this context to our prompt
-                    additional_context = f"""
-                    Additional context for generating this application:
-                    {mcp_result.get('text', '')}
-                    """
-                
-            # Building prompt for the first step
-            prompt_step1 = f"""
-            Analyze the user's request below. Your tasks are:
-            1.  **Reformulate Request:** Create a detailed, precise prompt outlining features, technologies (assume standard web tech like Python/Flask or Node/Express if unspecified, or stick to HTML/CSS/JS if simple), and requirements. This will guide code generation. Include comments in generated code.
-            2.  **Define Project Structure:** Propose a complete, logical file/directory structure. List each item on a new line. Use relative paths. Mark directories with a trailing '/'. DO NOT include comments (#) or backticks (```) in the structure list itself.
-
-            User's Request:
-            "{user_prompt}"
+                except Exception:
+                    # En cas d'erreur, revenir au répertoire utilisateur
+                    pass
             
-            {additional_context if additional_context else ""}
+            # Pour tous les systèmes d'exploitation, revenir au répertoire de l'utilisateur
+            user_dir = os.path.expanduser("~")
+            suggested_path = os.path.join(user_dir, directory_name)
+            return jsonify({"path": suggested_path})
+            
+    except Exception as e:
+        app.logger.error(f"Erreur lors de la récupération du chemin: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
-            Output format MUST be exactly as follows, starting immediately with the first marker:
+@app.route('/validate_directory_path', methods=['POST'])
+def validate_directory_path():
+    """Valider et créer si nécessaire un chemin de répertoire complet"""
+    try:
+        full_path = request.form.get('full_path', '')
+        create_if_missing = request.form.get('create_if_missing', 'false') == 'true'
+        
+        if not full_path:
+            return jsonify({"valid": False, "error": "Chemin non spécifié"}), 400
+        
+        # Normaliser le chemin pour s'assurer qu'il est dans le bon format
+        normalized_path = os.path.normpath(full_path)
+        
+        # Vérifier si le chemin existe déjà
+        if os.path.exists(normalized_path):
+            if os.path.isdir(normalized_path):
+                # Le chemin existe et c'est un dossier
+                return jsonify({"valid": True, "path": normalized_path})
+            else:
+                # Le chemin existe mais ce n'est pas un dossier
+                return jsonify({"valid": False, "error": "Le chemin spécifié existe mais n'est pas un dossier"})
+        elif create_if_missing:
+            # Essayer de créer le dossier
+            try:
+                os.makedirs(normalized_path, exist_ok=True)
+                return jsonify({"valid": True, "path": normalized_path})
+            except Exception as e:
+                return jsonify({"valid": False, "error": f"Impossible de créer le dossier: {str(e)}"})
+        else:
+            return jsonify({"valid": False, "error": "Le dossier spécifié n'existe pas"})
+    except Exception as e:
+        app.logger.error(f"Erreur lors de la validation du chemin: {str(e)}")
+        return jsonify({"valid": False, "error": str(e)}), 500
 
-            ### REFORMULATED PROMPT ###
-            [Detailed reformulated prompt here]
+@app.route('/list_files', methods=['GET'])
+def list_files():
+    """Liste les fichiers dans un répertoire spécifié"""
+    directory = request.args.get('directory')
+    if not directory or not os.path.isdir(directory):
+        return jsonify({"status": "error", "message": "Répertoire invalide"}), 400
+    
+    try:
+        # Lister les fichiers
+        files = []
+        for file in os.listdir(directory):
+            file_path = os.path.join(directory, file)
+            if os.path.isfile(file_path):
+                files.append(file)
+        
+        return jsonify({
+            "status": "success",
+            "directory": directory,
+            "files": files
+        })
+    except Exception as e:
+        app.logger.error(f"Erreur lors de la lecture du répertoire {directory}: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-            ### STRUCTURE ###
-            [List files/folders, one per line, e.g.:
-            src/
-            src/main.py
-            requirements.txt
-            README.md]
-            """
-            messages_step1 = [{"role": "user", "content": prompt_step1}]
+@app.route('/open_folder', methods=['POST'])
+def open_folder():
+    """Ouvre un dossier dans l'explorateur de fichiers du système d'exploitation"""
+    try:
+        data = request.json
+        folder_path = data.get('folder_path')
+        
+        if not folder_path or not os.path.isdir(folder_path):
+            return jsonify({"status": "error", "message": "Chemin de dossier invalide"}), 400
+        
+        # Ouvrir le dossier selon le système d'exploitation
+        if os.name == 'nt':  # Windows
+            # Sur Windows, on utilise explorer.exe avec le chemin absolu
+            os.startfile(folder_path)
+        elif os.name == 'posix':  # Linux/Mac
+            try:
+                # Pour macOS, on utilise 'open'
+                if sys.platform == 'darwin':
+                    subprocess.Popen(['open', folder_path])
+                else:
+                    # Pour Linux, on utilise xdg-open
+                    subprocess.Popen(['xdg-open', folder_path])
+            except Exception as e:
+                return jsonify({"status": "error", "message": f"Erreur lors de l'ouverture du dossier: {str(e)}"}), 500
+        
+        return jsonify({"status": "success", "message": "Dossier ouvert avec succès"})
+    except Exception as e:
+        app.logger.error(f"Erreur lors de l'ouverture du dossier: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-            response_step1 = call_openrouter_api(api_key, selected_model, messages_step1, temperature=0.6, max_retries=2)
-            st.session_state.last_api_call_time = time.time() # Record time
+@app.route('/open_folder_dialog', methods=['GET'])
+def open_folder_dialog():
+    """Ouvre un sélecteur de dossier natif Windows et renvoie le chemin sélectionné"""
+    try:
+        if os.name != 'nt':
+            return jsonify({"status": "error", "message": "Cette fonctionnalité n'est disponible que sur Windows"}), 400
+        
+        import subprocess
+        import tempfile
+        
+        # Script PowerShell pour ouvrir un sélecteur de dossier natif Windows
+        ps_script = """
+        Add-Type -AssemblyName System.Windows.Forms
+        $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+        $folderBrowser.Description = "Sélectionnez le dossier où vous souhaitez générer votre application"
+        $folderBrowser.RootFolder = [System.Environment+SpecialFolder]::Desktop
+        $folderBrowser.ShowNewFolderButton = $true
+        
+        if ($folderBrowser.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            $folderBrowser.SelectedPath
+        } else {
+            "CANCELED"
+        }
+        """
+        
+        # Écrire le script dans un fichier temporaire
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".ps1")
+        temp_file_path = temp_file.name
+        temp_file.write(ps_script.encode('utf-8'))
+        temp_file.close()
+        
+        # Exécuter le script PowerShell
+        result = subprocess.check_output(
+            ["powershell", "-ExecutionPolicy", "Bypass", "-File", temp_file_path],
+            universal_newlines=True
+        ).strip()
+        
+        # Supprimer le fichier temporaire
+        os.unlink(temp_file_path)
+        
+        if result == "CANCELED":
+            return jsonify({"status": "canceled", "message": "Sélection annulée par l'utilisateur"})
+        
+        # Vérifier si le chemin existe
+        if os.path.exists(result) and os.path.isdir(result):
+            return jsonify({"status": "success", "path": result})
+        else:
+            return jsonify({"status": "error", "message": "Le chemin sélectionné n'est pas valide"})
+            
+    except Exception as e:
+        app.logger.error(f"Erreur lors de l'ouverture du sélecteur de dossier: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-        if response_step1 and response_step1.get("choices"):
-            response_text_step1 = response_step1["choices"][0]["message"]["content"]
-            reformulated_prompt, structure_lines = parse_structure_and_prompt(response_text_step1)
+@app.route('/get_project_structure', methods=['POST'])
+def get_project_structure():
+    """Récupère la structure du projet généré"""
+    if 'generation_result' not in session:
+        return jsonify({"status": "error", "message": "Aucun résultat de génération trouvé"}), 400
+    
+    target_dir = session['generation_result'].get('target_directory')
+    if not target_dir or not Path(target_dir).is_dir():
+        return jsonify({"status": "error", "message": "Répertoire cible introuvable"}), 400
+    
+    # Fonction pour construire la structure de répertoire récursivement
+    def build_directory_structure(directory_path):
+        directory = Path(directory_path)
+        result = []
+        
+        for item in sorted(directory.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
+            if item.name.startswith('.') or '__pycache__' in str(item):
+                continue  # Ignorer les fichiers/dossiers cachés et __pycache__
+                
+            node = {'name': item.name, 'isFolder': item.is_dir()}
+            
+            if item.is_dir():
+                children = build_directory_structure(item)
+                if children:  # Ne pas inclure les dossiers vides
+                    node['children'] = children
+                    
+            result.append(node)
+            
+        return result
+    
+    try:
+        structure = build_directory_structure(target_dir)
+        return jsonify({"status": "success", "structure": structure})
+    except Exception as e:
+        app.logger.error(f"Erreur lors de la récupération de la structure: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-            if reformulated_prompt and structure_lines:
-                st.session_state.reformulated_prompt = reformulated_prompt
-                st.session_state.project_structure = structure_lines
-                status_placeholder_step1.success("✅ Step 1 completed: Prompt reformulated and structure defined.")
+def generate_application_thread(task_id, api_key, model, prompt, target_dir, use_mcp, 
+                              frontend_framework, include_animations, empty_files_check):
+    """Fonction exécutée dans un thread pour générer l'application"""
+    try:
+        from src.generation.generation_flow import generate_application
+        from src.utils.model_utils import is_free_model
+        
+        # Fonction de callback pour la mise à jour de la progression
+        def update_progress_callback(step, message, progress=None):
+            if progress is not None:
+                generation_tasks[task_id]['progress'] = progress
+            if message:
+                generation_tasks[task_id]['current_step'] = message
+            app.logger.info(f"[Étape {step}] {message}")
+        
+        # Appel à la fonction de génération avec le callback de progression
+        success = generate_application(
+            api_key=api_key,
+            selected_model=model,
+            user_prompt=prompt,
+            target_directory=target_dir,
+            use_mcp_tools=use_mcp,
+            frontend_framework=frontend_framework,
+            include_animations=include_animations,
+            progress_callback=update_progress_callback
+        )
+        
+        # En fonction du résultat de la génération
+        if success:
+            from pathlib import Path
+            
+            # Récupérer la liste des fichiers créés
+            files_written = []
+            files_still_empty = []
+            
+            for root, dirs, files in os.walk(target_dir):
+                for file in files:
+                    rel_path = os.path.relpath(os.path.join(root, file), target_dir)
+                    rel_path = os.path.normpath(rel_path)
+                    files_written.append(rel_path)
+                    if os.path.getsize(os.path.join(root, file)) == 0:
+                        files_still_empty.append(rel_path)
+            
+            # Mettre à jour l'état de la tâche
+            generation_tasks[task_id]['progress'] = 100
+            generation_tasks[task_id]['status'] = 'completed'
+            generation_tasks[task_id]['result'] = {
+                'success': True,
+                'target_directory': target_dir,
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'files_created': len(files_written),
+                'file_list': files_written,
+                'files_still_empty': files_still_empty,
+                'prompt': prompt,
+                'reformulated_prompt': app.config.get('reformulated_prompt', '')
+            }
+            
+            app.logger.info(f"Génération terminée. {len(files_written)} fichiers créés, {len(files_still_empty)} fichiers toujours vides.")
+        else:
+            generation_tasks[task_id]['status'] = 'failed'
+            generation_tasks[task_id]['error'] = "Échec de la génération de l'application"
+            app.logger.error("Échec de la génération de l'application")
+            
+    except Exception as e:
+        import traceback
+        app.logger.error(f"Erreur lors de la génération: {str(e)}")
+        app.logger.error(traceback.format_exc())
+        generation_tasks[task_id]['error'] = str(e)
+        generation_tasks[task_id]['status'] = 'failed'
 
-                with st.expander("View Reformulated Prompt and Structure"):
-                    st.subheader("Reformulated Prompt:")
-                    st.markdown(f"```text\n{reformulated_prompt}\n```")
-                    st.subheader("Proposed Project Structure (Cleaned):")
-                    st.code("\n".join(structure_lines), language='text')
+@app.route('/generate', methods=['POST'])
+def generate():
+    """Generate application based on user input"""
+    try:
+        data = request.form
+        api_key = data.get('api_key', '')
+        model = data.get('model', 'google/gemini-2.5-pro-exp-03-25:free')
+        prompt = data.get('user_prompt', '')
+        target_dir = data.get('target_directory', '')
+        
+        # Correction de la récupération de l'état de la case à cocher pour les outils MCP
+        use_mcp = 'use_mcp_tools' in data
+        
+        frontend_framework = data.get('frontend_framework', 'Auto-detect')
+        include_animations = data.get('include_animations', 'on') == 'on'
+        empty_files_check = data.get('empty_files_check', 'on') == 'on'
+        
+        errors = []
+        if not api_key:
+            errors.append("API key is required")
+        if not prompt:
+            errors.append("Application description is required")
+        if not target_dir:
+            errors.append("Target directory is required")
+        elif not Path(target_dir).is_dir():
+            try:
+                Path(target_dir).mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                errors.append(f"Impossible de créer le répertoire '{target_dir}': {str(e)}")
+            
+        if errors:
+            return jsonify({"status": "error", "errors": errors})
+            
+        session['prompt'] = prompt
+        session['target_dir'] = target_dir
+        session['model'] = model
+        session['use_mcp'] = use_mcp
+        session['frontend_framework'] = frontend_framework
+        session['include_animations'] = include_animations
+        
+        task_id = str(uuid.uuid4())
+        session['generation_task_id'] = task_id
+        
+        generation_tasks[task_id] = {
+            'id': task_id,
+            'status': 'in_progress',
+            'progress': 0,
+            'current_step': 'Initialisation...',
+            'start_time': datetime.now(),
+            'error': None,
+            'result': None
+        }
+        
+        thread = threading.Thread(
+            target=generate_application_thread,
+            args=(task_id, api_key, model, prompt, target_dir, use_mcp, frontend_framework, include_animations, empty_files_check)
+        )
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Génération démarrée",
+            "task_id": task_id
+        })
+    
+    except Exception as e:
+        app.logger.error(f"Erreur lors de la génération: {str(e)}")
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({"status": "error", "message": str(e)})
+        else:
+            flash(f"Erreur: {str(e)}", "danger")
+            return redirect(url_for('index'))
 
-                # == STEP 2: Creating File/Folder Structure ==
-                st.info("▶️ Step 2: Creating Physical Structure...")
-                status_placeholder_step2 = st.empty()
-                with st.spinner(f"Creating folders and files in '{target_directory}'..."):
-                    created_paths = create_project_structure(target_directory, st.session_state.project_structure)
+@app.route('/generation_progress', methods=['GET'])
+def generation_progress():
+    """Récupérer l'état de progression de la génération"""
+    task_id = session.get('generation_task_id')
+    
+    if not task_id or task_id not in generation_tasks:
+        return jsonify({
+            "status": "error",
+            "message": "Aucune tâche de génération trouvée"
+        })
+    
+    task = generation_tasks[task_id]
+    
+    if task['status'] == 'completed' and task['result']:
+        session['generation_result'] = task['result']
+    
+    response = {
+        "status": task['status'],
+        "progress": task['progress'],
+        "current_step": task['current_step']
+    }
+    
+    if task['status'] == 'completed':
+        response["redirect_url"] = url_for('result')
+    elif task['status'] == 'failed':
+        response["error"] = task['error']
+    
+    return jsonify(response)
 
-                if created_paths is not None:
-                    status_placeholder_step2.success(f"✅ Step 2 completed: Structure created in '{target_directory}'.")
+@app.route('/result')
+def result():
+    """Show generation result"""
+    if 'generation_result' not in session:
+        flash("Aucun résultat de génération trouvé. Veuillez d'abord générer une application.", "warning")
+        return redirect(url_for('index'))
+        
+    return render_template('result.html', 
+                          result=session['generation_result'],
+                          prompt=session.get('prompt', ''),
+                          target_dir=session.get('target_dir', ''))
 
-                    # == STEP 3: Code Generation ==
-                    st.info("▶️ Step 3: Generating Complete Code...")
-                    status_placeholder_step3 = st.empty()
-                    with st.spinner("Calling AI to generate code (this may take time)..."):
+@app.route('/preview')
+def preview():
+    """Affiche la page de prévisualisation de l'application générée"""
+    if 'generation_result' not in session or not session['generation_result'].get('success'):
+        flash("Aucune génération réussie trouvée. Veuillez d'abord générer une application.", "warning")
+        return redirect(url_for('index'))
+        
+    target_dir = session['generation_result'].get('target_directory')
+    if not target_dir or not Path(target_dir).is_dir():
+        flash("Répertoire d'application généré introuvable.", "danger")
+        return redirect(url_for('result'))
+    
+    # Récupérer ou générer un ID de session pour la prévisualisation
+    if 'preview_session_id' not in session:
+        session['preview_session_id'] = str(uuid.uuid4())
+    
+    # Pour l'affichage initial, nous ne démarrons pas encore l'application
+    # Elle sera démarrée via une requête AJAX après le chargement de la page
+    
+    return render_template('preview.html', 
+                          target_dir=target_dir,
+                          preview_session_id=session['preview_session_id'],
+                          prompt=session.get('prompt', ''))
 
-                        # Check rate limit for free models
-                        if is_free_model(selected_model):
-                           current_time = time.time()
-                           time_since_last_call = current_time - st.session_state.get('last_api_call_time', 0)
-                           if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
-                               wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
-                               status_placeholder_step3.warning(f"⏳ Free model detected. Waiting {wait_time:.1f} seconds (rate limit)...")
-                               time.sleep(wait_time)
+@app.route('/preview/start', methods=['POST'])
+def start_preview():
+    """Démarre la prévisualisation de l'application"""
+    # Débogage de la session
+    app.logger.info(f"Contenu de la session: {dict(session)}")
+    
+    if 'generation_result' not in session:
+        app.logger.error("Erreur: 'generation_result' n'est pas présent dans la session")
+        return jsonify({"status": "error", "message": "Aucun résultat de génération trouvé"}), 400
+    
+    app.logger.info(f"generation_result dans la session: {session['generation_result']}")
+    target_dir = session['generation_result'].get('target_directory')
+    if not target_dir or not Path(target_dir).is_dir():
+        app.logger.error(f"Erreur: Répertoire cible '{target_dir}' introuvable ou invalide")
+        return jsonify({"status": "error", "message": "Répertoire cible introuvable"}), 400
+    
+    # Utiliser l'ID de session fourni ou celui de la session Flask
+    preview_session_id = request.json.get('session_id') if request.json else session.get('preview_session_id')
+    if not preview_session_id:
+        preview_session_id = str(uuid.uuid4())
+        session['preview_session_id'] = preview_session_id
+    
+    # Nettoyer les ports non utilisés avant de démarrer
+    from src.preview.preview_manager import cleanup_unused_ports
+    ports_cleaned = cleanup_unused_ports()
+    if ports_cleaned > 0:
+        app.logger.info(f"{ports_cleaned} ports libérés avant le démarrage")
+    
+    # Démarrer la prévisualisation avec le module preview_manager
+    from src.preview.preview_manager import start_preview
+    success, message, info = start_preview(target_dir, preview_session_id)
+    
+    if success:
+        return jsonify({
+            "status": "success", 
+            "message": message,
+            "url": info.get("url"),
+            "project_type": info.get("project_type"),
+            "logs": info.get("logs", [])
+        })
+    else:
+        return jsonify({
+            "status": "error", 
+            "message": message,
+            "logs": info.get("logs", [])
+        }), 500
 
-                        # --- Adding animation instruction ---
-                        animation_instruction = ""
-                        if not prompt_mentions_design(user_prompt):
-                             animation_instruction = (
-                                 "\n7. **Animation & Fluidity:** Since no specific design was requested, "
-                                 "please incorporate subtle CSS animations and transitions (e.g., hover effects, smooth section loading/transitions, subtle button feedback) "
-                                 "to make the user interface feel modern, fluid, and engaging. Prioritize usability and avoid overly distracting animations."
-                             )
-                             st.info("ℹ️ No design instructions detected, adding request for fluid animations.")
-                        
-                        # Add tool results if available
-                        tool_results_text = ""
-                        if use_mcp_tools and st.session_state.tool_results:
-                            tool_results_text = "\n**Tool Results:** The following information was gathered to help with development:\n"
-                            for tool_name, tool_info in st.session_state.tool_results.items():
-                                st.write(f"**{tool_name}**")
-                                st.write(f"Arguments: {tool_info.get('args', {})}")
-                                if 'result' in tool_info:
-                                    with st.expander(f"View {tool_name} results"):
-                                        st.code(tool_info['result'])
-                        
-                        # Building prompt for code generation with MCP tool results
-                        prompt_step2 = f"""
-                        Generate the *complete* code for the application based on the prompt and structure below.
+@app.route('/preview/status', methods=['GET'])
+def preview_status():
+    """Récupère le statut actuel de la prévisualisation"""
+    preview_session_id = session.get('preview_session_id')
+    if not preview_session_id:
+        return jsonify({"status": "error", "message": "Aucune session de prévisualisation trouvée"}), 400
+    
+    # Récupérer le statut depuis le module preview_manager
+    from src.preview.preview_manager import get_preview_status
+    status_info = get_preview_status(preview_session_id)
+    
+    return jsonify({
+        "status": "success",
+        "running": status_info.get("running", False),
+        "url": status_info.get("url"),
+        "project_type": status_info.get("project_type"),
+        "logs": status_info.get("logs", []),
+        "duration": status_info.get("duration")
+    })
 
-                        **Detailed Prompt:**
-                        {st.session_state.reformulated_prompt}
-                        
-                        {tool_results_text if tool_results_text else ""}
+@app.route('/preview/stop', methods=['POST'])
+def stop_preview():
+    """Arrête la prévisualisation de l'application"""
+    preview_session_id = session.get('preview_session_id')
+    if not preview_session_id:
+        return jsonify({"status": "error", "message": "Aucune session de prévisualisation trouvée"}), 400
+    
+    # Arrêter la prévisualisation avec le module preview_manager
+    from src.preview.preview_manager import stop_preview
+    success, message = stop_preview(preview_session_id)
+    
+    if success:
+        return jsonify({"status": "success", "message": message})
+    else:
+        return jsonify({"status": "error", "message": message}), 500
 
-                        **Project Structure (for reference only):**
-                        ```
-                        {chr(10).join(st.session_state.project_structure)}
-                        ```
+@app.route('/preview/restart', methods=['POST'])
+def restart_preview():
+    """Redémarre la prévisualisation de l'application"""
+    preview_session_id = session.get('preview_session_id')
+    if not preview_session_id:
+        return jsonify({"status": "error", "message": "Aucune session de prévisualisation trouvée"}), 400
+    
+    # Redémarrer la prévisualisation avec le module preview_manager
+    from src.preview.preview_manager import restart_preview
+    success, message, info = restart_preview(preview_session_id)
+    
+    if success:
+        return jsonify({
+            "status": "success", 
+            "message": message,
+            "url": info.get("url"),
+            "project_type": info.get("project_type"),
+            "logs": info.get("logs", [])
+        })
+    else:
+        return jsonify({
+            "status": "error", 
+            "message": message,
+            "logs": info.get("logs", [])
+        }), 500
 
-                        **Instructions:**
-                        1. Provide the full code for *all* files listed in the structure.
-                        2. Use the EXACT format `--- FILE: path/to/filename ---` on a line by itself before each file's code block. Start the response *immediately* with the first marker. No introductory text.
-                        3. Ensure code is functional, includes imports, basic error handling, and comments.
-                        4. For `requirements.txt` or similar, list dependencies.
-                        5. For `README.md`, provide setup/run instructions.
-                        6. If the code exceeds token limits, end the *entire* response *exactly* with: `GENERATION_INCOMPLETE` (no other text after).{animation_instruction}
+@app.route('/preview/refresh', methods=['POST'])
+def refresh_preview():
+    """Endpoint pour rafraîchir manuellement la prévisualisation"""
+    try:
+        return jsonify({
+            "status": "success",
+            "message": "Rafraîchissement manuel demandé"
+        })
+    except Exception as e:
+        app.logger.error(f"Erreur lors du rafraîchissement manuel: {str(e)}")
+        return jsonify({
+            "status": "error", 
+            "message": f"Erreur lors du rafraîchissement: {str(e)}"
+        }), 500
 
-                        Generate the code now:
-                        """
-                        messages_step2 = [{"role": "user", "content": prompt_step2}]
+@app.route('/iterate', methods=['POST'])
+def iterate_generation():
+    """Continue l'itération de la génération pour améliorer le code"""
+    if 'generation_result' not in session:
+        flash("Aucun résultat de génération trouvé. Veuillez d'abord générer une application.", "warning")
+        return redirect(url_for('index'))
+    
+    try:
+        data = request.form
+        api_key = data.get('api_key', '')
+        model = data.get('model', session.get('model', 'google/gemini-2.5-pro-exp-03-25:free'))
+        feedback = data.get('feedback', '')
+        target_dir = session.get('target_dir', '')
+        reformulated_prompt = session['generation_result'].get('reformulated_prompt', '')
+        
+        if not api_key:
+            flash("Clé API requise", "danger")
+            return redirect(url_for('result'))
+        if not feedback:
+            flash("Veuillez fournir des instructions pour l'itération", "danger")
+            return redirect(url_for('result'))
+        if not target_dir or not Path(target_dir).is_dir():
+            flash("Répertoire cible introuvable", "danger")
+            return redirect(url_for('result'))
+            
+        task_id = str(uuid.uuid4())
+        session['generation_task_id'] = task_id
+        
+        generation_tasks[task_id] = {
+            'id': task_id,
+            'status': 'in_progress',
+            'progress': 0,
+            'current_step': 'Initialisation de l\'itération...',
+            'start_time': datetime.now(),
+            'error': None,
+            'result': None,
+            'is_iteration': True,
+            'previous_result': session['generation_result']
+        }
+        
+        thread = threading.Thread(
+            target=iterate_application_thread,
+            args=(task_id, api_key, model, reformulated_prompt, feedback, target_dir)
+        )
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Itération démarrée",
+            "task_id": task_id
+        })
+    
+    except Exception as e:
+        app.logger.error(f"Erreur lors de l'itération: {str(e)}")
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({"status": "error", "message": str(e)})
+        else:
+            flash(f"Erreur: {str(e)}", "danger")
+            return redirect(url_for('result'))
 
-                        # Use tools for code generation if enabled
-                        if use_mcp_tools:
-                            response_step2 = call_openrouter_api(
-                                api_key, 
-                                selected_model, 
-                                messages_step2, 
-                                temperature=0.4, 
-                                max_retries=2,
-                                tools=get_default_tools()
-                            )
-                        else:
-                            # Use lower temperature for code generation for less creativity/errors
-                            response_step2 = call_openrouter_api(
-                                api_key, 
-                                selected_model, 
-                                messages_step2, 
-                                temperature=0.4, 
-                                max_retries=2
-                            )
-                        st.session_state.last_api_call_time = time.time()
+@app.route('/continue_iteration', methods=['POST'])
+def continue_iteration():
+    """Continue l'itération de la génération avec des instructions supplémentaires"""
+    if 'generation_result' not in session:
+        flash("Aucun résultat de génération trouvé. Veuillez d'abord générer une application.", "warning")
+        return redirect(url_for('index'))
+    
+    try:
+        data = request.form
+        api_key = data.get('api_key', '')
+        model = data.get('model', session.get('model', 'google/gemini-2.5-pro-exp-03-25:free'))
+        feedback = data.get('feedback', '')
+        regenerate_code = data.get('regenerate_code', 'off') == 'on'
+        target_dir = session.get('target_dir', '')
+        original_prompt = session.get('prompt', '')
+        reformulated_prompt = session['generation_result'].get('reformulated_prompt', '')
+        
+        if not api_key:
+            flash("Clé API requise", "danger")
+            return redirect(url_for('result'))
+        if not feedback:
+            flash("Veuillez fournir des instructions pour l'itération", "danger")
+            return redirect(url_for('result'))
+        if not target_dir or not Path(target_dir).is_dir():
+            flash("Répertoire cible introuvable", "danger")
+            return redirect(url_for('result'))
+            
+        task_id = str(uuid.uuid4())
+        session['generation_task_id'] = task_id
+        
+        # Sauvegarder l'historique des itérations
+        if 'iteration_history' not in session:
+            session['iteration_history'] = []
+        
+        # Ajouter l'itération actuelle à l'historique
+        iteration_entry = {
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'feedback': feedback,
+            'regenerate_code': regenerate_code
+        }
+        session['iteration_history'].append(iteration_entry)
+        
+        generation_tasks[task_id] = {
+            'id': task_id,
+            'status': 'in_progress',
+            'progress': 0,
+            'current_step': 'Initialisation de l\'itération...',
+            'start_time': datetime.now(),
+            'error': None,
+            'result': None,
+            'is_iteration': True,
+            'previous_result': session['generation_result']
+        }
+        
+        thread = threading.Thread(
+            target=iterate_application_thread,
+            args=(task_id, api_key, model, reformulated_prompt, feedback, target_dir, regenerate_code)
+        )
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Itération démarrée",
+            "task_id": task_id
+        })
+    
+    except Exception as e:
+        app.logger.error(f"Erreur lors de l'itération: {str(e)}")
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({"status": "error", "message": str(e)})
+        else:
+            flash(f"Erreur: {str(e)}", "danger")
+            return redirect(url_for('result'))
 
-                    if response_step2 and response_step2.get("choices"):
-                        code_response_text = response_step2["choices"][0]["message"]["content"]
-                        
-                        # Check for tool calls
-                        if use_mcp_tools and response_step2["choices"][0]["message"].get("tool_calls"):
-                            status_placeholder_step3.info("🔍 AI is using tools to enhance code generation...")
-                            
-                            # Process each tool call
-                            tool_calls = response_step2["choices"][0]["message"]["tool_calls"]
-                            for tool_call in tool_calls:
-                                function_info = tool_call.get("function", {})
-                                tool_name = function_info.get("name")
-                                tool_args_str = function_info.get("arguments", "{}")
-                                
-                                try:
-                                    tool_args = json.loads(tool_args_str)
-                                    
-                                    # Execute the tool via MCP client
-                                    tool_query = f"Execute {tool_name} with {tool_args}"
-                                    tool_result = asyncio.run(run_mcp_query(st.session_state.mcp_client, tool_query))
-                                    
-                                    if tool_result:
-                                        # Store the tool results
-                                        st.session_state.tool_results[tool_name] = {
-                                            "args": tool_args,
-                                            "result": tool_result.get("text", "")
-                                        }
-                                        
-                                        # Build a follow-up prompt with the tool results
-                                        processed_result = handle_tool_results(tool_name, tool_result.get("text", ""))
-                                        
-                                        follow_up_prompt = f"""
-                                        I've used {tool_name} to gather additional information for the code generation.
-                                        
-                                        The tool returned this information:
-                                        
-                                        {processed_result}
-                                        
-                                        Please use this additional information to improve the code generation.
-                                        Continue generating the code using the same format:
-                                        `--- FILE: path/to/filename ---`
-                                        
-                                        And remember to include all files from the structure.
-                                        """
-                                        
-                                        # Make another API call with the follow-up prompt
-                                        follow_up_messages = messages_step2 + [
-                                            {"role": "assistant", "content": code_response_text},
-                                            {"role": "user", "content": follow_up_prompt}
-                                        ]
-                                        
-                                        status_placeholder_step3.info(f"🔍 Using information from {tool_name} to enhance code...")
-                                        
-                                        # Check rate limit
-                                        if is_free_model(selected_model):
-                                            current_time = time.time()
-                                            time_since_last_call = time.time() - st.session_state.get('last_api_call_time', 0)
-                                            if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
-                                                wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
-                                                st.warning(f"⏳ Waiting {wait_time:.1f}s before continuing...")
-                                                time.sleep(wait_time)
-                                        
-                                        # Make the follow-up call
-                                        follow_up_response = call_openrouter_api(
-                                            api_key, 
-                                            selected_model, 
-                                            follow_up_messages, 
-                                            temperature=0.4
-                                        )
-                                        st.session_state.last_api_call_time = time.time()
-                                        
-                                        if follow_up_response and follow_up_response.get("choices"):
-                                            # Update the code response with the enhanced version
-                                            enhanced_code = follow_up_response["choices"][0]["message"]["content"]
-                                            code_response_text = enhanced_code
-                                except Exception as e:
-                                    st.warning(f"Error processing tool {tool_name}: {e}")
-                        
-                        st.session_state.last_code_generation_response = code_response_text # Store for display
-                        status_placeholder_step3.success("✅ Step 3 completed: Code generation response received.")
+def iterate_application_thread(task_id, api_key, model, reformulated_prompt, feedback, target_dir):
+    """Fonction exécutée dans un thread pour itérer sur l'application générée"""
+    try:
+        from src.api.openrouter_api import extract_files_from_response, generate_code_with_openrouter
+        
+        generation_tasks[task_id]['progress'] = 10
+        generation_tasks[task_id]['current_step'] = "Analyse du code existant..."
+        
+        existing_files = {}
+        try:
+            for root, dirs, files in os.walk(target_dir):
+                for file in files:
+                    rel_path = os.path.relpath(os.path.join(root, file), target_dir)
+                    if os.path.getsize(os.path.join(root, file)) > 0:  
+                        with open(os.path.join(root, file), 'r', encoding='utf-8', errors='ignore') as f:
+                            try:
+                                existing_files[rel_path] = f.read()
+                            except:
+                                pass
+        except Exception as e:
+            app.logger.error(f"Erreur lors de la lecture des fichiers existants: {str(e)}")
+            generation_tasks[task_id]['error'] = f"Erreur lors de la lecture des fichiers: {str(e)}"
+            generation_tasks[task_id]['status'] = 'failed'
+            return
+            
+        generation_tasks[task_id]['progress'] = 30
+        generation_tasks[task_id]['current_step'] = "Préparation de l'itération..."
+        
+        code_summary = "Structure du projet et aperçu du code existant:\n\n"
+        for file_path, content in existing_files.items():
+            code_summary += f"FILE: {file_path}\n"
+            preview = content[:300] + "..." if len(content) > 300 else content
+            code_summary += f"```\n{preview}\n```\n\n"
+            
+        system_prompt = """Vous êtes un expert en développement logiciel. Votre tâche est d'améliorer le code 
+        existant d'une application selon les instructions de l'utilisateur.
+        
+        Ne générez que les fichiers qui doivent être modifiés ou ajoutés.
+        
+        Pour chaque fichier à modifier ou ajouter, indiquez clairement:
+        
+        ```
+        FILE: <chemin/du/fichier>
+        ```
+        
+        Suivi du contenu complet du fichier après modifications.
+        Ne tronquez pas le code et fournissez des implémentations complètes.
+        Assurez-vous d'être précis quant aux chemins des fichiers.
+        """
+        
+        user_prompt = f"""Voici la description originale du projet:
+        
+        {reformulated_prompt}
+        
+        Voici un aperçu du code existant:
+        
+        {code_summary}
+        
+        Itération demandée par l'utilisateur:
+        
+        {feedback}
+        
+        Veuillez améliorer le code existant selon ces instructions. 
+        Fournissez uniquement les fichiers qui doivent être modifiés ou ajoutés."""
+        
+        generation_tasks[task_id]['progress'] = 50
+        generation_tasks[task_id]['current_step'] = "Génération des améliorations..."
+        
+        response = generate_code_with_openrouter(
+            api_key=api_key,
+            model=model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            temperature=0.3  
+        )
+        
+        if not response or 'error' in response:
+            error_message = response.get('error', "Erreur inconnue lors de l'appel à l'API pour l'itération")
+            generation_tasks[task_id]['error'] = error_message
+            generation_tasks[task_id]['status'] = 'failed'
+            return
+            
+        generation_tasks[task_id]['progress'] = 70
+        generation_tasks[task_id]['current_step'] = "Application des améliorations..."
+        
+        modified_files = extract_files_from_response(response)
+        
+        if not modified_files:
+            app.logger.warning("Aucun fichier n'a été extrait de la réponse de l'API.")
+            code_response_text = response.get('content', '')
+            import re
+            file_blocks = re.findall(r'FILE: (.+?)\n```[\w\+]*\n(.*?)```', code_response_text, re.DOTALL)
+            
+            for file_path, content in file_blocks:
+                norm_path = os.path.normpath(file_path.strip())
+                modified_files[norm_path] = content.strip()
+            
+            if not modified_files:
+                app.logger.error("Échec de l'extraction des fichiers modifiés, même avec la méthode de secours.")
+                generation_tasks[task_id]['error'] = "Impossible d'extraire les fichiers modifiés de la réponse de l'API"
+                generation_tasks[task_id]['status'] = 'failed'
+                return
+                
+        files_written = []
+        for file_path, content in modified_files.items():
+            try:
+                norm_path = os.path.normpath(file_path)
+                full_path = os.path.join(target_dir, norm_path)
+                
+                os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                
+                with open(full_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                
+                files_written.append(norm_path)
+                app.logger.info(f"Fichier modifié écrit: {full_path}")
+                    
+            except Exception as e:
+                app.logger.error(f"Erreur lors de l'écriture du fichier {file_path}: {str(e)}")
+        
+        generation_tasks[task_id]['progress'] = 100
+        generation_tasks[task_id]['status'] = 'completed'
+        generation_tasks[task_id]['result'] = {
+            'success': True,
+            'target_directory': target_dir,
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'files_modified': len(files_written),
+            'file_list': files_written,
+            'prompt': feedback,
+            'reformulated_prompt': reformulated_prompt,
+            'iteration': True
+        }
+        
+        app.logger.info(f"Itération terminée. {len(files_written)} fichiers modifiés.")
+            
+    except Exception as e:
+        app.logger.error(f"Erreur lors de l'itération: {str(e)}")
+        generation_tasks[task_id]['error'] = str(e)
+        generation_tasks[task_id]['status'] = 'failed'
 
-                        # == STEP 4: Writing Code to Files ==
-                        st.info("▶️ Step 4: Writing Code to Files...")
-                        status_placeholder_step4 = st.empty()
-                        files_written = []
-                        errors = []
-                        generation_incomplete = False
-                        with st.spinner("Analyzing response and writing code..."):
-                            files_written, errors, generation_incomplete = parse_and_write_code(target_directory, code_response_text)
+# Gestion des erreurs
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('error.html', 
+                           code=404, 
+                           message="Page introuvable", 
+                           description="La page que vous recherchez n'existe pas ou a été déplacée."), 404
 
-                        if files_written or errors:
-                            status_placeholder_step4.success(f"✅ Step 4 completed: Response processing finished.")
-                            st.subheader("File writing results:")
-                            for f in files_written:
-                                st.success(f"   📄 File written: {Path(f).relative_to(Path(target_directory))}")
-                            for err in errors:
-                                st.error(f"   ❌ {err}")
+@app.errorhandler(500)
+def server_error(e):
+    return render_template('error.html', 
+                           code=500, 
+                           message="Erreur serveur", 
+                           description="Une erreur interne s'est produite. Veuillez réessayer plus tard."), 500
 
-                            # == STEP 5: Check for Empty Files and Generate Missing Code ==
-                            empty_files_check = st.checkbox("Check for empty files and generate their code", value=True)
-                            
-                            if empty_files_check and not errors and (files_written or generation_incomplete):
-                                st.info("▶️ Step 5: Checking for empty files and generating missing code...")
-                                status_placeholder_step5 = st.empty()
-                                
-                                with st.spinner("Identifying empty files..."):
-                                    empty_files = identify_empty_files(target_directory, st.session_state.project_structure)
-                                
-                                if empty_files:
-                                    status_placeholder_step5.warning(f"Found {len(empty_files)} empty files that need code generation.")
-                                    st.write("Empty files:")
-                                    for ef in empty_files:
-                                        st.info(f"   📄 Empty file: {ef}")
-                                    
-                                    # Check rate limit before calling API again
-                                    if is_free_model(selected_model):
-                                        current_time = time.time()
-                                        time_since_last_call = time.time() - st.session_state.get('last_api_call_time', 0)
-                                        if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
-                                            wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
-                                            st.warning(f"⏳ Free model detected. Waiting {wait_time:.1f} seconds before generating missing code...")
-                                            time.sleep(wait_time)
-                                    
-                                    with st.spinner("Generating code for empty files..."):
-                                        additional_files, additional_errors = generate_missing_code(
-                                            api_key, 
-                                            selected_model, 
-                                            empty_files, 
-                                            st.session_state.reformulated_prompt, 
-                                            st.session_state.project_structure,
-                                            st.session_state.last_code_generation_response,
-                                            target_directory
-                                        )
-                                        st.session_state.last_api_call_time = time.time()
-                                    
-                                    if additional_files:
-                                        status_placeholder_step5.success(f"✅ Successfully generated code for {len(additional_files)} empty files.")
-                                        st.subheader("Additional files filled:")
-                                        for f in additional_files:
-                                            st.success(f"   📄 File filled: {Path(f).relative_to(Path(target_directory))}")
-                                        
-                                        # Add to main file list
-                                        files_written.extend(additional_files)
-                                    
-                                    if additional_errors:
-                                        for err in additional_errors:
-                                            st.error(f"   ❌ {err}")
-                                        
-                                        # Add to main error list
-                                        errors.extend(additional_errors)
-                                else:
-                                    status_placeholder_step5.success("✅ No empty files found - all files contain code.")
-                            
-                            # Show tool results if any were used
-                            if use_mcp_tools and st.session_state.tool_results:
-                                with st.expander("View MCP Tool Results"):
-                                    st.subheader("🔍 Tool Results Used")
-                                    for tool_name, tool_info in st.session_state.tool_results.items():
-                                        st.write(f"**{tool_name}**")
-                                        st.write(f"Arguments: {tool_info.get('args', {})}")
-                                        if 'result' in tool_info:
-                                            with st.expander(f"View {tool_name} results"):
-                                                st.code(tool_info['result'])
-                            
-                            # Final success message
-                            if not errors:
-                                st.success("🎉 Application generated successfully!")
-                                st.balloons()
-                            elif len(errors) < len(files_written) / 2:  # If errors are less than half the files
-                                st.warning("🎯 Application generated with some errors. Check the error messages above.")
-                            else:
-                                st.error("❗️ Several errors occurred during application generation.")
+@app.errorhandler(403)
+def forbidden(e):
+    return render_template('error.html', 
+                           code=403, 
+                           message="Accès interdit", 
+                           description="Vous n'avez pas les permissions nécessaires pour accéder à cette ressource."), 403
 
-                        else:
-                             status_placeholder_step4.error("❌ Step 4 failed: No files could be written.")
+# Route de test pour vérifier que le serveur fonctionne
+@app.route('/ping')
+def ping():
+    return jsonify({"status": "ok", "message": "Le serveur fonctionne correctement!"})
 
-                    else:
-                        status_placeholder_step3.error("❌ Step 3 failed: Code generation retrieval failed.")
-                        if response_step2: st.json(response_step2) # Display error response if available
-
-                else: # Error during structure creation (handled in the function)
-                   status_placeholder_step2.error("❌ Step 2 failed: Unable to create project structure.")
-
-            else: # Error when parsing step 1
-                status_placeholder_step1.error("❌ Step 1 failed: Unable to parse AI response (prompt/structure).")
-                if 'response_text_step1' in locals():
-                    with st.expander("View raw response from Step 1"):
-                        st.code(response_text_step1, language='text')
-        else: # Error during API call in step 1
-             status_placeholder_step1.error("❌ Step 1 failed: API call for reformulation/structure failed.")
-             if response_step1: st.json(response_step1) # Display error response if available
-
-        st.session_state.process_running = False # Re-enable button
-        st.info("🏁 Process completed.") # Indicate global end
-
-    else: # Invalid input
-        st.session_state.process_running = False # Re-enable button if input error
-
-# Show response expander for debugging
-show_response_expander()
+if __name__ == '__main__':
+    app.run(debug=True)
