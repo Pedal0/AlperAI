@@ -1,13 +1,13 @@
 {% extends "layout.html" %}
 
-{% block title %}Générateur d'applications IA{% endblock %}
+{% block title %}AI Application Generator{% endblock %}
 
 {% block content %}
 <div class="hero-section mb-5">
-    <h1 class="animate__animated animate__fadeInDown">Générateur d'Applications <span class="gradient-text">IA</span></h1>
+    <h1 class="animate__animated animate__fadeInDown">AI Application <span class="gradient-text">Generator</span></h1>
     <p class="lead animate__animated animate__fadeIn animate__delay-1s">
-        Décrivez l'application que vous souhaitez, et laissez l'IA la générer pour vous.
-        <br>Aucune compétence en programmation n'est requise !
+        Describe the application you want, and let AI generate it for you.
+        <br>No programming skills required!
     </p>
 </div>
 
@@ -24,7 +24,7 @@
                             </h3>
                             
                             <div class="mb-4">
-                                <label for="api_key" class="form-label">Clé API OpenRouter</label>
+                                <label for="api_key" class="form-label">OpenRouter API Key</label>
                                 <div class="input-group">
                                     <input type="password" class="form-control" id="api_key" name="api_key" value="{{ api_key }}" required>
                                     <button class="btn btn-outline-secondary toggle-password" type="button">
@@ -32,12 +32,12 @@
                                     </button>
                                 </div>
                                 <div class="form-text">
-                                    Obtenir une clé sur <a href="https://openrouter.ai/" target="_blank">OpenRouter</a>
+                                    Get a key at <a href="https://openrouter.ai/" target="_blank">OpenRouter</a>
                                 </div>
                             </div>
                             
                             <div class="mb-4">
-                                <label for="model" class="form-label">Modèle IA</label>
+                                <label for="model" class="form-label">AI Model</label>
                                 <select class="form-select mb-2" id="model" name="model">
                                     <option value="google/gemini-2.5-pro-preview-03-25" >Gemini 2.5 Pro Preview</option>
                                     <option value="openrouter/optimus-alpha">Optimus Alpha (Free)</option>
@@ -46,13 +46,13 @@
                                     <option value="meta-llama/llama-4-scout:free">Llama 4 Scout (Free No Tools)</option>
                                     <option value="deepseek/deepseek-chat-v3-0324:free">DeepSeek Chat v3 (Free)</option>
                                     <option value="anthropic/claude-3.7-sonnet">Claude 3.7 Sonnet</option>
-                                    <option value="custom">Autre modèle (personnalisé)...</option>
+                                    <option value="custom">Other model (custom)...</option>
                                 </select>
                                 <div id="customModelContainer" class="d-none">
                                     <input type="text" class="form-control" id="customModel" name="customModel" 
-                                           placeholder="Entrez l'identifiant du modèle (ex: organizaiton/model:tag)">
+                                           placeholder="Enter the model identifier (e.g. organization/model:tag)">
                                     <div class="form-text">
-                                        Format: organization/model:tag - Vérifiez sur <a href="https://openrouter.ai/models" target="_blank">OpenRouter</a>
+                                        Format: organization/model:tag - Check on <a href="https://openrouter.ai/models" target="_blank">OpenRouter</a>
                                     </div>
                                 </div>
                             </div>
@@ -60,17 +60,17 @@
                             <div class="mb-4">
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" id="use_mcp_tools" name="use_mcp_tools" checked>
-                                    <label class="form-check-label" for="use_mcp_tools">Activer les outils MCP</label>
+                                    <label class="form-check-label" for="use_mcp_tools">Enable MCP tools</label>
                                 </div>
                                 <div class="form-text">
-                                    Améliore la génération avec des recherches web et des ressources de code
+                                    Enhances generation with web searches and code resources
                                 </div>
                             </div>
                             
                             <div id="frontendOptions" class="mb-4">
-                                <label class="form-label">Options Frontend</label>
+                                <label class="form-label">Frontend Options</label>
                                 <select class="form-select mb-2" id="frontend_framework" name="frontend_framework">
-                                    <option value="Auto-detect" selected>Auto-détection</option>
+                                    <option value="Auto-detect" selected>Auto-detect</option>
                                     <option value="Bootstrap">Bootstrap</option>
                                     <option value="Tailwind CSS">Tailwind CSS</option>
                                     <option value="Bulma">Bulma</option>
@@ -80,7 +80,7 @@
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="include_animations" name="include_animations" checked>
                                     <label class="form-check-label" for="include_animations">
-                                        Inclure des animations CSS
+                                        Include CSS animations
                                     </label>
                                 </div>
                             </div>
@@ -91,15 +91,15 @@
                     <div class="col-lg-8 input-panel">
                         <div class="p-4">
                             <h3 class="mb-4">
-                                <i class="fas fa-pencil-alt me-2"></i>Description de l'application
+                                <i class="fas fa-pencil-alt me-2"></i>Application Description
                             </h3>
                             
                             <div class="mb-4">
-                                <textarea class="form-control" id="user_prompt" name="user_prompt" rows="6" placeholder="Exemple: Créer une application de gestion de tâches avec authentification utilisateur. Les utilisateurs doivent pouvoir ajouter, modifier et supprimer des tâches, définir des priorités et des dates d'échéance." required></textarea>
+                                <textarea class="form-control" id="user_prompt" name="user_prompt" rows="6" placeholder="Example: Create a task management application with user authentication. Users should be able to add, edit and delete tasks, set priorities and due dates." required></textarea>
                             </div>
                             
                             <div class="mb-4">
-                                <label for="target_directory" class="form-label">Répertoire de destination</label>
+                                <label for="target_directory" class="form-label">Target Directory</label>
                                 <div class="input-group">
                                     <input type="text" class="form-control" id="target_directory" name="target_directory" placeholder="Ex: C:\Users\YourName\Projects\MyGeneratedApp" required>
                                     <button class="btn btn-outline-secondary" type="button" id="browseButton">
@@ -107,28 +107,28 @@
                                     </button>
                                 </div>
                                 <div class="form-text">
-                                    Le dossier doit exister et vous devez avoir les permissions d'écriture.
+                                    The folder must exist and you must have write permissions.
                                 </div>
                             </div>
                             
                             <div class="examples-section mt-4">
                                 <h5>
-                                    <i class="fas fa-lightbulb me-2"></i>Exemples de prompts
+                                    <i class="fas fa-lightbulb me-2"></i>Example Prompts
                                     <button type="button" class="btn btn-sm btn-link float-end" data-bs-toggle="collapse" data-bs-target="#examplesCollapse">
-                                        Afficher/Masquer
+                                        Show/Hide
                                     </button>
                                 </h5>
                                 <div class="collapse" id="examplesCollapse">
                                     <div class="card card-body mt-2">
                                         <div class="example-chips d-flex flex-wrap gap-2">
-                                            <button type="button" class="btn btn-sm btn-outline-primary example-chip" data-example="Créer un site web portfolio statique pour un photographe avec une page d'accueil, galerie, à propos et contact. Inclure un design responsive au look moderne.">
-                                                Site Portfolio
+                                            <button type="button" class="btn btn-sm btn-outline-primary example-chip" data-example="Create a static portfolio website for a photographer with a home page, gallery, about, and contact. Include a responsive design with a modern look.">
+                                                Portfolio Site
                                             </button>
-                                            <button type="button" class="btn btn-sm btn-outline-primary example-chip" data-example="Construire une application de gestion de tâches avec authentification utilisateur. Les utilisateurs doivent pouvoir créer, modifier et supprimer des tâches, définir des dates d'échéance et marquer les tâches comme terminées.">
-                                                App de Tâches
+                                            <button type="button" class="btn btn-sm btn-outline-primary example-chip" data-example="Build a task management application with user authentication. Users should be able to create, edit, and delete tasks, set due dates, and mark tasks as completed.">
+                                                Task App
                                             </button>
-                                            <button type="button" class="btn btn-sm btn-outline-primary example-chip" data-example="Créer une API RESTful pour une plateforme de blog avec des endpoints pour les articles, commentaires et utilisateurs. Inclure l'authentification et la gestion appropriée des erreurs.">
-                                                API RESTful
+                                            <button type="button" class="btn btn-sm btn-outline-primary example-chip" data-example="Create a RESTful API for a blog platform with endpoints for posts, comments, and users. Include authentication and proper error handling.">
+                                                RESTful API
                                             </button>
                                         </div>
                                     </div>
@@ -141,11 +141,11 @@
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" id="empty_files_check" name="empty_files_check" checked>
                                     <label class="form-check-label" for="empty_files_check">
-                                        Vérifier et générer les fichiers vides
+                                        Check and generate empty files
                                     </label>
                                 </div>
                                 <button type="submit" class="btn btn-primary btn-lg" id="generateButton">
-                                    <i class="fas fa-rocket me-2"></i>Générer l'Application
+                                    <i class="fas fa-rocket me-2"></i>Generate Application
                                 </button>
                             </div>
                         </div>
@@ -162,15 +162,15 @@
         <div class="modal-content">
             <div class="modal-body text-center p-4">
                 <div class="spinner-border text-primary mb-3" role="status">
-                    <span class="visually-hidden">Chargement...</span>
+                    <span class="visually-hidden">Loading...</span>
                 </div>
-                <h4 id="loadingTitle">Génération en cours...</h4>
-                <p id="loadingMessage">Veuillez patienter pendant que l'IA génère votre application.</p>
+                <h4 id="loadingTitle">Generation in progress...</h4>
+                <p id="loadingMessage">Please wait while the AI generates your application.</p>
                 
                 <div class="progress mt-3">
                     <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
                 </div>
-                <p class="mt-2"><span id="currentStep">Initialisation...</span></p>
+                <p class="mt-2"><span id="currentStep">Initializing...</span></p>
                 
                 <div class="alert alert-info mt-3 d-none" id="tipBox">
                     <i class="fas fa-info-circle me-2"></i><span id="tipText"></span>
@@ -204,15 +204,15 @@
             });
         });
         
-        // Sélection de dossier - utiliser le sélecteur natif Windows via une requête au serveur
+        // Folder selection - use native Windows selector via server request
         document.getElementById('browseButton').addEventListener('click', function() {
-            // Afficher un indicateur de chargement
+            // Show loading indicator
             const currentValue = document.getElementById('target_directory').value;
-            document.getElementById('target_directory').value = "Sélection en cours...";
+            document.getElementById('target_directory').value = "Selection in progress...";
             document.getElementById('target_directory').disabled = true;
             document.getElementById('browseButton').disabled = true;
             
-            // Appeler la nouvelle route qui lance un sélecteur de fichiers natif Windows
+            // Call the new route that launches a native Windows file selector
             fetch('{{ url_for("open_folder_dialog") }}')
                 .then(response => response.json())
                 .then(data => {
@@ -220,34 +220,34 @@
                     document.getElementById('target_directory').disabled = false;
                     
                     if (data.status === 'success') {
-                        // Mettre à jour le champ avec le chemin complet sélectionné
+                        // Update the field with the selected full path
                         document.getElementById('target_directory').value = data.path;
                     } else if (data.status === 'canceled') {
-                        // Si l'utilisateur a annulé, remettre la valeur précédente
+                        // If the user canceled, restore the previous value
                         document.getElementById('target_directory').value = currentValue || '';
                     } else {
-                        // En cas d'erreur, afficher un message et remettre la valeur précédente
-                        console.error('Erreur:', data.message);
+                        // In case of error, display a message and restore the previous value
+                        console.error('Error:', data.message);
                         document.getElementById('target_directory').value = currentValue || '';
                         
-                        // Proposer la méthode de saisie manuelle comme fallback
+                        // Offer manual entry method as fallback
                         openManualFolderDialog(currentValue);
                     }
                 })
                 .catch(error => {
-                    console.error('Erreur lors de la communication avec le serveur:', error);
+                    console.error('Error communicating with the server:', error);
                     document.getElementById('browseButton').disabled = false;
                     document.getElementById('target_directory').disabled = false;
                     document.getElementById('target_directory').value = currentValue || '';
                     
-                    // Proposer la méthode de saisie manuelle comme fallback
+                    // Offer manual entry method as fallback
                     openManualFolderDialog(currentValue);
                 });
         });
         
-        // Fonction pour ouvrir une boîte de dialogue de saisie manuelle comme méthode alternative
+        // Function to open a manual entry dialog as an alternative method
         function openManualFolderDialog(currentPath) {
-            // Créer une boîte de dialogue personnalisée
+            // Create a custom dialog
             const dialog = document.createElement('div');
             dialog.style.position = 'fixed';
             dialog.style.left = '0';
@@ -267,39 +267,39 @@
             dialogContent.style.width = '80%';
             dialogContent.style.maxWidth = '600px';
             dialogContent.innerHTML = `
-                <h5>Saisie manuelle du chemin</h5>
-                <p>Le sélecteur de dossier natif n'a pas fonctionné. Veuillez saisir manuellement le chemin complet du dossier :</p>
+                <h5>Manual Path Entry</h5>
+                <p>The native folder selector didn't work. Please manually enter the full folder path:</p>
                 <div class="input-group mb-3">
-                    <input type="text" class="form-control" id="manualPath" value="${currentPath || ''}" placeholder="Ex: E:\\Dev_maison\\mon_projet">
+                    <input type="text" class="form-control" id="manualPath" value="${currentPath || ''}" placeholder="Ex: E:\\Dev_maison\\my_project">
                 </div>
                 <div class="form-text mb-3">
-                    Exemples de chemins valides: C:\\Users\\nom\\Projects\\MonProjet, E:\\Dev_maison\\test
+                    Examples of valid paths: C:\\Users\\name\\Projects\\MyProject, E:\\Dev_maison\\test
                 </div>
                 <div class="d-flex justify-content-end">
-                    <button class="btn btn-secondary me-2" id="cancelPathBtn">Annuler</button>
-                    <button class="btn btn-primary" id="confirmPathBtn">Confirmer</button>
+                    <button class="btn btn-secondary me-2" id="cancelPathBtn">Cancel</button>
+                    <button class="btn btn-primary" id="confirmPathBtn">Confirm</button>
                 </div>
             `;
             
             dialog.appendChild(dialogContent);
             document.body.appendChild(dialog);
             
-            // Focus sur l'input
+            // Focus on the input
             setTimeout(() => {
                 document.getElementById('manualPath').focus();
                 document.getElementById('manualPath').select();
             }, 100);
             
-            // Bouton annuler
+            // Cancel button
             document.getElementById('cancelPathBtn').addEventListener('click', function() {
                 document.body.removeChild(dialog);
             });
             
-            // Bouton confirmer
+            // Confirm button
             document.getElementById('confirmPathBtn').addEventListener('click', function() {
                 const selectedPath = document.getElementById('manualPath').value.trim();
                 if (selectedPath) {
-                    // Vérifier si le chemin existe et le créer si nécessaire
+                    // Check if the path exists and create it if necessary
                     const formData = new FormData();
                     formData.append('full_path', selectedPath);
                     formData.append('create_if_missing', 'true');
@@ -314,20 +314,20 @@
                             document.getElementById('target_directory').value = data.path;
                             document.body.removeChild(dialog);
                         } else {
-                            alert(data.error || 'Chemin invalide. Veuillez vérifier et réessayer.');
+                            alert(data.error || 'Invalid path. Please check and try again.');
                         }
                     })
                     .catch(error => {
-                        console.error('Erreur:', error);
+                        console.error('Error:', error);
                         document.body.removeChild(dialog);
-                        alert('Une erreur est survenue lors de la validation du chemin');
+                        alert('An error occurred while validating the path');
                     });
                 } else {
-                    alert('Veuillez saisir un chemin valide');
+                    alert('Please enter a valid path');
                 }
             });
             
-            // Gérer la touche Entrée
+            // Handle Enter key
             document.getElementById('manualPath').addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
                     document.getElementById('confirmPathBtn').click();
@@ -339,7 +339,7 @@
         const form = document.getElementById('appGeneratorForm');
         
         form.addEventListener('submit', function(e) {
-            e.preventDefault(); // Empêcher la soumission standard du formulaire
+            e.preventDefault(); // Prevent standard form submission
             
             // Validate form
             if (!form.checkValidity()) {
@@ -348,16 +348,16 @@
                 return;
             }
             
-            // Préparer les données du formulaire
+            // Prepare form data
             const formData = new FormData(form);
             
-            // Gérer l'option de modèle personnalisé
+            // Handle custom model option
             if (document.getElementById('model').value === 'custom') {
                 const customModelValue = document.getElementById('customModel').value.trim();
                 if (customModelValue) {
                     formData.set('model', customModelValue);
                 } else {
-                    alert('Veuillez entrer un identifiant de modèle valide');
+                    alert('Please enter a valid model identifier');
                     return;
                 }
             }
@@ -373,11 +373,11 @@
             const tipText = document.getElementById('tipText');
             
             const tips = [
-                "Les modèles gratuits peuvent prendre plus de temps en raison des limites de taux.",
-                "Plus la description est détaillée, meilleure sera la génération de code.",
-                "Les outils MCP permettent à l'IA d'accéder à des informations externes pour améliorer le code généré.",
-                "La génération peut prendre de 30 secondes à 5 minutes selon la complexité de l'application.",
-                "Vous pourrez prévisualiser et tester l'application directement dans l'interface une fois générée."
+                "Free models may take longer due to rate limits.",
+                "The more detailed the description, the better the code generation.",
+                "MCP tools allow AI to access external information to improve the generated code.",
+                "Generation can take from 30 seconds to 5 minutes depending on application complexity.",
+                "You can preview and test the application directly in the interface once generated."
             ];
             
             // Show random tips
@@ -389,9 +389,9 @@
                 tipIndex = (tipIndex + 1) % tips.length;
                 tipBox.classList.remove('d-none');
                 tipText.textContent = tips[tipIndex];
-            }, 12000); // Afficher une nouvelle astuce toutes les 12 secondes
+            }, 12000); // Show a new tip every 12 seconds
             
-            // Effectuer la requête AJAX pour générer l'application
+            // Make AJAX request to generate the application
             fetch('{{ url_for("generate") }}', {
                 method: 'POST',
                 body: formData,
@@ -401,21 +401,21 @@
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`Erreur HTTP: ${response.status}`);
+                    throw new Error(`HTTP Error: ${response.status}`);
                 }
                 return response.json();
             })
             .then(data => {
-                // Vérifier la réponse
+                // Check response
                 if (data.status === 'success') {
-                    // Initier le suivi de progression
+                    // Start progress tracking
                     pollGenerationProgress();
                 } else if (data.status === 'error') {
-                    // Afficher les erreurs
+                    // Display errors
                     clearInterval(tipInterval);
                     loadingModal.hide();
                     
-                    let errorMessage = 'Une erreur est survenue lors de la génération.';
+                    let errorMessage = 'An error occurred during generation.';
                     if (data.errors && data.errors.length > 0) {
                         errorMessage = data.errors.join('<br>');
                     } else if (data.message) {
@@ -426,51 +426,51 @@
                 }
             })
             .catch(error => {
-                console.error('Erreur:', error);
+                console.error('Error:', error);
                 clearInterval(tipInterval);
                 loadingModal.hide();
-                alert('Une erreur est survenue lors de la communication avec le serveur: ' + error.message);
+                alert('An error occurred while communicating with the server: ' + error.message);
             });
             
-            // Fonction pour interroger le serveur sur la progression de la génération
+            // Function to poll the server for generation progress
             function pollGenerationProgress() {
                 let pollInterval = setInterval(() => {
                     fetch('{{ url_for("generation_progress") }}')
                     .then(response => response.json())
                     .then(data => {
-                        // Mettre à jour la barre de progression
+                        // Update progress bar
                         const progress = data.progress || 0;
                         progressBar.style.width = `${progress}%`;
                         
-                        // Mettre à jour l'étape actuelle
+                        // Update current step
                         if (data.current_step) {
                             currentStep.textContent = data.current_step;
                         }
                         
-                        // Si la génération est terminée
+                        // If generation is complete
                         if (data.status === 'completed') {
                             clearInterval(pollInterval);
                             clearInterval(tipInterval);
-                            currentStep.textContent = "Génération terminée !";
+                            currentStep.textContent = "Generation complete!";
                             
-                            // Redirection vers la page des résultats
+                            // Redirect to results page
                             setTimeout(() => {
                                 window.location.href = data.redirect_url || '{{ url_for("result") }}';
                             }, 1500);
                         }
                         
-                        // Si la génération a échoué
+                        // If generation failed
                         if (data.status === 'failed') {
                             clearInterval(pollInterval);
                             clearInterval(tipInterval);
                             loadingModal.hide();
-                            alert('Erreur lors de la génération: ' + (data.error || 'Erreur inconnue'));
+                            alert('Error during generation: ' + (data.error || 'Unknown error'));
                         }
                     })
                     .catch(error => {
-                        console.error('Erreur lors de la vérification de la progression:', error);
+                        console.error('Error checking progress:', error);
                     });
-                }, 1500); // Vérifier la progression toutes les 1.5 secondes
+                }, 1500); // Check progress every 1.5 seconds
             }
         });
         
@@ -498,4 +498,3 @@
     });
 </script>
 {% endblock %}
-``` 

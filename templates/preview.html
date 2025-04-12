@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}Prévisualisation{% endblock %}
+{% block title %}Preview{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -8,20 +8,20 @@
         <div class="preview-header mb-4">
             <div class="row align-items-center">
                 <div class="col-md-8">
-                    <h1 class="gradient-text">Prévisualisation de l'application</h1>
+                    <h1 class="gradient-text">Application Preview</h1>
                     <p class="lead">
-                        Votre application est maintenant prête à être testée.
+                        Your application is now ready for testing.
                     </p>
                     <p class="text-muted">
-                        <i class="fas fa-folder-open me-1"></i> Répertoire: <code id="project-path">{{ target_dir }}</code>
+                        <i class="fas fa-folder-open me-1"></i> Directory: <code id="project-path">{{ target_dir }}</code>
                     </p>
                 </div>
                 <div class="col-md-4 text-md-end">
                     <a href="{{ url_for('result') }}" class="btn btn-outline-primary me-2">
-                        <i class="fas fa-arrow-left me-1"></i> Retour aux résultats
+                        <i class="fas fa-arrow-left me-1"></i> Back to Results
                     </a>
                     <a href="{{ url_for('index') }}" class="btn btn-primary">
-                        <i class="fas fa-home me-1"></i> Accueil
+                        <i class="fas fa-home me-1"></i> Home
                     </a>
                 </div>
             </div>
@@ -53,15 +53,15 @@
                     <div class="tab-pane fade show active" id="application">
                         <div class="d-flex justify-content-between align-items-center p-3 preview-toolbar">
                             <div>
-                                <span class="badge bg-secondary me-2" id="app-status-badge">Non démarré</span>
-                                <span class="app-url" id="app-url">Adresse non disponible</span>
+                                <span class="badge bg-secondary me-2" id="app-status-badge">Not Started</span>
+                                <span class="app-url" id="app-url">Address not available</span>
                             </div>
                             <div>
                                 <button class="btn btn-sm btn-outline-secondary me-2" id="refreshPreviewBtn">
-                                    <i class="fas fa-sync-alt me-1"></i> Actualiser
+                                    <i class="fas fa-sync-alt me-1"></i> Refresh
                                 </button>
                                 <button class="btn btn-sm btn-outline-primary" id="openInNewTab" disabled>
-                                    <i class="fas fa-external-link-alt me-1"></i> Ouvrir dans un nouvel onglet
+                                    <i class="fas fa-external-link-alt me-1"></i> Open in New Tab
                                 </button>
                             </div>
                         </div>
@@ -69,10 +69,10 @@
                         <div class="preview-frame-container">
                             <div class="text-center py-5 loading-spinner">
                                 <div class="spinner-border text-primary mb-3 d-none" id="loading-spinner" role="status">
-                                    <span class="visually-hidden">Chargement de l'application...</span>
+                                    <span class="visually-hidden">Loading application...</span>
                                 </div>
-                                <p id="loading-message">Application non démarrée</p>
-                                <p class="text-muted small">Utilisez les boutons ci-dessous pour lancer l'application.</p>
+                                <p id="loading-message">Application not started</p>
+                                <p class="text-muted small">Use the buttons below to start the application.</p>
                             </div>
                             
                             <iframe id="previewFrame" class="preview-frame d-none" src="about:blank" frameborder="0"></iframe>
@@ -80,10 +80,10 @@
                             <div class="application-error d-none" id="application-error">
                                 <div class="text-center py-5">
                                     <i class="fas fa-exclamation-triangle text-warning mb-3" style="font-size: 3rem;"></i>
-                                    <h3>Impossible de lancer l'application</h3>
-                                    <p>L'application n'a pas pu être démarrée correctement.</p>
+                                    <h3>Unable to start the application</h3>
+                                    <p>The application could not be started properly.</p>
                                     <div class="error-details bg-light p-3 mt-3 text-start">
-                                        <pre id="errorDetails">Erreur non spécifiée</pre>
+                                        <pre id="errorDetails">Unspecified error</pre>
                                     </div>
                                 </div>
                             </div>
@@ -92,24 +92,24 @@
                     
                     <!-- Configuration Tab -->
                     <div class="tab-pane fade p-4" id="config">
-                        <h4 class="mb-4">Configuration de l'application</h4>
+                        <h4 class="mb-4">Application Configuration</h4>
                         
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="card mb-4">
                                     <div class="card-header">
-                                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informations générales</h5>
+                                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>General Information</h5>
                                     </div>
                                     <div class="card-body">
                                         <table class="table">
                                             <tbody>
                                                 <tr>
-                                                    <th scope="row">Répertoire</th>
+                                                    <th scope="row">Directory</th>
                                                     <td>{{ target_dir }}</td>
                                                 </tr>
                                                 <tr>
-                                                    <th scope="row">Type d'application</th>
-                                                    <td id="project-type">Non détecté</td>
+                                                    <th scope="row">Application Type</th>
+                                                    <td id="project-type">Not detected</td>
                                                 </tr>
                                                 <tr>
                                                     <th scope="row">Port</th>
@@ -128,12 +128,12 @@
                             <div class="col-md-6">
                                 <div class="card mb-4" id="files-card">
                                     <div class="card-header">
-                                        <h5 class="mb-0"><i class="fas fa-file-code me-2"></i>Fichiers principaux</h5>
+                                        <h5 class="mb-0"><i class="fas fa-file-code me-2"></i>Main Files</h5>
                                     </div>
                                     <div class="card-body">
                                         <div class="list-group" id="main-files-list">
                                             <div class="text-center py-3 text-muted">
-                                                <i class="fas fa-spinner fa-spin me-2"></i> Chargement des fichiers...
+                                                <i class="fas fa-spinner fa-spin me-2"></i> Loading files...
                                             </div>
                                         </div>
                                     </div>
@@ -143,12 +143,12 @@
                         
                         <div class="card">
                             <div class="card-header">
-                                <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Commandes de gestion</h5>
+                                <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Management Commands</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row">
                                     <div class="col-md-6">
-                                        <h6>Commande de démarrage</h6>
+                                        <h6>Start Command</h6>
                                         <div class="input-group mb-3">
                                             <input type="text" class="form-control" id="start-command" value="..." readonly>
                                             <button class="btn btn-outline-secondary copy-btn" type="button" data-target="start-command">
@@ -157,7 +157,7 @@
                                         </div>
                                     </div>
                                     <div class="col-md-6">
-                                        <h6>Installation des dépendances</h6>
+                                        <h6>Install Dependencies</h6>
                                         <div class="input-group mb-3">
                                             <input type="text" class="form-control" id="deps-command" value="..." readonly>
                                             <button class="btn btn-outline-secondary copy-btn" type="button" data-target="deps-command">
@@ -169,13 +169,13 @@
                                 
                                 <div class="d-flex mt-3">
                                     <button class="btn btn-success me-2" id="startAppBtn">
-                                        <i class="fas fa-play me-1"></i> Démarrer l'application
+                                        <i class="fas fa-play me-1"></i> Start Application
                                     </button>
                                     <button class="btn btn-danger me-2" id="stopAppBtn" disabled>
-                                        <i class="fas fa-stop me-1"></i> Arrêter l'application
+                                        <i class="fas fa-stop me-1"></i> Stop Application
                                     </button>
                                     <button class="btn btn-warning" id="restartAppBtn" disabled>
-                                        <i class="fas fa-sync-alt me-1"></i> Redémarrer l'application
+                                        <i class="fas fa-sync-alt me-1"></i> Restart Application
                                     </button>
                                 </div>
                             </div>
@@ -186,9 +186,9 @@
                     <div class="tab-pane fade" id="logs">
                         <div class="logs-toolbar d-flex justify-content-between align-items-center p-2 bg-light border-bottom">
                             <div class="d-flex align-items-center">
-                                <span class="badge bg-secondary me-2" id="logs-status">Logs inactifs</span>
+                                <span class="badge bg-secondary me-2" id="logs-status">Logs inactive</span>
                                 <select class="form-select form-select-sm log-level" style="width: auto;">
-                                    <option value="all">Tous les niveaux</option>
+                                    <option value="all">All levels</option>
                                     <option value="INFO">Info</option>
                                     <option value="WARNING">Warning</option>
                                     <option value="ERROR">Error</option>
@@ -196,10 +196,10 @@
                             </div>
                             <div>
                                 <button class="btn btn-sm btn-outline-secondary me-2" id="clearLogs">
-                                    <i class="fas fa-trash-alt me-1"></i> Effacer
+                                    <i class="fas fa-trash-alt me-1"></i> Clear
                                 </button>
                                 <button class="btn btn-sm btn-outline-primary" id="downloadLogs">
-                                    <i class="fas fa-download me-1"></i> Télécharger
+                                    <i class="fas fa-download me-1"></i> Download
                                 </button>
                             </div>
                         </div>
@@ -208,7 +208,7 @@
                             <div class="logs-content bg-dark text-light p-3 rounded" id="logsContent">
                                 <div class="text-center text-muted py-3">
                                     <i class="fas fa-terminal mb-2"></i>
-                                    <p>Les logs apparaîtront ici lorsque l'application sera démarrée.</p>
+                                    <p>Logs will appear here when the application is started.</p>
                                 </div>
                             </div>
                         </div>
@@ -220,18 +220,18 @@
         <!-- Control Panel -->
         <div class="card mt-4 mb-4">
             <div class="card-header">
-                <h4 class="mb-0"><i class="fas fa-tools me-2"></i>Panneau de contrôle</h4>
+                <h4 class="mb-0"><i class="fas fa-tools me-2"></i>Control Panel</h4>
             </div>
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-6">
-                        <h5 class="mb-3">Outils de développement</h5>
+                        <h5 class="mb-3">Development Tools</h5>
                         <div class="d-flex flex-wrap">
                             <button class="btn btn-outline-primary me-2 mb-2" id="openFolderBtn">
-                                <i class="fas fa-folder-open me-1"></i> Ouvrir le dossier
+                                <i class="fas fa-folder-open me-1"></i> Open Folder
                             </button>
                             <button class="btn btn-outline-info me-2 mb-2" id="copyPathBtn">
-                                <i class="fas fa-copy me-1"></i> Copier le chemin
+                                <i class="fas fa-copy me-1"></i> Copy Path
                             </button>
                         </div>
                     </div>
@@ -239,7 +239,7 @@
                         <h5 class="mb-3">Actions</h5>
                         <div class="d-flex flex-wrap">
                             <button class="btn btn-outline-secondary me-2 mb-2" id="improveWithAIBtn">
-                                <i class="fas fa-magic me-1"></i> Améliorer avec l'IA
+                                <i class="fas fa-magic me-1"></i> Improve with AI
                             </button>
                         </div>
                     </div>
@@ -255,14 +255,14 @@
         <div class="modal-content">
             <div class="modal-body text-center p-4">
                 <div class="spinner-border text-primary mb-3" role="status">
-                    <span class="visually-hidden">Chargement...</span>
+                    <span class="visually-hidden">Loading...</span>
                 </div>
-                <h4>Démarrage de l'application...</h4>
-                <p>Veuillez patienter pendant le démarrage du serveur et l'initialisation de l'application.</p>
+                <h4>Starting the application...</h4>
+                <p>Please wait while the server starts and the application initializes.</p>
                 <div class="progress mt-3">
                     <div id="appLoadingProgress" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
                 </div>
-                <p class="mt-2"><span id="loadingStatusText">Initialisation...</span></p>
+                <p class="mt-2"><span id="loadingStatusText">Initializing...</span></p>
             </div>
         </div>
     </div>
@@ -275,7 +275,7 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Variables globales
+        // Global variables
         const previewFrame = document.getElementById('previewFrame');
         const loadingSpinner = document.getElementById('loading-spinner');
         const loadingMessage = document.getElementById('loading-message');
@@ -300,7 +300,7 @@
         const startCommandEl = document.getElementById('start-command');
         const depsCommandEl = document.getElementById('deps-command');
 
-        // État de l'application
+        // Application state
         let appStatus = {
             running: false,
             url: null,
@@ -308,106 +308,106 @@
             logs: []
         };
 
-        // Statut de sondage
+        // Polling status
         let statusPollInterval = null;
 
-        // Fonctions utilitaires
+        // Utility functions
         function showError(message) {
             appError.classList.remove('d-none');
             errorDetails.textContent = message;
             loadingSpinner.classList.add('d-none');
             previewFrame.classList.add('d-none');
-            appStatusBadge.textContent = 'Erreur';
+            appStatusBadge.textContent = 'Error';
             appStatusBadge.className = 'badge bg-danger me-2';
-            loadingMessage.textContent = 'Erreur lors du démarrage';
+            loadingMessage.textContent = 'Error during startup';
         }
 
         function updateAppStatus(status) {
             appStatus = status;
             
-            // Mettre à jour l'interface en fonction du statut
+            // Update interface based on status
             if (status.running) {
-                // Application en cours d'exécution
-                appStatusBadge.textContent = 'En cours d\'exécution';
+                // Application is running
+                appStatusBadge.textContent = 'Running';
                 appStatusBadge.className = 'badge bg-success me-2';
-                logsStatusBadge.textContent = 'Logs actifs';
+                logsStatusBadge.textContent = 'Logs active';
                 logsStatusBadge.className = 'badge bg-success me-2';
                 
-                // Activer/désactiver les boutons
+                // Enable/disable buttons
                 startAppBtn.disabled = true;
                 stopAppBtn.disabled = false;
                 restartAppBtn.disabled = false;
                 refreshPreviewBtn.disabled = false;
                 openInNewTabBtn.disabled = false;
                 
-                // Afficher l'iframe
+                // Show iframe
                 loadingSpinner.classList.add('d-none');
                 appError.classList.add('d-none');
                 previewFrame.classList.remove('d-none');
                 
-                // Masquer le message de chargement
+                // Hide loading message
                 document.querySelector('.loading-spinner').classList.add('d-none');
                 
-                // Mettre à jour l'URL
+                // Update URL
                 if (status.url) {
                     appUrlEl.textContent = status.url;
                     appUrlConfigEl.textContent = status.url;
                     
-                    // Mettre à jour le port
+                    // Update port
                     const urlObj = new URL(status.url);
                     appPortEl.textContent = urlObj.port || (urlObj.protocol === 'https:' ? '443' : '80');
                     
-                    // Charger l'application dans l'iframe
+                    // Load application in iframe
                     if (previewFrame.src !== status.url) {
                         previewFrame.src = status.url;
                     }
                 }
                 
-                // Mettre à jour le type de projet
+                // Update project type
                 if (status.project_type) {
                     const projectTypeMap = {
-                        'flask': 'Application Web Flask',
-                        'express': 'Application Node.js Express',
-                        'react': 'Application React',
-                        'vue': 'Application Vue.js',
-                        'angular': 'Application Angular',
-                        'static': 'Site Web Statique',
-                        'unknown': 'Type Inconnu'
+                        'flask': 'Flask Web Application',
+                        'express': 'Node.js Express Application',
+                        'react': 'React Application',
+                        'vue': 'Vue.js Application',
+                        'angular': 'Angular Application',
+                        'static': 'Static Website',
+                        'unknown': 'Unknown Type'
                     };
                     
                     projectTypeEl.textContent = projectTypeMap[status.project_type] || status.project_type;
                     
-                    // Mettre à jour les commandes en fonction du type de projet
+                    // Update commands based on project type
                     updateCommandsForProjectType(status.project_type);
                 }
             } else {
-                // Application arrêtée
-                appStatusBadge.textContent = 'Arrêtée';
+                // Application stopped
+                appStatusBadge.textContent = 'Stopped';
                 appStatusBadge.className = 'badge bg-secondary me-2';
-                logsStatusBadge.textContent = 'Logs inactifs';
+                logsStatusBadge.textContent = 'Logs inactive';
                 logsStatusBadge.className = 'badge bg-secondary me-2';
                 
-                // Activer/désactiver les boutons
+                // Enable/disable buttons
                 startAppBtn.disabled = false;
                 stopAppBtn.disabled = true;
                 restartAppBtn.disabled = true;
                 refreshPreviewBtn.disabled = true;
                 openInNewTabBtn.disabled = true;
                 
-                // Masquer l'iframe
+                // Hide iframe
                 previewFrame.classList.add('d-none');
                 loadingSpinner.classList.remove('d-none');
-                loadingMessage.textContent = 'Application arrêtée';
+                loadingMessage.textContent = 'Application stopped';
                 
-                // Si erreur de sortie du processus
+                // If process exit error
                 if (status.exit_code !== undefined && status.exit_code !== 0) {
                     appError.classList.remove('d-none');
-                    errorDetails.textContent = `Le processus s'est terminé avec le code d'erreur: ${status.exit_code}`;
-                    loadingMessage.textContent = 'Erreur lors de l\'exécution';
+                    errorDetails.textContent = `The process terminated with error code: ${status.exit_code}`;
+                    loadingMessage.textContent = 'Error during execution';
                 }
             }
             
-            // Mettre à jour les logs
+            // Update logs
             updateLogs(status.logs || []);
         }
 
@@ -428,7 +428,7 @@
         }
 
         function updateLogs(logs) {
-            // Filtrer les logs selon le niveau sélectionné
+            // Filter logs by selected level
             const level = logLevelSelect.value;
             let filteredLogs = logs;
             
@@ -436,26 +436,26 @@
                 filteredLogs = logs.filter(log => log.level === level);
             }
             
-            // Vider le conteneur de logs
+            // Clear logs container
             logsContent.innerHTML = '';
             
-            // Si aucun log, afficher un message
+            // If no logs, show a message
             if (filteredLogs.length === 0) {
                 logsContent.innerHTML = `
                     <div class="text-center text-muted py-3">
                         <i class="fas fa-terminal mb-2"></i>
-                        <p>Aucun log disponible pour le moment.</p>
+                        <p>No logs available at this time.</p>
                     </div>
                 `;
                 return;
             }
             
-            // Ajouter les logs au conteneur
+            // Add logs to container
             filteredLogs.forEach(log => {
                 const logLine = document.createElement('pre');
                 logLine.className = 'log-line';
                 
-                // Déterminer la classe CSS en fonction du niveau
+                // Determine CSS class based on level
                 let levelClass = 'log-info';
                 if (log.level === 'WARNING') levelClass = 'log-warning';
                 if (log.level === 'ERROR') levelClass = 'log-error';
@@ -464,25 +464,25 @@
                 logsContent.appendChild(logLine);
             });
             
-            // Faire défiler vers le bas
+            // Scroll to bottom
             logsContent.scrollTop = logsContent.scrollHeight;
         }
 
         function startApp() {
-            // Montrer le modal de chargement
+            // Show loading modal
             const loadingModal = new bootstrap.Modal(document.getElementById('appLoadingModal'));
             loadingModal.show();
             
-            // Démarrer l'animation de la barre de progression
+            // Start progress bar animation
             const progressBar = document.getElementById('appLoadingProgress');
             const statusText = document.getElementById('loadingStatusText');
             let progress = 0;
             
-            // Mettre à jour le UI
+            // Update UI
             loadingSpinner.classList.remove('d-none');
-            loadingMessage.textContent = "Démarrage de l'application...";
+            loadingMessage.textContent = "Starting the application...";
             
-            // Appel API pour démarrer l'application
+            // API call to start the application
             fetch('/preview/start', {
                 method: 'POST',
                 headers: {
@@ -494,12 +494,12 @@
             })
             .then(response => response.json())
             .then(data => {
-                // Fermer le modal après quelques secondes
+                // Close modal after a few seconds
                 setTimeout(() => {
                     loadingModal.hide();
                     
                     if (data.status === 'success') {
-                        // Mettre à jour le statut
+                        // Update status
                         updateAppStatus({
                             running: true,
                             url: data.url,
@@ -507,49 +507,49 @@
                             logs: data.logs || []
                         });
                         
-                        // Démarrer le sondage régulier
+                        // Start regular polling
                         startStatusPolling();
                     } else {
-                        // Afficher l'erreur
+                        // Show error
                         showError(data.message);
                         
-                        // Mettre à jour les logs même en cas d'erreur
+                        // Update logs even in case of error
                         updateLogs(data.logs || []);
                     }
                 }, 2000);
                 
-                // Simuler la progression
+                // Simulate progress
                 const progressInterval = setInterval(() => {
                     progress += 5;
                     progressBar.style.width = progress + '%';
                     
                     if (progress === 20) {
-                        statusText.textContent = "Détection du type de projet...";
+                        statusText.textContent = "Detecting project type...";
                     } else if (progress === 40) {
-                        statusText.textContent = "Installation des dépendances...";
+                        statusText.textContent = "Installing dependencies...";
                     } else if (progress === 60) {
-                        statusText.textContent = "Démarrage du serveur...";
+                        statusText.textContent = "Starting server...";
                     } else if (progress === 80) {
-                        statusText.textContent = "Configuration de l'application...";
+                        statusText.textContent = "Configuring application...";
                     } else if (progress >= 100) {
                         clearInterval(progressInterval);
-                        statusText.textContent = "Application prête !";
+                        statusText.textContent = "Application ready!";
                     }
                 }, 100);
             })
             .catch(error => {
                 loadingModal.hide();
-                showError('Erreur lors du démarrage de l\'application: ' + error.message);
+                showError('Error starting the application: ' + error.message);
             });
         }
 
         function stopApp() {
-            // Mettre à jour le UI
+            // Update UI
             loadingSpinner.classList.remove('d-none');
-            loadingMessage.textContent = 'Arrêt de l\'application...';
+            loadingMessage.textContent = 'Stopping the application...';
             previewFrame.classList.add('d-none');
             
-            // Appel API pour arrêter l'application
+            // API call to stop the application
             fetch('/preview/stop', {
                 method: 'POST',
                 headers: {
@@ -559,31 +559,31 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    // Arrêter le sondage
+                    // Stop polling
                     stopStatusPolling();
                     
-                    // Mettre à jour le statut
+                    // Update status
                     updateAppStatus({
                         running: false
                     });
                     
-                    loadingMessage.textContent = 'Application arrêtée';
+                    loadingMessage.textContent = 'Application stopped';
                 } else {
                     showError(data.message);
                 }
             })
             .catch(error => {
-                showError('Erreur lors de l\'arrêt de l\'application: ' + error.message);
+                showError('Error stopping the application: ' + error.message);
             });
         }
 
         function restartApp() {
-            // Mettre à jour le UI
+            // Update UI
             loadingSpinner.classList.remove('d-none');
-            loadingMessage.textContent = 'Redémarrage de l\'application...';
+            loadingMessage.textContent = 'Restarting the application...';
             previewFrame.classList.add('d-none');
             
-            // Appel API pour redémarrer l'application
+            // API call to restart the application
             fetch('/preview/restart', {
                 method: 'POST',
                 headers: {
@@ -593,7 +593,7 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    // Mettre à jour le statut
+                    // Update status
                     updateAppStatus({
                         running: true,
                         url: data.url,
@@ -603,36 +603,36 @@
                 } else {
                     showError(data.message);
                     
-                    // Mettre à jour les logs même en cas d'erreur
+                    // Update logs even in case of error
                     updateLogs(data.logs || []);
                 }
             })
             .catch(error => {
-                showError('Erreur lors du redémarrage de l\'application: ' + error.message);
+                showError('Error restarting the application: ' + error.message);
             });
         }
 
         function startStatusPolling() {
-            // Arrêter tout sondage existant
+            // Stop any existing polling
             stopStatusPolling();
             
-            // Mémoriser l'URL actuelle pour éviter les rechargements inutiles
+            // Remember current URL to avoid unnecessary reloads
             let lastUrl = appStatus.url;
             let lastFrameSrc = previewFrame.src;
             let frameLoaded = false;
             
-            // Indiquer que l'iframe s'est chargée
+            // Indicate that the iframe has loaded
             previewFrame.onload = function() {
                 frameLoaded = true;
             };
             
-            // Démarrer un nouveau sondage avec une fréquence plus basse pour économiser les ressources
+            // Start new polling with lower frequency to save resources
             statusPollInterval = setInterval(() => {
                 fetch('/preview/status')
                     .then(response => response.json())
                     .then(data => {
                         if (data.status === 'success') {
-                            // Mettre à jour les logs et informations de statut
+                            // Update logs and status information
                             const newStatus = {
                                 running: data.running,
                                 url: data.url,
@@ -641,22 +641,22 @@
                                 exit_code: data.exit_code
                             };
                             
-                            // Ne plus mettre à jour automatiquement l'iframe - désactivé pour permettre à l'utilisateur de naviguer sans interruption
-                            // L'utilisateur peut utiliser le bouton "Actualiser" pour rafraîchir manuellement
+                            // No longer automatically update iframe - disabled to allow user to navigate without interruption
+                            // User can use "Refresh" button to manually refresh
                             
-                            // Mettre à jour l'état de l'application
+                            // Update application state
                             updateAppStatus(newStatus);
                             
-                            // Si l'application n'est plus en cours d'exécution, arrêter le sondage
+                            // If application is no longer running, stop polling
                             if (!data.running) {
                                 stopStatusPolling();
                             }
                         }
                     })
                     .catch(error => {
-                        console.error('Erreur lors du sondage:', error);
+                        console.error('Error during polling:', error);
                     });
-            }, 5000); // Toutes les 5 secondes au lieu de 3
+            }, 5000); // Every 5 seconds instead of 3
         }
 
         function stopStatusPolling() {
@@ -666,9 +666,9 @@
             }
         }
         
-        // Initialiser l'interface à partir du chemin du projet
+        // Initialize interface from project path
         function initializeFilesList() {
-            // Liste des types de fichiers et leur badge
+            // List of file types and their badges
             const fileTypeBadges = {
                 '.py': { icon: 'fa-file-code', badge: 'Python' },
                 '.js': { icon: 'fa-file-code', badge: 'JavaScript' },
@@ -676,57 +676,57 @@
                 '.css': { icon: 'fa-file-code', badge: 'CSS' },
                 '.json': { icon: 'fa-file-code', badge: 'JSON' },
                 '.md': { icon: 'fa-file-alt', badge: 'Documentation' },
-                '.txt': { icon: 'fa-file-alt', badge: 'Texte' },
-                'requirements.txt': { icon: 'fa-file-alt', badge: 'Dépendances' },
-                'package.json': { icon: 'fa-file-alt', badge: 'Dépendances' },
-                'app.py': { icon: 'fa-file-code', badge: 'Principal' },
-                'main.py': { icon: 'fa-file-code', badge: 'Principal' },
-                'server.js': { icon: 'fa-file-code', badge: 'Principal' },
-                'index.js': { icon: 'fa-file-code', badge: 'Principal' },
+                '.txt': { icon: 'fa-file-alt', badge: 'Text' },
+                'requirements.txt': { icon: 'fa-file-alt', badge: 'Dependencies' },
+                'package.json': { icon: 'fa-file-alt', badge: 'Dependencies' },
+                'app.py': { icon: 'fa-file-code', badge: 'Main' },
+                'main.py': { icon: 'fa-file-code', badge: 'Main' },
+                'server.js': { icon: 'fa-file-code', badge: 'Main' },
+                'index.js': { icon: 'fa-file-code', badge: 'Main' },
                 'README.md': { icon: 'fa-file-alt', badge: 'Documentation' }
             };
             
-            // Scanner le répertoire du projet (via l'API)
+            // Scan the project directory (via API)
             fetch(`/list_files?directory=${encodeURIComponent(projectPath)}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success' && data.files) {
                         mainFilesList.innerHTML = '';
                         
-                        // Filtrer pour ne garder que les fichiers principaux
+                        // Filter to keep only main files
                         const importantFiles = data.files.filter(file => {
-                            // Vérifier si le fichier est dans la liste des types importants
+                            // Check if file is in the list of important types
                             const ext = '.' + file.split('.').pop();
                             return (ext in fileTypeBadges) || (file in fileTypeBadges);
                         });
                         
                         if (importantFiles.length === 0) {
-                            mainFilesList.innerHTML = '<div class="text-center py-3 text-muted">Aucun fichier principal détecté</div>';
+                            mainFilesList.innerHTML = '<div class="text-center py-3 text-muted">No main files detected</div>';
                             return;
                         }
                         
-                        // Ajouter les fichiers à la liste
+                        // Add files to the list
                         importantFiles.forEach(file => {
                             const ext = '.' + file.split('.').pop();
-                            const fileInfo = fileTypeBadges[file] || fileTypeBadges[ext] || { icon: 'fa-file', badge: 'Fichier' };
+                            const fileInfo = fileTypeBadges[file] || fileTypeBadges[ext] || { icon: 'fa-file', badge: 'File' };
                             
                             const listItem = document.createElement('a');
                             listItem.href = '#';
                             listItem.className = 'list-group-item list-group-item-action';
                             listItem.innerHTML = `
                                 <i class="fas ${fileInfo.icon} me-2"></i>${file} 
-                                <span class="badge bg-${fileInfo.badge === 'Principal' ? 'primary' : 'secondary'} ms-1">${fileInfo.badge}</span>
+                                <span class="badge bg-${fileInfo.badge === 'Main' ? 'primary' : 'secondary'} ms-1">${fileInfo.badge}</span>
                             `;
                             
                             mainFilesList.appendChild(listItem);
                         });
                     } else {
-                        mainFilesList.innerHTML = '<div class="text-center py-3 text-muted">Impossible de lister les fichiers</div>';
+                        mainFilesList.innerHTML = '<div class="text-center py-3 text-muted">Unable to list files</div>';
                     }
                 })
                 .catch(error => {
-                    console.error('Erreur lors de la récupération des fichiers:', error);
-                    mainFilesList.innerHTML = '<div class="text-center py-3 text-muted">Erreur lors de la récupération des fichiers</div>';
+                    console.error('Error retrieving files:', error);
+                    mainFilesList.innerHTML = '<div class="text-center py-3 text-muted">Error retrieving files</div>';
                 });
         }
 
@@ -735,23 +735,23 @@
         stopAppBtn.addEventListener('click', stopApp);
         restartAppBtn.addEventListener('click', restartApp);
         
-        // Améliorer avec l'IA
+        // Improve with AI
         document.getElementById('improveWithAIBtn').addEventListener('click', function() {
-            // Redirection vers la page d'itération avec les paramètres nécessaires
+            // Redirect to iteration page with necessary parameters
             window.location.href = '{{ url_for("result") }}#iteration-section';
         });
         
         refreshPreviewBtn.addEventListener('click', function() {
-            // Mettre à jour le texte du bouton pour indiquer le rafraîchissement
+            // Update button text to indicate refreshing
             const originalText = this.innerHTML;
-            this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Rafraîchissement...';
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Refreshing...';
             this.disabled = true;
             
-            // Plutôt que d'essayer de recharger l'iframe directement (ce qui provoque l'erreur cross-origin)
-            // Nous allons recharger l'iframe en modifiant sa source
+            // Rather than trying to reload the iframe directly (which causes cross-origin error)
+            // We'll reload the iframe by modifying its source
             const currentSrc = previewFrame.src;
             
-            // Appeler l'API pour rafraîchir manuellement
+            // Call API to manually refresh
             fetch('/preview/refresh', {
                 method: 'POST',
                 headers: {
@@ -760,14 +760,14 @@
             })
             .then(response => response.json())
             .then(data => {
-                // Rafraîchir l'iframe en modifiant sa source
+                // Refresh iframe by modifying its source
                 previewFrame.src = 'about:blank';
                 
-                // Réaffecter l'URL d'origine après un court délai
+                // Reassign original URL after a short delay
                 setTimeout(() => {
                     previewFrame.src = currentSrc;
                     
-                    // Restaurer le texte original après le rafraîchissement
+                    // Restore original text after refresh
                     setTimeout(() => {
                         this.innerHTML = originalText;
                         this.disabled = false;
@@ -775,7 +775,7 @@
                 }, 100);
             })
             .catch(error => {
-                console.error('Erreur lors du rafraîchissement:', error);
+                console.error('Error during refresh:', error);
                 this.innerHTML = originalText;
                 this.disabled = false;
             });
@@ -787,13 +787,13 @@
             }
         });
         
-        // Ouvrir le dossier
+        // Open folder
         document.getElementById('openFolderBtn').addEventListener('click', function() {
-            // Montrer un indicateur de chargement
+            // Show loading indicator
             const originalText = this.innerHTML;
-            this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Ouverture...';
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Opening...';
             
-            // Appeler l'API pour ouvrir le dossier
+            // Call API to open folder
             fetch('/open_folder', {
                 method: 'POST',
                 headers: {
@@ -806,39 +806,39 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    this.innerHTML = '<i class="fas fa-check me-1"></i> Dossier ouvert!';
+                    this.innerHTML = '<i class="fas fa-check me-1"></i> Folder opened!';
                 } else {
-                    this.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> Erreur';
-                    console.error('Erreur lors de l\'ouverture du dossier:', data.message);
+                    this.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> Error';
+                    console.error('Error opening folder:', data.message);
                 }
                 
-                // Restaurer le texte original après 2 secondes
+                // Restore original text after 2 seconds
                 setTimeout(() => {
                     this.innerHTML = originalText;
                 }, 2000);
             })
             .catch(error => {
-                console.error('Erreur lors de l\'ouverture du dossier:', error);
-                this.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> Erreur';
+                console.error('Error opening folder:', error);
+                this.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> Error';
                 
-                // Restaurer le texte original après 2 secondes
+                // Restore original text after 2 seconds
                 setTimeout(() => {
                     this.innerHTML = originalText;
                 }, 2000);
             });
         });
 
-        // Filtre des logs par niveau
+        // Log level filter
         logLevelSelect.addEventListener('change', function() {
             updateLogs(appStatus.logs || []);
         });
         
-        // Effacer les logs
+        // Clear logs
         document.getElementById('clearLogs').addEventListener('click', function() {
-            logsContent.innerHTML = '<div class="text-center text-muted py-3"><p>Logs effacés.</p></div>';
+            logsContent.innerHTML = '<div class="text-center text-muted py-3"><p>Logs cleared.</p></div>';
         });
         
-        // Télécharger les logs
+        // Download logs
         document.getElementById('downloadLogs').addEventListener('click', function() {
             const logsText = appStatus.logs.map(log => 
                 `${log.timestamp} [${log.level}] ${log.message}`
@@ -855,17 +855,17 @@
             URL.revokeObjectURL(url);
         });
         
-        // Copier le chemin
+        // Copy path
         document.getElementById('copyPathBtn').addEventListener('click', function() {
             navigator.clipboard.writeText(projectPath).then(() => {
-                this.innerHTML = '<i class="fas fa-check me-1"></i> Copié!';
+                this.innerHTML = '<i class="fas fa-check me-1"></i> Copied!';
                 setTimeout(() => {
-                    this.innerHTML = '<i class="fas fa-copy me-1"></i> Copier le chemin';
+                    this.innerHTML = '<i class="fas fa-copy me-1"></i> Copy Path';
                 }, 2000);
             });
         });
         
-        // Boutons de copie
+        // Copy buttons
         document.querySelectorAll('.copy-btn').forEach(button => {
             button.addEventListener('click', function() {
                 const targetId = this.getAttribute('data-target');
@@ -885,7 +885,7 @@
             });
         });
         
-        // Vérifier le statut initial de l'application et démarrer automatiquement
+        // Check initial application status and start automatically
         fetch('/preview/status')
             .then(response => response.json())
             .then(data => {
@@ -898,21 +898,21 @@
                         exit_code: data.exit_code
                     });
                     
-                    // Si l'application est en cours d'exécution, démarrer le sondage
+                    // If application is running, start polling
                     if (data.running) {
                         startStatusPolling();
                     } else {
-                        // Démarrer automatiquement l'application si elle n'est pas en cours d'exécution
+                        // Automatically start the application if not running
                         startApp();
                     }
                 }
                 
-                // Initialiser la liste des fichiers
+                // Initialize file list
                 initializeFilesList();
             })
             .catch(error => {
-                console.error('Erreur lors de la vérification du statut initial:', error);
-                // Tenter de démarrer l'application malgré l'erreur
+                console.error('Error checking initial status:', error);
+                // Try to start the application despite the error
                 startApp();
             });
     });

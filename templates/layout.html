@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Générateur d'applications IA{% endblock %}</title>
+    <title>{% block title %}AI Application Generator{% endblock %}</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -36,12 +36,12 @@
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
                         <a class="nav-link {{ 'active' if request.endpoint == 'index' }}" href="{{ url_for('index') }}">
-                            <i class="fas fa-home me-1"></i> Accueil
+                            <i class="fas fa-home me-1"></i> Home
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {{ 'active' if request.endpoint == 'about' }}" href="{{ url_for('about') }}">
-                            <i class="fas fa-info-circle me-1"></i> À propos
+                            <i class="fas fa-info-circle me-1"></i> About
                         </a>
                     </li>
                     <li class="nav-item">
@@ -76,11 +76,11 @@
             <div class="row">
                 <div class="col-md-6">
                     <p class="mb-0">
-                        <i class="fas fa-rocket me-1"></i> GenApp AI &copy; {{ now().year }} - Générateur d'applications IA
+                        <i class="fas fa-rocket me-1"></i> GenApp AI &copy; {{ now().year }} - AI Application Generator
                     </p>
                 </div>
                 <div class="col-md-6 text-md-end">
-                    <a href="{{ url_for('about') }}" class="me-3">À propos</a>
+                    <a href="{{ url_for('about') }}" class="me-3">About</a>
                     <a href="https://github.com/Pedal0/bot-project-creator" target="_blank" class="me-3">GitHub</a>
                 </div>
             </div>
