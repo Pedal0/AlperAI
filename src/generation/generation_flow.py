@@ -26,7 +26,6 @@ from src.utils.prompt_utils import (
 )
 from src.mcp.tool_utils import get_default_tools
 from src.mcp.handlers import handle_tool_results
-from src.preview.preview_manager import launch_preview_mode
 
 async def run_mcp_query(client, query, context=None):
     """
@@ -87,7 +86,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         mcp_client = SimpleMCPClient(api_key, selected_model)
         update_progress(0, "🔌 Outils MCP activés: Recherche web, documentation, et composants frontend disponibles.")
 
-    # == ÉTAPE 0: Extraction et traitement des URLs du prompt ==
+    # == ÉTAPE 0: Extraction et traitement des URLs du prompt ==`
     update_progress(0, "Extraction des URLs du prompt...", 5)
     urls = extract_urls_from_prompt(user_prompt)
     url_context = ""
@@ -109,7 +108,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
             update_progress(0, f"❌ Erreur lors de la récupération des URLs: {e}", 15)
             # Continuer même en cas d'erreur
 
-    # == ÉTAPE 1: Reformulation du prompt ==
+    # == ÉTAPE 1: Reformulation du prompt ==`
     update_progress(1, "Reformulation du prompt...", 20)
     
     # Vérifier la limite de taux pour les modèles gratuits
@@ -168,7 +167,11 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
             Contexte supplémentaire pour générer cette application:
             {mcp_result.get('text', '')}
             """
-    
+    else:
+        # Si les outils MCP sont désactivés, informer clairement l'utilisateur
+        if not use_mcp_tools:
+            update_progress(1, "ℹ️ Outils MCP désactivés: Génération basique sans outils d'assistance.", 25)
+
     # Construction du prompt pour la reformulation uniquement
     prompt_reformulation = f"""
     Analysez la demande de l'utilisateur ci-dessous. Votre tâche est de:
@@ -220,7 +223,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         update_progress(1, "❌ Échec de la reformulation du prompt.", 40)
         return False
 
-    # == ÉTAPE 2: Définition de la structure ==
+    # == ÉTAPE 2: Définition de la structure ==`
     update_progress(2, "Définition de la structure du projet...", 45)
     
     # Vérifier la limite de taux pour les modèles gratuits
@@ -295,14 +298,14 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         update_progress(2, "❌ Échec de la définition de la structure.", 55)
         return False
 
-    # == ÉTAPE 3: Création de la Structure de Fichiers/Dossiers ==
+    # == ÉTAPE 3: Création de la Structure de Fichiers/Dossiers ==`
     update_progress(3, f"Création des dossiers et fichiers dans '{target_directory}'...", 60)
     created_paths = create_project_structure(target_directory, structure_lines)
 
     if created_paths is not None:
         update_progress(3, f"✅ Structure créée dans '{target_directory}'.", 65)
 
-        # == ÉTAPE 4: Génération de Code ==
+        # == ÉTAPE 4: Génération de Code ==`
         update_progress(4, "Génération du code complet...", 70)
         
         # Vérifier la limite de taux pour les modèles gratuits
@@ -315,7 +318,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                 update_progress(4, f"⏳ Modèle gratuit détecté. Attente de {wait_time:.1f} secondes (limite de taux)...", 70)
                 time.sleep(wait_time)
 
-        # --- Ajout d'instructions d'animation ---
+        # --- Ajout d'instructions d'animation ---`
         animation_instruction = ""
         if include_animations and not prompt_mentions_design(user_prompt):
             animation_instruction = (
@@ -382,7 +385,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                 tools=get_default_tools()
             )
         else:
-            # Utiliser une température plus basse pour la génération de code
+            # Utiliser une température plus basse pour la génération de code sans outils
             response_code_gen = call_openrouter_api(
                 api_key, 
                 selected_model, 
@@ -396,7 +399,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
             code_response_text = response_code_gen["choices"][0]["message"]["content"]
             
             # Vérifier les appels d'outils
-            if use_mcp_tools and response_code_gen["choices"][0]["message"].get("tool_calls"):
+            if use_mcp_tools and response_code_gen["choices"][0]["message"].get("tool_calls") and mcp_client:
                 update_progress(4, "🔍 L'IA utilise des outils pour améliorer la génération de code...", 80)
                 
                 # Traiter chaque appel d'outil
@@ -472,11 +475,14 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                                 code_response_text = enhanced_code
                     except Exception as e:
                         logging.warning(f"Erreur lors du traitement de l'outil {tool_name}: {e}")
+            elif not use_mcp_tools and response_code_gen["choices"][0]["message"].get("tool_calls"):
+                # Avertir que des outils ont été demandés mais sont désactivés
+                update_progress(4, "⚠️ Le modèle a demandé des outils, mais les outils MCP sont désactivés. Les appels d'outils seront ignorés.", 80)
             
             process_state['last_code_generation_response'] = code_response_text
             update_progress(4, "✅ Réponse de génération de code reçue.", 90)
 
-            # == ÉTAPE 5: Écriture du Code dans les Fichiers ==
+            # == ÉTAPE 5: Écriture du Code dans les Fichiers ==`
             update_progress(5, "Écriture du code dans les fichiers...", 90)
             files_written = []
             errors = []
@@ -493,7 +499,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                 for err in errors:
                     logging.error(f"❌ {err}")
 
-                # == ÉTAPE 6: Vérifier les Fichiers Vides et Générer le Code Manquant ==
+                # == ÉTAPE 6: Vérifier les Fichiers Vides et Générer le Code Manquant ==`
                 if not errors and (files_written or generation_incomplete):
                     update_progress(6, "Vérification des fichiers vides...", 95)
                     
@@ -557,4 +563,5 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
     else:
         update_progress(3, "❌ Échec de la création de la structure.", 100)
         return False
+
 
