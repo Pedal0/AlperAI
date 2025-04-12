@@ -11,6 +11,7 @@ requests = "*"
 asyncio = "*"
 duckduckgo-search = "*"
 beautifulsoup4 = "*"
+aiohttp = "*"
 
 [dev-packages]
 
