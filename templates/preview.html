@@ -1,0 +1,479 @@
+{% extends "layout.html" %}
+
+{% block title %}Prévisualisation{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-11">
+        <div class="preview-header mb-4">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="gradient-text">Prévisualisation de l'application</h1>
+                    <p class="lead">
+                        Votre application est maintenant prête à être testée.
+                    </p>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <a href="{{ url_for('result') }}" class="btn btn-outline-primary me-2">
+                        <i class="fas fa-arrow-left me-1"></i> Retour aux résultats
+                    </a>
+                    <a href="{{ url_for('index') }}" class="btn btn-primary">
+                        <i class="fas fa-home me-1"></i> Accueil
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card preview-card">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" id="previewTabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="application-tab" data-bs-toggle="tab" href="#application">
+                            <i class="fas fa-play-circle me-1"></i> Application
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="config-tab" data-bs-toggle="tab" href="#config">
+                            <i class="fas fa-cogs me-1"></i> Configuration
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="logs-tab" data-bs-toggle="tab" href="#logs">
+                            <i class="fas fa-terminal me-1"></i> Logs
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body p-0">
+                <div class="tab-content">
+                    <!-- Application Preview Tab -->
+                    <div class="tab-pane fade show active" id="application">
+                        <div class="d-flex justify-content-between align-items-center p-3 preview-toolbar">
+                            <div>
+                                <span class="badge bg-success me-2">En cours d'exécution</span>
+                                <span class="app-url">http://localhost:5000</span>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary me-2" id="refreshPreview">
+                                    <i class="fas fa-sync-alt me-1"></i> Actualiser
+                                </button>
+                                <button class="btn btn-sm btn-outline-primary" id="openInNewTab">
+                                    <i class="fas fa-external-link-alt me-1"></i> Ouvrir dans un nouvel onglet
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="preview-frame-container">
+                            <div class="text-center py-5 loading-spinner">
+                                <div class="spinner-border text-primary mb-3" role="status">
+                                    <span class="visually-hidden">Chargement de l'application...</span>
+                                </div>
+                                <p>Chargement de l'application...</p>
+                                <p class="text-muted small">Cela peut prendre quelques instants selon la complexité de votre application.</p>
+                            </div>
+                            
+                            <iframe id="previewFrame" class="preview-frame d-none" src="about:blank" frameborder="0"></iframe>
+                            
+                            <div class="application-error d-none">
+                                <div class="text-center py-5">
+                                    <i class="fas fa-exclamation-triangle text-warning mb-3" style="font-size: 3rem;"></i>
+                                    <h3>Impossible de lancer l'application</h3>
+                                    <p>L'application n'a pas pu être démarrée correctement.</p>
+                                    <div class="error-details bg-light p-3 mt-3 text-start">
+                                        <pre id="errorDetails">Erreur non spécifiée</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Configuration Tab -->
+                    <div class="tab-pane fade p-4" id="config">
+                        <h4 class="mb-4">Configuration de l'application</h4>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informations générales</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <table class="table">
+                                            <tbody>
+                                                <tr>
+                                                    <th scope="row">Répertoire</th>
+                                                    <td>{{ target_dir }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">Type d'application</th>
+                                                    <td>Application Web Flask</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">Port</th>
+                                                    <td>5000</td>
+                                                </tr>
+                                                <tr>
+                                                    <th scope="row">URL</th>
+                                                    <td>http://localhost:5000</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="fas fa-file-code me-2"></i>Fichiers principaux</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="list-group">
+                                            <a href="#" class="list-group-item list-group-item-action">
+                                                <i class="fas fa-file-code me-2"></i>app.py <span class="badge bg-primary ms-1">Principal</span>
+                                            </a>
+                                            <a href="#" class="list-group-item list-group-item-action">
+                                                <i class="fas fa-database me-2"></i>database.db <span class="badge bg-secondary ms-1">Base de données</span>
+                                            </a>
+                                            <a href="#" class="list-group-item list-group-item-action">
+                                                <i class="fas fa-file-alt me-2"></i>requirements.txt <span class="badge bg-info ms-1">Dépendances</span>
+                                            </a>
+                                            <a href="#" class="list-group-item list-group-item-action">
+                                                <i class="fas fa-file-alt me-2"></i>README.md <span class="badge bg-info ms-1">Documentation</span>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Commandes de gestion</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Commande de démarrage</h6>
+                                        <div class="input-group mb-3">
+                                            <input type="text" class="form-control" value="python app.py" readonly>
+                                            <button class="btn btn-outline-secondary copy-btn" type="button" data-value="python app.py">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Installation des dépendances</h6>
+                                        <div class="input-group mb-3">
+                                            <input type="text" class="form-control" value="pip install -r requirements.txt" readonly>
+                                            <button class="btn btn-outline-secondary copy-btn" type="button" data-value="pip install -r requirements.txt">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-flex mt-3">
+                                    <button class="btn btn-success me-2" id="startAppBtn" disabled>
+                                        <i class="fas fa-play me-1"></i> Démarrer l'application
+                                    </button>
+                                    <button class="btn btn-danger me-2" id="stopAppBtn">
+                                        <i class="fas fa-stop me-1"></i> Arrêter l'application
+                                    </button>
+                                    <button class="btn btn-warning" id="restartAppBtn">
+                                        <i class="fas fa-sync-alt me-1"></i> Redémarrer l'application
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Logs Tab -->
+                    <div class="tab-pane fade" id="logs">
+                        <div class="logs-toolbar d-flex justify-content-between align-items-center p-2 bg-light border-bottom">
+                            <div class="d-flex align-items-center">
+                                <span class="badge bg-success me-2">Logs actifs</span>
+                                <select class="form-select form-select-sm log-level" style="width: auto;">
+                                    <option value="all">Tous les niveaux</option>
+                                    <option value="info">Info</option>
+                                    <option value="warning">Warning</option>
+                                    <option value="error">Error</option>
+                                </select>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary me-2" id="clearLogs">
+                                    <i class="fas fa-trash-alt me-1"></i> Effacer
+                                </button>
+                                <button class="btn btn-sm btn-outline-primary" id="downloadLogs">
+                                    <i class="fas fa-download me-1"></i> Télécharger
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="logs-container p-3">
+                            <div class="logs-content bg-dark text-light p-3 rounded" id="logsContent">
+                                <pre class="log-line"><span class="timestamp">12:00:00</span> <span class="log-info">[INFO]</span> Application en cours de démarrage...</pre>
+                                <pre class="log-line"><span class="timestamp">12:00:01</span> <span class="log-info">[INFO]</span> Chargement des configurations...</pre>
+                                <pre class="log-line"><span class="timestamp">12:00:01</span> <span class="log-info">[INFO]</span> Connexion à la base de données...</pre>
+                                <pre class="log-line"><span class="timestamp">12:00:02</span> <span class="log-warning">[WARNING]</span> Attention : Mode DEBUG activé pour le développement</pre>
+                                <pre class="log-line"><span class="timestamp">12:00:02</span> <span class="log-info">[INFO]</span> Démarrage du serveur Flask sur le port 5000...</pre>
+                                <pre class="log-line"><span class="timestamp">12:00:03</span> <span class="log-info">[INFO]</span> Serveur démarré ! Application prête à l'emploi.</pre>
+                                <pre class="log-line"><span class="timestamp">12:00:04</span> <span class="log-info">[INFO]</span> * En écoute sur http://127.0.0.1:5000</pre>
+                                <pre class="log-line"><span class="timestamp">12:00:05</span> <span class="log-info">[INFO]</span> * Mode de débogage: activé</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Control Panel -->
+        <div class="card mt-4 mb-4">
+            <div class="card-header">
+                <h4 class="mb-0"><i class="fas fa-tools me-2"></i>Panneau de contrôle</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5 class="mb-3">Outils de développement</h5>
+                        <div class="d-flex flex-wrap">
+                            <button class="btn btn-outline-primary me-2 mb-2">
+                                <i class="fas fa-code me-1"></i> Éditeur de code
+                            </button>
+                            <button class="btn btn-outline-info me-2 mb-2">
+                                <i class="fas fa-database me-1"></i> Base de données
+                            </button>
+                            <button class="btn btn-outline-success me-2 mb-2">
+                                <i class="fas fa-bug me-1"></i> Déboguer
+                            </button>
+                            <button class="btn btn-outline-warning me-2 mb-2">
+                                <i class="fas fa-terminal me-1"></i> Console
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h5 class="mb-3">Actions</h5>
+                        <div class="d-flex flex-wrap">
+                            <button class="btn btn-outline-dark me-2 mb-2">
+                                <i class="fas fa-file-archive me-1"></i> Exporter le projet
+                            </button>
+                            <button class="btn btn-outline-danger me-2 mb-2">
+                                <i class="fas fa-trash-alt me-1"></i> Supprimer le projet
+                            </button>
+                            <button class="btn btn-outline-secondary me-2 mb-2">
+                                <i class="fas fa-magic me-1"></i> Améliorer avec l'IA
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- App Loading Progress Modal -->
+<div class="modal fade" id="appLoadingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center p-4">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Chargement...</span>
+                </div>
+                <h4>Démarrage de l'application...</h4>
+                <p>Veuillez patienter pendant le démarrage du serveur et l'initialisation de l'application.</p>
+                <div class="progress mt-3">
+                    <div id="appLoadingProgress" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+                </div>
+                <p class="mt-2"><span id="loadingStatusText">Initialisation...</span></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Simulate application loading
+        const previewFrame = document.getElementById('previewFrame');
+        const loadingSpinner = document.querySelector('.loading-spinner');
+        const appError = document.querySelector('.application-error');
+        
+        // Update logs dynamically
+        const logsContent = document.getElementById('logsContent');
+        const logLevelSelect = document.querySelector('.log-level');
+        
+        // Filter logs based on selected level
+        logLevelSelect.addEventListener('change', function() {
+            const level = this.value;
+            const logLines = logsContent.querySelectorAll('.log-line');
+            
+            logLines.forEach(line => {
+                if (level === 'all') {
+                    line.style.display = '';
+                } else {
+                    const hasLevel = line.innerHTML.includes(`[${level.toUpperCase()}]`);
+                    line.style.display = hasLevel ? '' : 'none';
+                }
+            });
+        });
+        
+        // Clear logs
+        document.getElementById('clearLogs').addEventListener('click', function() {
+            logsContent.innerHTML = '<pre class="log-line"><span class="timestamp">' + 
+                new Date().toLocaleTimeString() + '</span> <span class="log-info">[INFO]</span> Logs effacés.</pre>';
+        });
+        
+        // Download logs
+        document.getElementById('downloadLogs').addEventListener('click', function() {
+            const logs = logsContent.innerText;
+            const blob = new Blob([logs], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'application-logs.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+        
+        // Copy buttons
+        document.querySelectorAll('.copy-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const value = this.getAttribute('data-value');
+                navigator.clipboard.writeText(value).then(() => {
+                    const icon = this.querySelector('i');
+                    icon.classList.remove('fa-copy');
+                    icon.classList.add('fa-check');
+                    setTimeout(() => {
+                        icon.classList.remove('fa-check');
+                        icon.classList.add('fa-copy');
+                    }, 2000);
+                });
+            });
+        });
+        
+        // App control buttons
+        document.getElementById('startAppBtn').addEventListener('click', function() {
+            simulateAppStart();
+        });
+        
+        document.getElementById('stopAppBtn').addEventListener('click', function() {
+            simulateAppStop();
+        });
+        
+        document.getElementById('restartAppBtn').addEventListener('click', function() {
+            simulateAppRestart();
+        });
+        
+        // Refresh preview button
+        document.getElementById('refreshPreview').addEventListener('click', function() {
+            if (previewFrame.contentWindow) {
+                previewFrame.contentWindow.location.reload();
+            }
+        });
+        
+        // Open in new tab
+        document.getElementById('openInNewTab').addEventListener('click', function() {
+            window.open('http://localhost:5000', '_blank');
+        });
+        
+        // Simulate application loading
+        simulateAppStart();
+        
+        function simulateAppStart() {
+            // Show loading modal
+            const loadingModal = new bootstrap.Modal(document.getElementById('appLoadingModal'));
+            loadingModal.show();
+            
+            // Update progress bar
+            const progressBar = document.getElementById('appLoadingProgress');
+            const statusText = document.getElementById('loadingStatusText');
+            let progress = 0;
+            
+            const progressInterval = setInterval(() => {
+                progress += 5;
+                progressBar.style.width = progress + '%';
+                
+                if (progress === 20) {
+                    statusText.textContent = "Chargement des dépendances...";
+                } else if (progress === 40) {
+                    statusText.textContent = "Initialisation de la base de données...";
+                } else if (progress === 60) {
+                    statusText.textContent = "Démarrage du serveur Flask...";
+                } else if (progress === 80) {
+                    statusText.textContent = "Configuration de l'application...";
+                } else if (progress >= 100) {
+                    clearInterval(progressInterval);
+                    statusText.textContent = "Application prête !";
+                    
+                    // Close modal after a short delay
+                    setTimeout(() => {
+                        loadingModal.hide();
+                        
+                        // Show the iframe with the application
+                        loadingSpinner.classList.add('d-none');
+                        previewFrame.classList.remove('d-none');
+                        
+                        // Load a sample page in the iframe (in a real app this would be your actual application)
+                        // For demo purposes, we'll use a placeholder
+                        previewFrame.src = "https://placeholder-app.netlify.app/";
+                        
+                        // Update button states
+                        document.getElementById('startAppBtn').disabled = true;
+                        document.getElementById('stopAppBtn').disabled = false;
+                        document.getElementById('restartAppBtn').disabled = false;
+                        
+                        // Add a log entry
+                        addLogEntry('INFO', 'Application démarrée avec succès sur le port 5000');
+                    }, 500);
+                }
+            }, 100);
+        }
+        
+        function simulateAppStop() {
+            // Hide the iframe
+            previewFrame.classList.add('d-none');
+            loadingSpinner.classList.remove('d-none');
+            loadingSpinner.querySelector('p').textContent = "Application arrêtée";
+            
+            // Update button states
+            document.getElementById('startAppBtn').disabled = false;
+            document.getElementById('stopAppBtn').disabled = true;
+            document.getElementById('restartAppBtn').disabled = true;
+            
+            // Add a log entry
+            addLogEntry('INFO', 'Application arrêtée');
+        }
+        
+        function simulateAppRestart() {
+            // Hide the iframe
+            previewFrame.classList.add('d-none');
+            loadingSpinner.classList.remove('d-none');
+            loadingSpinner.querySelector('p').textContent = "Redémarrage de l'application...";
+            
+            // Add a log entry
+            addLogEntry('INFO', 'Redémarrage de l\'application...');
+            
+            // Simulate a restart delay
+            setTimeout(() => {
+                simulateAppStart();
+            }, 1000);
+        }
+        
+        function addLogEntry(level, message) {
+            const now = new Date();
+            const timestamp = now.toLocaleTimeString();
+            const logClass = level.toLowerCase();
+            
+            const logLine = document.createElement('pre');
+            logLine.className = 'log-line';
+            logLine.innerHTML = `<span class="timestamp">${timestamp}</span> <span class="log-${logClass}">[${level}]</span> ${message}`;
+            
+            logsContent.appendChild(logLine);
+            logsContent.scrollTop = logsContent.scrollHeight;
+        }
+    });
+</script>
+{% endblock %}

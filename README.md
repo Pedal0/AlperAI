@@ -1,6 +1,6 @@
 # AI Application Generator
 
-This project uses AI to generate complete, functional applications based on user descriptions. It leverages the OpenRouter API to design, generate, and validate application code. The Streamlit interface provides an intuitive way to create applications without writing code.
+This project uses AI to generate complete, functional applications based on user descriptions. It leverages the OpenRouter API to design, generate, and validate application code. The Flask interface provides an intuitive and modern way to create applications without writing code.
 
 ## Prerequisites
 
@@ -37,19 +37,29 @@ This project uses AI to generate complete, functional applications based on user
    pipenv shell
    ```
 
-2. Launch the Streamlit application:
+2. Launch the Flask application:
 
    ```
-   streamlit run app.py
+   python run.py
    ```
 
-3. Enable MCP Tools in the sidebar for enhanced generation (enabled by default).
+3. Open your browser and navigate to http://localhost:5000
 
-4. Click **"Generate Application"** to begin creating your application.
+4. Fill in the application description, select your options, and click **"Generate Application"** to begin creating your application.
+
+## Modern UI Features
+
+The application now includes a modern, responsive UI with:
+
+- **Interactive Dashboard**: Easy-to-use interface with modern design elements
+- **Real-time Feedback**: Visual indicators show generation progress
+- **Animations and Effects**: Smooth transitions and visual feedback
+- **Preview Functionality**: View the generated application directly in the interface
+- **Responsive Design**: Works seamlessly on desktop and mobile devices
 
 ## MCP Tools Enhancement
 
-This application now includes Model Context Protocol (MCP) tools integration to enhance code generation:
+This application includes Model Context Protocol (MCP) tools integration to enhance code generation:
 
 - **Web Search Tool**: Searches the web for information relevant to your project
 - **Documentation Search Tool**: Retrieves documentation for specific technologies and frameworks
@@ -96,7 +106,7 @@ For best results, try to be specific in your descriptions. Here are some example
 - **API Key Issues**: Make sure your OpenRouter API key is correctly set in the `.env` file.
 - **Dependency Errors**: If you encounter any dependency errors, try installing them manually:
   ```
-  pienv install streamlit openai python-dotenv asyncio
+  pipenv install flask openai python-dotenv asyncio
   ```
 
 ## API Configuration
