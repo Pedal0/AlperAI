@@ -343,7 +343,7 @@
         
         // Download button functionality
         document.getElementById('downloadBtn').addEventListener('click', function() {
-            alert("Download feature to be implemented. This action would create a ZIP file of your project.");
+            window.location.href = "{{ url_for('download_zip') }}";
         });
         
         // Open folder button (this would require backend support in a real implementation)
