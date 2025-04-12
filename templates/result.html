@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}Résultats de la génération{% endblock %}
+{% block title %}Generation Results{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -8,8 +8,8 @@
         <div class="success-banner animate__animated animate__fadeInUp">
             <div class="text-center">
                 <i class="fas fa-check-circle success-icon mb-3"></i>
-                <h1 class="mb-3">Application générée avec succès !</h1>
-                <p class="lead">Votre application a été créée dans le répertoire spécifié.</p>
+                <h1 class="mb-3">Application generated successfully!</h1>
+                <p class="lead">Your application has been created in the specified directory.</p>
             </div>
         </div>
         
@@ -19,7 +19,7 @@
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary" 
                                 type="button" role="tab" aria-controls="summary" aria-selected="true">
-                            <i class="fas fa-info-circle me-2"></i>Résumé
+                            <i class="fas fa-info-circle me-2"></i>Summary
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
@@ -31,13 +31,13 @@
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="tools-tab" data-bs-toggle="tab" data-bs-target="#tools" 
                                 type="button" role="tab" aria-controls="tools" aria-selected="false">
-                            <i class="fas fa-tools me-2"></i>Outils utilisés
+                            <i class="fas fa-tools me-2"></i>Tools Used
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="iterate-tab" data-bs-toggle="tab" data-bs-target="#iterate" 
                                 type="button" role="tab" aria-controls="iterate" aria-selected="false">
-                            <i class="fas fa-sync-alt me-2"></i>Itération
+                            <i class="fas fa-sync-alt me-2"></i>Iteration
                         </button>
                     </li>
                 </ul>
@@ -48,7 +48,7 @@
                     <div class="tab-pane fade show active" id="summary" role="tabpanel" aria-labelledby="summary-tab">
                         <div class="row mb-4">
                             <div class="col-md-6">
-                                <h4><i class="fas fa-folder-open me-2"></i>Emplacement</h4>
+                                <h4><i class="fas fa-folder-open me-2"></i>Location</h4>
                                 <div class="input-group">
                                     <input type="text" class="form-control" value="{{ target_dir }}" readonly>
                                     <button class="btn btn-outline-secondary copy-btn" type="button" data-value="{{ target_dir }}">
@@ -57,18 +57,18 @@
                                 </div>
                                 <div class="mt-2">
                                     <button class="btn btn-sm btn-primary open-folder-btn" data-path="{{ target_dir }}">
-                                        <i class="fas fa-external-link-alt me-1"></i> Ouvrir le dossier
+                                        <i class="fas fa-external-link-alt me-1"></i> Open Folder
                                     </button>
                                 </div>
                             </div>
                             <div class="col-md-6">
-                                <h4><i class="fas fa-clock me-2"></i>Date de création</h4>
-                                <p class="mb-0">{{ now().strftime('%d/%m/%Y à %H:%M:%S') }}</p>
+                                <h4><i class="fas fa-clock me-2"></i>Creation Date</h4>
+                                <p class="mb-0">{{ now().strftime('%m/%d/%Y at %H:%M:%S') }}</p>
                             </div>
                         </div>
                         
                         <div class="mb-4">
-                            <h4><i class="fas fa-pencil-alt me-2"></i>Description de l'application</h4>
+                            <h4><i class="fas fa-pencil-alt me-2"></i>Application Description</h4>
                             <div class="border rounded p-3 bg-light">
                                 <p class="mb-0">{{ prompt }}</p>
                             </div>
@@ -80,8 +80,8 @@
                                     <a href="{{ url_for('preview') }}" class="btn btn-lg btn-outline-primary rounded-circle">
                                         <i class="fas fa-play"></i>
                                     </a>
-                                    <h5 class="mt-2">Prévisualiser</h5>
-                                    <p class="text-muted small">Voir l'application en action</p>
+                                    <h5 class="mt-2">Preview</h5>
+                                    <p class="text-muted small">See the application in action</p>
                                 </div>
                             </div>
                             <div class="col-md-4 text-center">
@@ -89,8 +89,8 @@
                                     <a href="{{ url_for('index') }}" class="btn btn-lg btn-outline-success rounded-circle">
                                         <i class="fas fa-plus"></i>
                                     </a>
-                                    <h5 class="mt-2">Nouveau projet</h5>
-                                    <p class="text-muted small">Créer une autre application</p>
+                                    <h5 class="mt-2">New Project</h5>
+                                    <p class="text-muted small">Create another application</p>
                                 </div>
                             </div>
                             <div class="col-md-4 text-center">
@@ -98,8 +98,8 @@
                                     <button class="btn btn-lg btn-outline-info rounded-circle" id="downloadBtn">
                                         <i class="fas fa-download"></i>
                                     </button>
-                                    <h5 class="mt-2">Télécharger</h5>
-                                    <p class="text-muted small">Obtenir une archive du code</p>
+                                    <h5 class="mt-2">Download</h5>
+                                    <p class="text-muted small">Get a code archive</p>
                                 </div>
                             </div>
                         </div>
@@ -107,26 +107,26 @@
                     
                     <!-- Structure Tab -->
                     <div class="tab-pane fade" id="structure" role="tabpanel" aria-labelledby="structure-tab">
-                        <h4 class="mb-3">Structure du projet</h4>
+                        <h4 class="mb-3">Project Structure</h4>
                         <div class="directory-tree">
                             <ul id="directoryTree" class="file-tree">
-                                <li><i class="fas fa-spinner fa-spin"></i> Chargement de la structure...</li>
+                                <li><i class="fas fa-spinner fa-spin"></i> Loading structure...</li>
                             </ul>
                         </div>
                     </div>
                     
                     <!-- Tools Tab -->
                     <div class="tab-pane fade" id="tools" role="tabpanel" aria-labelledby="tools-tab">
-                        <h4 class="mb-4">Outils MCP utilisés</h4>
+                        <h4 class="mb-4">MCP Tools Used</h4>
                         <div class="tools-list">
                             <div class="tool-item mb-4">
                                 <div class="d-flex align-items-center mb-2">
                                     <div class="tool-icon">
                                         <i class="fas fa-search"></i>
                                     </div>
-                                    <h5 class="mb-0 ms-3">Recherche Web</h5>
+                                    <h5 class="mb-0 ms-3">Web Search</h5>
                                 </div>
-                                <p>Recherche d'informations pertinentes sur le web pour la génération de code.</p>
+                                <p>Search for relevant information on the web for code generation.</p>
                             </div>
                             
                             <div class="tool-item mb-4">
@@ -136,7 +136,7 @@
                                     </div>
                                     <h5 class="mb-0 ms-3">Documentation</h5>
                                 </div>
-                                <p>Consultation de documentation technique pour les technologies et frameworks.</p>
+                                <p>Access to technical documentation for technologies and frameworks.</p>
                             </div>
                             
                             <div class="tool-item mb-4">
@@ -144,9 +144,9 @@
                                     <div class="tool-icon">
                                         <i class="fas fa-laptop-code"></i>
                                     </div>
-                                    <h5 class="mb-0 ms-3">Composants Frontend</h5>
+                                    <h5 class="mb-0 ms-3">Frontend Components</h5>
                                 </div>
-                                <p>Recherche et intégration de composants UI pour le frontend de l'application.</p>
+                                <p>Search and integration of UI components for the application frontend.</p>
                             </div>
                             
                             <div class="tool-item">
@@ -156,42 +156,42 @@
                                     </div>
                                     <h5 class="mb-0 ms-3">Animations</h5>
                                 </div>
-                                <p>Intégration d'animations CSS et transitions pour améliorer l'interface utilisateur.</p>
+                                <p>Integration of CSS animations and transitions to enhance the user interface.</p>
                             </div>
                         </div>
                     </div>
 
                     <!-- Iterate Tab -->
                     <div class="tab-pane fade" id="iterate" role="tabpanel" aria-labelledby="iterate-tab">
-                        <h4 class="mb-4">Améliorer votre application</h4>
-                        <p class="mb-4">Vous pouvez demander des améliorations spécifiques pour votre application générée. Décrivez ce que vous souhaitez améliorer, et le système effectuera une nouvelle itération de génération.</p>
+                        <h4 class="mb-4">Improve Your Application</h4>
+                        <p class="mb-4">You can request specific improvements for your generated application. Describe what you want to improve, and the system will perform a new generation iteration.</p>
                         
                         <form id="iterationForm" action="{{ url_for('continue_iteration') }}" method="post">
                             <input type="hidden" name="project_dir" value="{{ target_dir }}">
                             <div class="mb-3">
-                                <label for="iterationFeedback" class="form-label">Quelles améliorations souhaitez-vous?</label>
+                                <label for="iterationFeedback" class="form-label">What improvements would you like?</label>
                                 <textarea class="form-control" id="iterationFeedback" name="feedback" rows="5" 
-                                          placeholder="Ex: Ajouter une fonctionnalité de recherche, améliorer le design, optimiser les performances..."></textarea>
+                                          placeholder="Ex: Add a search feature, improve the design, optimize performance..."></textarea>
                             </div>
                             <div class="form-check mb-3">
                                 <input class="form-check-input" type="checkbox" id="keepCurrentCode" name="keep_current" checked>
                                 <label class="form-check-label" for="keepCurrentCode">
-                                    Conserver le code existant (décoché = régénération complète)
+                                    Keep existing code (unchecked = complete regeneration)
                                 </label>
                             </div>
                             <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-sync-alt me-2"></i>Lancer l'itération
+                                <i class="fas fa-sync-alt me-2"></i>Start Iteration
                             </button>
                         </form>
                         
                         <div class="mt-5" id="previousIterations">
-                            <h5 class="mb-3">Historique des itérations</h5>
+                            <h5 class="mb-3">Iteration History</h5>
                             {% if iterations %}
                                 <div class="list-group">
                                     {% for iteration in iterations %}
                                         <div class="list-group-item">
                                             <div class="d-flex w-100 justify-content-between">
-                                                <h6 class="mb-1">Itération #{{ iteration.number }}</h6>
+                                                <h6 class="mb-1">Iteration #{{ iteration.number }}</h6>
                                                 <small>{{ iteration.date }}</small>
                                             </div>
                                             <p class="mb-1">{{ iteration.feedback }}</p>
@@ -199,7 +199,7 @@
                                     {% endfor %}
                                 </div>
                             {% else %}
-                                <p class="text-muted">Aucune itération précédente.</p>
+                                <p class="text-muted">No previous iterations.</p>
                             {% endif %}
                         </div>
                     </div>
@@ -230,12 +230,12 @@
             });
         });
         
-        // Charger la structure réelle du projet
+        // Load the actual project structure
         function loadProjectStructure() {
             const directoryTree = document.getElementById('directoryTree');
-            directoryTree.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin me-2"></i>Chargement de la structure...</div>';
+            directoryTree.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin me-2"></i>Loading structure...</div>';
             
-            // Appel à l'API pour récupérer la structure du projet
+            // API call to retrieve the project structure
             fetch('/get_project_structure', {
                 method: 'POST',
                 headers: {
@@ -248,10 +248,10 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success' && data.structure) {
-                    // Effacer le contenu actuel
+                    // Clear current content
                     directoryTree.innerHTML = '';
                     
-                    // Fonction récursive pour construire l'arborescence
+                    // Recursive function to build the tree
                     function buildTreeHTML(items, parentElement) {
                         const ul = document.createElement('ul');
                         
@@ -262,23 +262,23 @@
                                 li.className = 'folder-item';
                                 li.innerHTML = `<i class="fas fa-folder"></i> <span>${item.name}/</span>`;
                                 
-                                // Ajouter les enfants du dossier
+                                // Add folder children
                                 if (item.children && item.children.length > 0) {
                                     buildTreeHTML(item.children, li);
                                 } else {
-                                    // Dossier vide
+                                    // Empty folder
                                     const emptyUl = document.createElement('ul');
                                     const emptyLi = document.createElement('li');
                                     emptyLi.className = 'text-muted small';
-                                    emptyLi.innerHTML = '<i class="fas fa-info-circle"></i> Dossier vide';
+                                    emptyLi.innerHTML = '<i class="fas fa-info-circle"></i> Empty folder';
                                     emptyUl.appendChild(emptyLi);
                                     li.appendChild(emptyUl);
                                 }
                             } else {
-                                // C'est un fichier
+                                // It's a file
                                 li.className = 'file-item';
                                 
-                                // Déterminer l'icône en fonction de l'extension
+                                // Determine icon based on extension
                                 let fileIcon = 'fa-file';
                                 const extension = item.name.split('.').pop().toLowerCase();
                                 
@@ -307,10 +307,10 @@
                         parentElement.appendChild(ul);
                     }
                     
-                    // Construire l'arborescence
+                    // Build the tree
                     buildTreeHTML(data.structure, directoryTree);
                     
-                    // Ajouter les écouteurs d'événements pour les dossiers
+                    // Add event listeners for folders
                     document.querySelectorAll('.folder-item > span').forEach(folderLabel => {
                         folderLabel.addEventListener('click', function() {
                             this.parentElement.classList.toggle('collapsed');
@@ -320,36 +320,36 @@
                     directoryTree.innerHTML = `
                         <div class="alert alert-warning">
                             <i class="fas fa-exclamation-triangle me-2"></i>
-                            Impossible de charger la structure du projet: ${data.message || 'Erreur inconnue'}
+                            Unable to load project structure: ${data.message || 'Unknown error'}
                         </div>
                     `;
                 }
             })
             .catch(error => {
-                console.error('Erreur lors du chargement de la structure:', error);
+                console.error('Error loading structure:', error);
                 directoryTree.innerHTML = `
                     <div class="alert alert-danger">
                         <i class="fas fa-exclamation-circle me-2"></i>
-                        Erreur lors de la récupération de la structure: ${error.message}
+                        Error retrieving structure: ${error.message}
                     </div>
                 `;
             });
         }
         
-        // Charger la structure du projet lorsque l'onglet structure est affiché
+        // Load project structure when structure tab is shown
         document.getElementById('structure-tab').addEventListener('shown.bs.tab', function(e) {
             loadProjectStructure();
         });
         
         // Download button functionality
         document.getElementById('downloadBtn').addEventListener('click', function() {
-            alert("Fonctionnalité de téléchargement à implémenter. Cette action créerait un fichier ZIP de votre projet.");
+            alert("Download feature to be implemented. This action would create a ZIP file of your project.");
         });
         
         // Open folder button (this would require backend support in a real implementation)
         document.querySelectorAll('.open-folder-btn').forEach(button => {
             button.addEventListener('click', function() {
-                alert("Cette fonctionnalité ouvrirait le dossier du projet dans l'explorateur de fichiers.");
+                alert("This feature would open the project folder in the file explorer.");
             });
         });
     });
