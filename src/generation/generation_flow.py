@@ -18,7 +18,11 @@ from src.utils.file_utils import (
     identify_empty_files,
     generate_missing_code
 )
-from src.utils.prompt_utils import prompt_mentions_design
+from src.utils.prompt_utils import (
+    prompt_mentions_design,
+    extract_urls_from_prompt,
+    process_urls
+)
 from src.mcp.tool_utils import get_default_tools
 from src.mcp.handlers import handle_tool_results
 from src.preview.preview_manager import launch_preview_mode
@@ -59,12 +63,35 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
     st.session_state.reformulated_prompt = ""
     st.session_state.project_structure = []
     st.session_state.tool_results = {}
+    st.session_state.url_contents = {}  # Pour stocker le contenu des URLs
     
     # Initialiser le client MCP si les outils sont activés
     if use_mcp_tools:
         from src.mcp.clients import SimpleMCPClient
         st.session_state.mcp_client = SimpleMCPClient(api_key, selected_model)
         st.info("🔌 Outils MCP activés: Recherche web, documentation, et composants frontend disponibles.")
+
+    # == ÉTAPE 0: Extraction et traitement des URLs du prompt ==
+    urls = extract_urls_from_prompt(user_prompt)
+    url_context = ""
+    
+    if urls:
+        st.info(f"🔗 URLs détectées dans votre demande: {len(urls)} URL(s)")
+        with st.spinner("Récupération du contenu des URLs..."):
+            try:
+                url_contents = asyncio.run(process_urls(urls))
+                st.session_state.url_contents = url_contents
+                
+                # Préparer le contexte des URLs
+                url_context = "\n\n### CONTENU DES URLS FOURNIES ###\n"
+                for url, content in url_contents.items():
+                    truncated_content = content[:5000] + "..." if len(content) > 5000 else content
+                    url_context += f"\nURL: {url}\n```\n{truncated_content}\n```\n"
+                
+                st.success(f"✅ Contenu récupéré pour {len(url_contents)} URL(s)")
+            except Exception as e:
+                st.error(f"❌ Erreur lors de la récupération des URLs: {e}")
+                # Continuer même en cas d'erreur
 
     # == ÉTAPE 1: Reformulation et Structure ==
     st.info("▶️ Étape 1: Reformulation du prompt et définition de la structure...")
@@ -132,7 +159,11 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         Demande de l'Utilisateur:
         "{user_prompt}"
         
+        {url_context if url_context else ""}
+        
         {additional_context if additional_context else ""}
+
+        IMPORTANT: Si l'utilisateur a fourni des URLs, lisez attentivement leur contenu et suivez les instructions ou inspirez-vous des exemples qui y sont présents.
 
         Le format de sortie DOIT être exactement comme suit, en commençant immédiatement par le premier marqueur:
 
@@ -165,6 +196,10 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                 st.markdown(f"```text\n{reformulated_prompt}\n```")
                 st.subheader("Structure de Projet Proposée (Nettoyée):")
                 st.code("\n".join(structure_lines), language='text')
+                if url_context:
+                    st.subheader("URLs Utilisées:")
+                    for url in st.session_state.url_contents.keys():
+                        st.markdown(f"- [{url}]({url})")
 
             # == ÉTAPE 2: Création de la Structure de Fichiers/Dossiers ==
             st.info("▶️ Étape 2: Création de la Structure Physique...")
@@ -209,6 +244,11 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                                 with st.expander(f"Voir les résultats de {tool_name}"):
                                     st.code(tool_info['result'])
                     
+                    # Contexte des URLs pour la génération de code
+                    url_reference = ""
+                    if st.session_state.url_contents:
+                        url_reference = "\n**URLs fournies:** Veuillez vous référer aux URLs fournies par l'utilisateur comme source d'inspiration ou documentation. Suivez autant que possible les exemples ou la documentation fournie dans ces URLs."
+                    
                     # Construction du prompt pour la génération de code avec les résultats des outils MCP
                     prompt_step2 = f"""
                     Générez le code *complet* de l'application basé sur le prompt et la structure ci-dessous.
@@ -217,6 +257,10 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                     {st.session_state.reformulated_prompt}
                     
                     {tool_results_text if tool_results_text else ""}
+                    
+                    {url_reference if url_reference else ""}
+                    
+                    {url_context if url_context else ""}
 
                     **Structure du Projet (uniquement pour référence):**
                     ```
@@ -230,6 +274,8 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                     4. Pour `requirements.txt` ou similaire, listez les dépendances.
                     5. Pour `README.md`, fournissez des instructions de configuration/exécution.
                     6. Si le code dépasse les limites de jetons, terminez la réponse *entière* *exactement* avec: `GENERATION_INCOMPLETE` (aucun autre texte après).{animation_instruction}
+                    
+                    IMPORTANT: SI un style, template ou documentation est fourni dans les URLs, utilisez-les comme référence primaire.
 
                     Générez le code maintenant:
                     """
@@ -485,3 +531,4 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
     st.session_state.process_running = False  # Réactiver le bouton
     st.info("🏁 Processus terminé.")  # Indiquer la fin globale
     return True
+
