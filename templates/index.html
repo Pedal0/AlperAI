@@ -1,0 +1,447 @@
+{% extends "layout.html" %}
+
+{% block title %}Générateur d'applications IA{% endblock %}
+
+{% block content %}
+<div class="hero-section mb-5">
+    <h1 class="animate__animated animate__fadeInDown">Générateur d'Applications <span class="gradient-text">IA</span></h1>
+    <p class="lead animate__animated animate__fadeIn animate__delay-1s">
+        Décrivez l'application que vous souhaitez, et laissez l'IA la générer pour vous.
+        <br>Aucune compétence en programmation n'est requise !
+    </p>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <form id="appGeneratorForm" action="{{ url_for('generate') }}" method="post" class="animate__animated animate__fadeInUp">
+            <div class="card main-card">
+                <div class="row g-0">
+                    <!-- Configuration Panel -->
+                    <div class="col-lg-4 config-panel">
+                        <div class="p-4">
+                            <h3 class="mb-4">
+                                <i class="fas fa-cogs me-2"></i>Configuration
+                            </h3>
+                            
+                            <div class="mb-4">
+                                <label for="api_key" class="form-label">Clé API OpenRouter</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="api_key" name="api_key" value="{{ api_key }}" required>
+                                    <button class="btn btn-outline-secondary toggle-password" type="button">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                                <div class="form-text">
+                                    Obtenir une clé sur <a href="https://openrouter.ai/" target="_blank">OpenRouter</a>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label for="model" class="form-label">Modèle IA</label>
+                                <select class="form-select mb-2" id="model" name="model">
+                                    <option value="google/gemini-2.5-pro-preview-03-25" selected>Gemini 2.5 Pro Preview</option>
+                                    <option value="google/gemini-2.5-pro-exp-03-25:free">Gemini 2.5 Pro experimental (Free)</option>
+                                    <option value="meta-llama/llama-4-maverick:free">Llama 4 Maverick (Free)</option>
+                                    <option value="meta-llama/llama-4-scout:free">Llama 4 Scout (Free)</option>
+                                    <option value="deepseek/deepseek-chat-v3-0324:free">DeepSeek Chat v3 (Free)</option>
+                                    <option value="anthropic/claude-3.7-sonnet">Claude 3.7 Sonnet</option>
+                                    <option value="custom">Autre modèle (personnalisé)...</option>
+                                </select>
+                                <div id="customModelContainer" class="d-none">
+                                    <input type="text" class="form-control" id="customModel" name="customModel" 
+                                           placeholder="Entrez l'identifiant du modèle (ex: organizaiton/model:tag)">
+                                    <div class="form-text">
+                                        Format: organization/model:tag - Vérifiez sur <a href="https://openrouter.ai/models" target="_blank">OpenRouter</a>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="use_mcp_tools" name="use_mcp_tools" checked>
+                                    <label class="form-check-label" for="use_mcp_tools">Activer les outils MCP</label>
+                                </div>
+                                <div class="form-text">
+                                    Améliore la génération avec des recherches web et des ressources de code
+                                </div>
+                            </div>
+                            
+                            <div id="frontendOptions" class="mb-4">
+                                <label class="form-label">Options Frontend</label>
+                                <select class="form-select mb-2" id="frontend_framework" name="frontend_framework">
+                                    <option value="Auto-detect" selected>Auto-détection</option>
+                                    <option value="Bootstrap">Bootstrap</option>
+                                    <option value="Tailwind CSS">Tailwind CSS</option>
+                                    <option value="Bulma">Bulma</option>
+                                    <option value="Material Design">Material Design</option>
+                                </select>
+                                
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="include_animations" name="include_animations" checked>
+                                    <label class="form-check-label" for="include_animations">
+                                        Inclure des animations CSS
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Input Panel -->
+                    <div class="col-lg-8 input-panel">
+                        <div class="p-4">
+                            <h3 class="mb-4">
+                                <i class="fas fa-pencil-alt me-2"></i>Description de l'application
+                            </h3>
+                            
+                            <div class="mb-4">
+                                <textarea class="form-control" id="user_prompt" name="user_prompt" rows="6" placeholder="Exemple: Créer une application de gestion de tâches avec authentification utilisateur. Les utilisateurs doivent pouvoir ajouter, modifier et supprimer des tâches, définir des priorités et des dates d'échéance." required></textarea>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label for="target_directory" class="form-label">Répertoire de destination</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="target_directory" name="target_directory" placeholder="Ex: C:\Users\YourName\Projects\MyGeneratedApp" required>
+                                    <button class="btn btn-outline-secondary" type="button" id="browseButton">
+                                        <i class="fas fa-folder-open"></i>
+                                    </button>
+                                </div>
+                                <div class="form-text">
+                                    Le dossier doit exister et vous devez avoir les permissions d'écriture.
+                                </div>
+                            </div>
+                            
+                            <div class="examples-section mt-4">
+                                <h5>
+                                    <i class="fas fa-lightbulb me-2"></i>Exemples de prompts
+                                    <button type="button" class="btn btn-sm btn-link float-end" data-bs-toggle="collapse" data-bs-target="#examplesCollapse">
+                                        Afficher/Masquer
+                                    </button>
+                                </h5>
+                                <div class="collapse" id="examplesCollapse">
+                                    <div class="card card-body mt-2">
+                                        <div class="example-chips d-flex flex-wrap gap-2">
+                                            <button type="button" class="btn btn-sm btn-outline-primary example-chip" data-example="Créer un site web portfolio statique pour un photographe avec une page d'accueil, galerie, à propos et contact. Inclure un design responsive au look moderne.">
+                                                Site Portfolio
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-primary example-chip" data-example="Construire une application de gestion de tâches avec authentification utilisateur. Les utilisateurs doivent pouvoir créer, modifier et supprimer des tâches, définir des dates d'échéance et marquer les tâches comme terminées.">
+                                                App de Tâches
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-primary example-chip" data-example="Créer une API RESTful pour une plateforme de blog avec des endpoints pour les articles, commentaires et utilisateurs. Inclure l'authentification et la gestion appropriée des erreurs.">
+                                                API RESTful
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-footer p-4">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="empty_files_check" name="empty_files_check" checked>
+                                    <label class="form-check-label" for="empty_files_check">
+                                        Vérifier et générer les fichiers vides
+                                    </label>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-lg" id="generateButton">
+                                    <i class="fas fa-rocket me-2"></i>Générer l'Application
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Loading Modal -->
+<div class="modal fade" id="loadingModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center p-4">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Chargement...</span>
+                </div>
+                <h4 id="loadingTitle">Génération en cours...</h4>
+                <p id="loadingMessage">Veuillez patienter pendant que l'IA génère votre application.</p>
+                
+                <div class="progress mt-3">
+                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                </div>
+                <p class="mt-2"><span id="currentStep">Initialisation...</span></p>
+                
+                <div class="alert alert-info mt-3 d-none" id="tipBox">
+                    <i class="fas fa-info-circle me-2"></i><span id="tipText"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Toggle password visibility
+        document.querySelector('.toggle-password').addEventListener('click', function() {
+            const apiKeyInput = document.getElementById('api_key');
+            const type = apiKeyInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            apiKeyInput.setAttribute('type', type);
+            
+            // Toggle eye icon
+            const icon = this.querySelector('i');
+            icon.classList.toggle('fa-eye');
+            icon.classList.toggle('fa-eye-slash');
+        });
+        
+        // Example chips
+        document.querySelectorAll('.example-chip').forEach(chip => {
+            chip.addEventListener('click', function() {
+                const example = this.getAttribute('data-example');
+                document.getElementById('user_prompt').value = example;
+            });
+        });
+        
+        // Browse button - utiliser l'API File System Access si disponible
+        document.getElementById('browseButton').addEventListener('click', async function() {
+            try {
+                // Vérifier si l'API est supportée par le navigateur
+                if ('showDirectoryPicker' in window) {
+                    try {
+                        // Ouvrir le sélecteur de dossier natif
+                        const directoryHandle = await window.showDirectoryPicker();
+                        const path = directoryHandle.name;
+                        
+                        // Obtenir le chemin complet via une requête au serveur
+                        const formData = new FormData();
+                        formData.append('directory_name', path);
+                        
+                        const response = await fetch('{{ url_for("get_directory_path") }}', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            document.getElementById('target_directory').value = data.path;
+                        } else {
+                            throw new Error('Erreur lors de la récupération du chemin');
+                        }
+                    } catch (err) {
+                        console.error('Erreur lors de la sélection du dossier:', err);
+                        // Méthode alternative pour Windows
+                        openWindowsFolderPicker();
+                    }
+                } else {
+                    // Méthode alternative pour les navigateurs qui ne supportent pas l'API
+                    openWindowsFolderPicker();
+                }
+            } catch (err) {
+                console.error('Erreur lors de la sélection du dossier:', err);
+                alert('Une erreur est survenue lors de la sélection du dossier. Veuillez entrer le chemin manuellement.');
+            }
+        });
+        
+        // Méthode alternative pour Windows utilisant une iframe cachée
+        function openWindowsFolderPicker() {
+            // Créer un élément input de type file caché
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.webkitdirectory = true; // Pour Chrome et Safari
+            input.directory = true; // Pour Firefox
+            input.multiple = false;
+            
+            // Ajouter l'écouteur d'événement pour capturer la sélection
+            input.addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    // Extraire le chemin du dossier à partir du premier fichier
+                    const filePath = this.files[0].webkitRelativePath || this.files[0].name;
+                    const folderPath = filePath.split('/')[0];
+                    
+                    // Faire une requête au serveur pour obtenir le chemin complet
+                    const formData = new FormData();
+                    formData.append('directory_name', folderPath);
+                    
+                    fetch('{{ url_for("get_directory_path") }}', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('target_directory').value = data.path;
+                    })
+                    .catch(error => {
+                        console.error('Erreur:', error);
+                        alert('Une erreur est survenue. Veuillez entrer le chemin manuellement.');
+                    });
+                }
+            });
+            
+            // Déclencher le clic sur l'input
+            input.click();
+        }
+        
+        // Form submission with actual API call instead of simulation
+        const form = document.getElementById('appGeneratorForm');
+        
+        form.addEventListener('submit', function(e) {
+            e.preventDefault(); // Empêcher la soumission standard du formulaire
+            
+            // Validate form
+            if (!form.checkValidity()) {
+                e.stopPropagation();
+                form.classList.add('was-validated');
+                return;
+            }
+            
+            // Préparer les données du formulaire
+            const formData = new FormData(form);
+            
+            // Gérer l'option de modèle personnalisé
+            if (document.getElementById('model').value === 'custom') {
+                const customModelValue = document.getElementById('customModel').value.trim();
+                if (customModelValue) {
+                    formData.set('model', customModelValue);
+                } else {
+                    alert('Veuillez entrer un identifiant de modèle valide');
+                    return;
+                }
+            }
+            
+            // Show loading modal
+            const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+            loadingModal.show();
+            
+            // Initialize progress elements
+            const progressBar = document.getElementById('progressBar');
+            const currentStep = document.getElementById('currentStep');
+            const tipBox = document.getElementById('tipBox');
+            const tipText = document.getElementById('tipText');
+            
+            const tips = [
+                "Les modèles gratuits peuvent prendre plus de temps en raison des limites de taux.",
+                "Plus la description est détaillée, meilleure sera la génération de code.",
+                "Les outils MCP permettent à l'IA d'accéder à des informations externes pour améliorer le code généré.",
+                "La génération peut prendre de 30 secondes à 5 minutes selon la complexité de l'application.",
+                "Vous pourrez prévisualiser et tester l'application directement dans l'interface une fois générée."
+            ];
+            
+            // Show random tips
+            let tipIndex = 0;
+            tipBox.classList.remove('d-none');
+            tipText.textContent = tips[tipIndex];
+            
+            const tipInterval = setInterval(() => {
+                tipIndex = (tipIndex + 1) % tips.length;
+                tipBox.classList.remove('d-none');
+                tipText.textContent = tips[tipIndex];
+            }, 12000); // Afficher une nouvelle astuce toutes les 12 secondes
+            
+            // Effectuer la requête AJAX pour générer l'application
+            fetch('{{ url_for("generate") }}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erreur HTTP: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Vérifier la réponse
+                if (data.status === 'success') {
+                    // Initier le suivi de progression
+                    pollGenerationProgress();
+                } else if (data.status === 'error') {
+                    // Afficher les erreurs
+                    clearInterval(tipInterval);
+                    loadingModal.hide();
+                    
+                    let errorMessage = 'Une erreur est survenue lors de la génération.';
+                    if (data.errors && data.errors.length > 0) {
+                        errorMessage = data.errors.join('<br>');
+                    } else if (data.message) {
+                        errorMessage = data.message;
+                    }
+                    
+                    alert(errorMessage);
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                clearInterval(tipInterval);
+                loadingModal.hide();
+                alert('Une erreur est survenue lors de la communication avec le serveur: ' + error.message);
+            });
+            
+            // Fonction pour interroger le serveur sur la progression de la génération
+            function pollGenerationProgress() {
+                let pollInterval = setInterval(() => {
+                    fetch('{{ url_for("generation_progress") }}')
+                    .then(response => response.json())
+                    .then(data => {
+                        // Mettre à jour la barre de progression
+                        const progress = data.progress || 0;
+                        progressBar.style.width = `${progress}%`;
+                        
+                        // Mettre à jour l'étape actuelle
+                        if (data.current_step) {
+                            currentStep.textContent = data.current_step;
+                        }
+                        
+                        // Si la génération est terminée
+                        if (data.status === 'completed') {
+                            clearInterval(pollInterval);
+                            clearInterval(tipInterval);
+                            currentStep.textContent = "Génération terminée !";
+                            
+                            // Redirection vers la page des résultats
+                            setTimeout(() => {
+                                window.location.href = data.redirect_url || '{{ url_for("result") }}';
+                            }, 1500);
+                        }
+                        
+                        // Si la génération a échoué
+                        if (data.status === 'failed') {
+                            clearInterval(pollInterval);
+                            clearInterval(tipInterval);
+                            loadingModal.hide();
+                            alert('Erreur lors de la génération: ' + (data.error || 'Erreur inconnue'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erreur lors de la vérification de la progression:', error);
+                    });
+                }, 1500); // Vérifier la progression toutes les 1.5 secondes
+            }
+        });
+        
+        // Toggle MCP dependencies
+        const mcpToolsCheckbox = document.getElementById('use_mcp_tools');
+        const frontendOptions = document.getElementById('frontendOptions');
+        
+        mcpToolsCheckbox.addEventListener('change', function() {
+            frontendOptions.style.display = this.checked ? 'block' : 'none';
+        });
+        
+        // Initialize state
+        frontendOptions.style.display = mcpToolsCheckbox.checked ? 'block' : 'none';
+        
+        // Toggle custom model input
+        const modelSelect = document.getElementById('model');
+        const customModelContainer = document.getElementById('customModelContainer');
+        modelSelect.addEventListener('change', function() {
+            if (this.value === 'custom') {
+                customModelContainer.classList.remove('d-none');
+            } else {
+                customModelContainer.classList.add('d-none');
+            }
+        });
+    });
+</script>
+{% endblock %}

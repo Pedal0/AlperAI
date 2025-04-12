@@ -5,8 +5,9 @@ Contient les étapes et la logique de génération d'applications.
 import time
 import asyncio
 import json
-import streamlit as st
+import logging
 from pathlib import Path
+from flask import session
 
 from src.config.constants import RATE_LIMIT_DELAY_SECONDS
 from src.utils.model_utils import is_free_model
@@ -42,7 +43,7 @@ async def run_mcp_query(client, query, context=None):
     result = await client.process_query(query, context)
     return result
 
-def generate_application(api_key, selected_model, user_prompt, target_directory, use_mcp_tools=True, frontend_framework="Auto-detect", include_animations=True):
+def generate_application(api_key, selected_model, user_prompt, target_directory, use_mcp_tools=True, frontend_framework="Auto-detect", include_animations=True, progress_callback=None):
     """
     Génère une application complète basée sur la description de l'utilisateur.
     
@@ -54,481 +55,506 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         use_mcp_tools (bool, optional): Utiliser les outils MCP pour améliorer la génération
         frontend_framework (str, optional): Framework frontend préféré
         include_animations (bool, optional): Inclure des animations CSS
+        progress_callback (function, optional): Fonction pour mettre à jour la progression
         
     Returns:
         bool: True si la génération a réussi, False sinon
     """
-    st.session_state.process_running = True  # Empêcher le double-clic
-    st.session_state.last_code_generation_response = ""  # Réinitialiser l'état
-    st.session_state.reformulated_prompt = ""
-    st.session_state.project_structure = []
-    st.session_state.tool_results = {}
-    st.session_state.url_contents = {}  # Pour stocker le contenu des URLs
+    from flask import current_app
+    import re  # Import déplacé ici
+    
+    # Variables locales au lieu d'utiliser la session Flask
+    process_state = {
+        'process_running': True,
+        'last_code_generation_response': "",
+        'reformulated_prompt': "",
+        'project_structure': [],
+        'tool_results': {},
+        'url_contents': {},
+        'last_api_call_time': 0,
+    }
+    
+    # Fonction pour mettre à jour la progression
+    def update_progress(step, message, progress=None):
+        if progress_callback:
+            progress_callback(step, message, progress)
+        logging.info(f"[Étape {step}] {message}")
     
     # Initialiser le client MCP si les outils sont activés
+    mcp_client = None
     if use_mcp_tools:
         from src.mcp.clients import SimpleMCPClient
-        st.session_state.mcp_client = SimpleMCPClient(api_key, selected_model)
-        st.info("🔌 Outils MCP activés: Recherche web, documentation, et composants frontend disponibles.")
+        mcp_client = SimpleMCPClient(api_key, selected_model)
+        update_progress(0, "🔌 Outils MCP activés: Recherche web, documentation, et composants frontend disponibles.")
 
     # == ÉTAPE 0: Extraction et traitement des URLs du prompt ==
+    update_progress(0, "Extraction des URLs du prompt...", 5)
     urls = extract_urls_from_prompt(user_prompt)
     url_context = ""
     
     if urls:
-        st.info(f"🔗 URLs détectées dans votre demande: {len(urls)} URL(s)")
-        with st.spinner("Récupération du contenu des URLs..."):
-            try:
-                url_contents = asyncio.run(process_urls(urls))
-                st.session_state.url_contents = url_contents
-                
-                # Préparer le contexte des URLs
-                url_context = "\n\n### CONTENU DES URLS FOURNIES ###\n"
-                for url, content in url_contents.items():
-                    truncated_content = content[:5000] + "..." if len(content) > 5000 else content
-                    url_context += f"\nURL: {url}\n```\n{truncated_content}\n```\n"
-                
-                st.success(f"✅ Contenu récupéré pour {len(url_contents)} URL(s)")
-            except Exception as e:
-                st.error(f"❌ Erreur lors de la récupération des URLs: {e}")
-                # Continuer même en cas d'erreur
+        update_progress(0, f"🔗 URLs détectées dans votre demande: {len(urls)} URL(s)", 10)
+        try:
+            url_contents = asyncio.run(process_urls(urls))
+            process_state['url_contents'] = url_contents
+            
+            # Préparer le contexte des URLs
+            url_context = "\n\n### CONTENU DES URLS FOURNIES ###\n"
+            for url, content in url_contents.items():
+                truncated_content = content[:5000] + "..." if len(content) > 5000 else content
+                url_context += f"\nURL: {url}\n```\n{truncated_content}\n```\n"
+            
+            update_progress(0, f"✅ Contenu récupéré pour {len(url_contents)} URL(s)", 15)
+        except Exception as e:
+            update_progress(0, f"❌ Erreur lors de la récupération des URLs: {e}", 15)
+            # Continuer même en cas d'erreur
 
-    # == ÉTAPE 1: Reformulation et Structure ==
-    st.info("▶️ Étape 1: Reformulation du prompt et définition de la structure...")
-    status_placeholder_step1 = st.empty()  # Pour afficher le statut
-    with st.spinner("Appel de l'IA pour reformuler et définir la structure..."):
+    # == ÉTAPE 1: Reformulation du prompt ==
+    update_progress(1, "Reformulation du prompt...", 20)
+    
+    # Vérifier la limite de taux pour les modèles gratuits
+    if is_free_model(selected_model):
+        current_time = time.time()
+        last_api_call_time = process_state.get('last_api_call_time', 0)
+        time_since_last_call = current_time - last_api_call_time
+        if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
+            wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
+            update_progress(1, f"⏳ Modèle gratuit détecté. Attente de {wait_time:.1f} secondes (limite de taux)...", 20)
+            time.sleep(wait_time)
+
+    # Si les outils MCP sont activés, les utiliser pour améliorer le prompt
+    additional_context = ""
+    if use_mcp_tools and mcp_client:
+        update_progress(1, "🔍 Utilisation des outils MCP pour analyser votre demande et recueillir des informations...", 25)
+        
+        # Ajouter les préférences frontend à la requête d'analyse
+        frontend_preferences = ""
+        if frontend_framework != "Auto-detect":
+            frontend_preferences = f"Pour le frontend, utilisez {frontend_framework}. "
+        if include_animations:
+            frontend_preferences += "Incluez des animations CSS et des transitions pour rendre l'UI attrayante. "
+        
+        analysis_query = f"""
+        Analysez cette demande de développement d'application: "{user_prompt}"
+        
+        1. Quel type d'application est demandé?
+        2. Quels frameworks ou bibliothèques pourraient être nécessaires?
+        3. Ai-je besoin de rechercher une documentation pour aider à l'implémentation?
+        4. Quels composants frontend seraient utiles pour ce projet?
+        5. Quel type de template conviendrait le mieux à cette application?
+        
+        {frontend_preferences}
+        
+        N'utilisez des outils que si nécessaire pour clarifier des détails techniques ou trouver des composants spécifiques.
+        """
+        
+        # Exécuter la requête MCP de manière asynchrone
+        mcp_result = asyncio.run(run_mcp_query(mcp_client, analysis_query))
+        
+        if mcp_result and "tool_calls" in mcp_result and mcp_result["tool_calls"]:
+            update_progress(1, "✅ Outils utilisés pour recueillir du contexte supplémentaire pour votre projet.", 30)
+            
+            # Traiter et stocker les résultats des outils
+            tool_results = {}
+            for tool_call in mcp_result["tool_calls"]:
+                tool_name = tool_call.get("tool")
+                if tool_name:
+                    tool_results[tool_name] = tool_call
+            
+            process_state['tool_results'] = tool_results
+            
+            # Ajouter ce contexte à notre prompt
+            additional_context = f"""
+            Contexte supplémentaire pour générer cette application:
+            {mcp_result.get('text', '')}
+            """
+    
+    # Construction du prompt pour la reformulation uniquement
+    prompt_reformulation = f"""
+    Analysez la demande de l'utilisateur ci-dessous. Votre tâche est de:
+    
+    **Reformuler la Demande:** Créez un prompt détaillé et précis décrivant les fonctionnalités, technologies (supposez des technologies web standard comme Python/Flask ou Node/Express si non spécifié, ou utilisez HTML/CSS/JS si simple), et exigences. Cela guidera la génération de code. Incluez des commentaires dans le code généré.
+
+    Demande de l'Utilisateur:
+    "{user_prompt}"
+    
+    {url_context if url_context else ""}
+    
+    {additional_context if additional_context else ""}
+
+    IMPORTANT: Si l'utilisateur a fourni des URLs, lisez attentivement leur contenu et suivez les instructions ou inspirez-vous des exemples qui y sont présents.
+
+    Le format de sortie DOIT être exactement comme suit:
+
+    ### REFORMULATED PROMPT ###
+    [Prompt reformulé détaillé ici]
+    """
+    messages_reformulation = [{"role": "user", "content": prompt_reformulation}]
+
+    response_reformulation = call_openrouter_api(api_key, selected_model, messages_reformulation, temperature=0.6, max_retries=2)
+    process_state['last_api_call_time'] = time.time()
+    
+    update_progress(1, "Analyse de la réponse de reformulation...", 35)
+    
+    reformulated_prompt = None
+    if response_reformulation and response_reformulation.get("choices"):
+        response_text = response_reformulation["choices"][0]["message"]["content"]
+        
+        # Extraire le prompt reformulé
+        prompt_match = re.search(r"###\s*REFORMULATED PROMPT\s*###\s*(.*)", response_text, re.DOTALL | re.IGNORECASE)
+        if prompt_match:
+            reformulated_prompt = prompt_match.group(1).strip()
+            process_state['reformulated_prompt'] = reformulated_prompt
+            # Stocker aussi dans app.config pour que app.py puisse le récupérer
+            if current_app:
+                current_app.config['reformulated_prompt'] = reformulated_prompt
+            update_progress(1, "✅ Prompt reformulé avec succès.", 40)
+        else:
+            update_progress(1, "⚠️ Format de réponse inattendu pour la reformulation.", 40)
+            # Utiliser la réponse complète comme fallback
+            reformulated_prompt = response_text.strip()
+            process_state['reformulated_prompt'] = reformulated_prompt
+            if current_app:
+                current_app.config['reformulated_prompt'] = reformulated_prompt
+    else:
+        update_progress(1, "❌ Échec de la reformulation du prompt.", 40)
+        return False
+
+    # == ÉTAPE 2: Définition de la structure ==
+    update_progress(2, "Définition de la structure du projet...", 45)
+    
+    # Vérifier la limite de taux pour les modèles gratuits
+    if is_free_model(selected_model):
+        current_time = time.time()
+        last_api_call_time = process_state.get('last_api_call_time', 0)
+        time_since_last_call = current_time - last_api_call_time
+        if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
+            wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
+            update_progress(2, f"⏳ Modèle gratuit détecté. Attente de {wait_time:.1f} secondes (limite de taux)...", 45)
+            time.sleep(wait_time)
+    
+    # Construction du prompt pour la structure uniquement
+    prompt_structure = f"""
+    Basé sur le prompt reformulé ci-dessous, votre tâche est de:
+    
+    **Définir la Structure du Projet:** Proposez une structure complète et logique de fichiers/répertoires pour cette application. Listez chaque élément sur une nouvelle ligne. Utilisez des chemins relatifs. Marquez les répertoires avec un '/' final. N'incluez PAS de commentaires (#) ou de backticks (```) dans la liste de structure elle-même.
+
+    Prompt reformulé:
+    {reformulated_prompt}
+    
+    {url_context if url_context else ""}
+
+    IMPORTANT: Si l'utilisateur a fourni des URLs, inspirez-vous des exemples ou de la structure qui y sont présents.
+
+    Le format de sortie DOIT être exactement comme suit:
+
+    ### STRUCTURE ###
+    [Liste des fichiers/dossiers, un par ligne, ex.:
+    src/
+    src/main.py
+    requirements.txt
+    README.md]
+    """
+    messages_structure = [{"role": "user", "content": prompt_structure}]
+
+    response_structure = call_openrouter_api(api_key, selected_model, messages_structure, temperature=0.6, max_retries=2)
+    process_state['last_api_call_time'] = time.time()
+    
+    update_progress(2, "Analyse de la réponse de structure...", 50)
+    
+    structure_lines = []
+    if response_structure and response_structure.get("choices"):
+        response_text = response_structure["choices"][0]["message"]["content"]
+        
+        # Extraire la structure
+        structure_match = re.search(r"###\s*STRUCTURE\s*###\s*(.*)", response_text, re.DOTALL | re.IGNORECASE)
+        if structure_match:
+            structure_block = structure_match.group(1).strip()
+            # Nettoyage de la structure
+            structure_block_cleaned = structure_block.strip().strip('`')
+            potential_lines = structure_block_cleaned.split('\n')
+
+            for line in potential_lines:
+                line = line.strip()
+                # Ignorer les lignes vides ou les marqueurs de code
+                if not line or line == '```':
+                    continue
+                # Supprimer les commentaires
+                if '#' in line:
+                    line = line.split('#', 1)[0].strip()
+                # Ajouter seulement si la ligne n'est pas vide après nettoyage
+                if line:
+                    structure_lines.append(line)
+            
+            process_state['project_structure'] = structure_lines
+            update_progress(2, "✅ Structure du projet définie avec succès.", 55)
+        else:
+            update_progress(2, "⚠️ Format de réponse inattendu pour la structure.", 55)
+            return False
+    else:
+        update_progress(2, "❌ Échec de la définition de la structure.", 55)
+        return False
+
+    # == ÉTAPE 3: Création de la Structure de Fichiers/Dossiers ==
+    update_progress(3, f"Création des dossiers et fichiers dans '{target_directory}'...", 60)
+    created_paths = create_project_structure(target_directory, structure_lines)
+
+    if created_paths is not None:
+        update_progress(3, f"✅ Structure créée dans '{target_directory}'.", 65)
+
+        # == ÉTAPE 4: Génération de Code ==
+        update_progress(4, "Génération du code complet...", 70)
+        
         # Vérifier la limite de taux pour les modèles gratuits
         if is_free_model(selected_model):
             current_time = time.time()
-            time_since_last_call = current_time - st.session_state.get('last_api_call_time', 0)
+            last_api_call_time = process_state.get('last_api_call_time', 0)
+            time_since_last_call = current_time - last_api_call_time
             if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
                 wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
-                status_placeholder_step1.warning(f"⏳ Modèle gratuit détecté. Attente de {wait_time:.1f} secondes (limite de taux)...")
+                update_progress(4, f"⏳ Modèle gratuit détecté. Attente de {wait_time:.1f} secondes (limite de taux)...", 70)
                 time.sleep(wait_time)
 
-        # Si les outils MCP sont activés, les utiliser pour améliorer le prompt
-        additional_context = ""
-        if use_mcp_tools and st.session_state.mcp_client:
-            status_placeholder_step1.info("🔍 Utilisation des outils MCP pour analyser votre demande et recueillir des informations...")
-            
-            # Ajouter les préférences frontend à la requête d'analyse
-            frontend_preferences = ""
-            if frontend_framework != "Auto-detect":
-                frontend_preferences = f"Pour le frontend, utilisez {frontend_framework}. "
-            if include_animations:
-                frontend_preferences += "Incluez des animations CSS et des transitions pour rendre l'UI attrayante. "
-            
-            analysis_query = f"""
-            Analysez cette demande de développement d'application: "{user_prompt}"
-            
-            1. Quel type d'application est demandé?
-            2. Quels frameworks ou bibliothèques pourraient être nécessaires?
-            3. Ai-je besoin de rechercher une documentation pour aider à l'implémentation?
-            4. Quels composants frontend seraient utiles pour ce projet?
-            5. Quel type de template conviendrait le mieux à cette application?
-            
-            {frontend_preferences}
-            
-            N'utilisez des outils que si nécessaire pour clarifier des détails techniques ou trouver des composants spécifiques.
-            """
-            
-            # Exécuter la requête MCP de manière asynchrone
-            mcp_result = asyncio.run(run_mcp_query(st.session_state.mcp_client, analysis_query))
-            
-            if mcp_result and "tool_calls" in mcp_result and mcp_result["tool_calls"]:
-                status_placeholder_step1.success("✅ Outils utilisés pour recueillir du contexte supplémentaire pour votre projet.")
-                
-                # Traiter et stocker les résultats des outils
-                for tool_call in mcp_result["tool_calls"]:
-                    tool_name = tool_call.get("tool")
-                    if tool_name:
-                        st.session_state.tool_results[tool_name] = tool_call
-                
-                # Ajouter ce contexte à notre prompt
-                additional_context = f"""
-                Contexte supplémentaire pour générer cette application:
-                {mcp_result.get('text', '')}
-                """
-            
-        # Construction du prompt pour la première étape
-        prompt_step1 = f"""
-        Analysez la demande de l'utilisateur ci-dessous. Vos tâches sont:
-        1.  **Reformuler la Demande:** Créez un prompt détaillé et précis décrivant les fonctionnalités, technologies (supposez des technologies web standard comme Python/Flask ou Node/Express si non spécifié, ou utilisez HTML/CSS/JS si simple), et exigences. Cela guidera la génération de code. Incluez des commentaires dans le code généré.
-        2.  **Définir la Structure du Projet:** Proposez une structure complète et logique de fichiers/répertoires. Listez chaque élément sur une nouvelle ligne. Utilisez des chemins relatifs. Marquez les répertoires avec un '/' final. N'incluez PAS de commentaires (#) ou de backticks (```) dans la liste de structure elle-même.
+        # --- Ajout d'instructions d'animation ---
+        animation_instruction = ""
+        if include_animations and not prompt_mentions_design(user_prompt):
+            animation_instruction = (
+                "\n7. **Animation & Fluidité:** Puisqu'aucun design spécifique n'a été demandé, "
+                "veuillez incorporer des animations CSS subtiles et des transitions (par exemple, effets hover, chargement/transitions fluides des sections, retour d'information subtil des boutons) "
+                "pour rendre l'interface utilisateur moderne, fluide et attrayante. Privilégiez l'utilisabilité et évitez les animations trop distrayantes."
+            )
+            update_progress(4, "ℹ️ Aucune instruction de design détectée, ajout d'une demande d'animations fluides.", 75)
+        
+        # Ajouter les résultats des outils si disponibles
+        tool_results_text = ""
+        if use_mcp_tools and process_state.get('tool_results'):
+            tool_results_text = "\n**Résultats des Outils:** Les informations suivantes ont été recueillies pour aider au développement:\n"
+            for tool_name, tool_info in process_state['tool_results'].items():
+                tool_results_text += f"\n- **{tool_name}**: {json.dumps(tool_info.get('args', {}))}\n"
+                if 'result' in tool_info:
+                    tool_results_text += f"Résultat: {tool_info['result'][:500]}...\n"
+        
+        # Contexte des URLs pour la génération de code
+        url_reference = ""
+        if process_state.get('url_contents'):
+            url_reference = "\n**URLs fournies:** Veuillez vous référer aux URLs fournies par l'utilisateur comme source d'inspiration ou documentation. Suivez autant que possible les exemples ou la documentation fournie dans ces URLs."
+        
+        # Construction du prompt pour la génération de code avec les résultats des outils MCP
+        prompt_code_gen = f"""
+        Générez le code *complet* de l'application basé sur le prompt et la structure ci-dessous.
 
-        Demande de l'Utilisateur:
-        "{user_prompt}"
+        **Prompt Détaillé:**
+        {reformulated_prompt}
+        
+        {tool_results_text if tool_results_text else ""}
+        
+        {url_reference if url_reference else ""}
         
         {url_context if url_context else ""}
+
+        **Structure du Projet (uniquement pour référence):**
+        ```
+        {chr(10).join(structure_lines)}
+        ```
+
+        **Instructions:**
+        1. Fournissez le code complet pour *tous* les fichiers listés dans la structure.
+        2. Utilisez le format EXACT `--- FILE: chemin/vers/nomfichier ---` sur une ligne par lui-même avant chaque bloc de code de fichier. Commencez la réponse *immédiatement* avec le premier marqueur. Aucun texte d'introduction.
+        3. Assurez-vous que le code est fonctionnel, inclut les imports, la gestion des erreurs de base et des commentaires.
+        4. Pour `requirements.txt` ou similaire, listez les dépendances.
+        5. Pour `README.md`, fournissez des instructions de configuration/exécution.
+        6. Si le code dépasse les limites de jetons, terminez la réponse *entière* *exactement* avec: `GENERATION_INCOMPLETE` (aucun autre texte après).{animation_instruction}
         
-        {additional_context if additional_context else ""}
+        IMPORTANT: SI un style, template ou documentation est fourni dans les URLs, utilisez-les comme référence primaire.
 
-        IMPORTANT: Si l'utilisateur a fourni des URLs, lisez attentivement leur contenu et suivez les instructions ou inspirez-vous des exemples qui y sont présents.
-
-        Le format de sortie DOIT être exactement comme suit, en commençant immédiatement par le premier marqueur:
-
-        ### REFORMULATED PROMPT ###
-        [Prompt reformulé détaillé ici]
-
-        ### STRUCTURE ###
-        [Liste des fichiers/dossiers, un par ligne, ex.:
-        src/
-        src/main.py
-        requirements.txt
-        README.md]
+        Générez le code maintenant:
         """
-        messages_step1 = [{"role": "user", "content": prompt_step1}]
+        messages_code_gen = [{"role": "user", "content": prompt_code_gen}]
 
-        response_step1 = call_openrouter_api(api_key, selected_model, messages_step1, temperature=0.6, max_retries=2)
-        st.session_state.last_api_call_time = time.time()  # Enregistrer l'heure
+        # Utiliser des outils pour la génération de code si activés
+        if use_mcp_tools:
+            response_code_gen = call_openrouter_api(
+                api_key, 
+                selected_model, 
+                messages_code_gen, 
+                temperature=0.4, 
+                max_retries=2,
+                tools=get_default_tools()
+            )
+        else:
+            # Utiliser une température plus basse pour la génération de code
+            response_code_gen = call_openrouter_api(
+                api_key, 
+                selected_model, 
+                messages_code_gen, 
+                temperature=0.4, 
+                max_retries=2
+            )
+        process_state['last_api_call_time'] = time.time()
 
-    if response_step1 and response_step1.get("choices"):
-        response_text_step1 = response_step1["choices"][0]["message"]["content"]
-        reformulated_prompt, structure_lines = parse_structure_and_prompt(response_text_step1)
-
-        if reformulated_prompt and structure_lines:
-            st.session_state.reformulated_prompt = reformulated_prompt
-            st.session_state.project_structure = structure_lines
-            status_placeholder_step1.success("✅ Étape 1 terminée: Prompt reformulé et structure définie.")
-
-            with st.expander("Voir le Prompt Reformulé et la Structure"):
-                st.subheader("Prompt Reformulé:")
-                st.markdown(f"```text\n{reformulated_prompt}\n```")
-                st.subheader("Structure de Projet Proposée (Nettoyée):")
-                st.code("\n".join(structure_lines), language='text')
-                if url_context:
-                    st.subheader("URLs Utilisées:")
-                    for url in st.session_state.url_contents.keys():
-                        st.markdown(f"- [{url}]({url})")
-
-            # == ÉTAPE 2: Création de la Structure de Fichiers/Dossiers ==
-            st.info("▶️ Étape 2: Création de la Structure Physique...")
-            status_placeholder_step2 = st.empty()
-            with st.spinner(f"Création des dossiers et fichiers dans '{target_directory}'..."):
-                created_paths = create_project_structure(target_directory, st.session_state.project_structure)
-
-            if created_paths is not None:
-                status_placeholder_step2.success(f"✅ Étape 2 terminée: Structure créée dans '{target_directory}'.")
-
-                # == ÉTAPE 3: Génération de Code ==
-                st.info("▶️ Étape 3: Génération du Code Complet...")
-                status_placeholder_step3 = st.empty()
-                with st.spinner("Appel de l'IA pour générer le code (cela peut prendre du temps)..."):
-                    # Vérifier la limite de taux pour les modèles gratuits
-                    if is_free_model(selected_model):
-                       current_time = time.time()
-                       time_since_last_call = current_time - st.session_state.get('last_api_call_time', 0)
-                       if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
-                           wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
-                           status_placeholder_step3.warning(f"⏳ Modèle gratuit détecté. Attente de {wait_time:.1f} secondes (limite de taux)...")
-                           time.sleep(wait_time)
-
-                    # --- Ajout d'instructions d'animation ---
-                    animation_instruction = ""
-                    if not prompt_mentions_design(user_prompt):
-                         animation_instruction = (
-                             "\n7. **Animation & Fluidité:** Puisqu'aucun design spécifique n'a été demandé, "
-                             "veuillez incorporer des animations CSS subtiles et des transitions (par exemple, effets hover, chargement/transitions fluides des sections, retour d'information subtil des boutons) "
-                             "pour rendre l'interface utilisateur moderne, fluide et attrayante. Privilégiez l'utilisabilité et évitez les animations trop distrayantes."
-                         )
-                         st.info("ℹ️ Aucune instruction de design détectée, ajout d'une demande d'animations fluides.")
+        if response_code_gen and response_code_gen.get("choices"):
+            code_response_text = response_code_gen["choices"][0]["message"]["content"]
+            
+            # Vérifier les appels d'outils
+            if use_mcp_tools and response_code_gen["choices"][0]["message"].get("tool_calls"):
+                update_progress(4, "🔍 L'IA utilise des outils pour améliorer la génération de code...", 80)
+                
+                # Traiter chaque appel d'outil
+                tool_calls = response_code_gen["choices"][0]["message"]["tool_calls"]
+                for tool_call in tool_calls:
+                    function_info = tool_call.get("function", {})
+                    tool_name = function_info.get("name")
+                    tool_args_str = function_info.get("arguments", "{}")
                     
-                    # Ajouter les résultats des outils si disponibles
-                    tool_results_text = ""
-                    if use_mcp_tools and st.session_state.tool_results:
-                        tool_results_text = "\n**Résultats des Outils:** Les informations suivantes ont été recueillies pour aider au développement:\n"
-                        for tool_name, tool_info in st.session_state.tool_results.items():
-                            st.write(f"**{tool_name}**")
-                            st.write(f"Arguments: {tool_info.get('args', {})}")
-                            if 'result' in tool_info:
-                                with st.expander(f"Voir les résultats de {tool_name}"):
-                                    st.code(tool_info['result'])
-                    
-                    # Contexte des URLs pour la génération de code
-                    url_reference = ""
-                    if st.session_state.url_contents:
-                        url_reference = "\n**URLs fournies:** Veuillez vous référer aux URLs fournies par l'utilisateur comme source d'inspiration ou documentation. Suivez autant que possible les exemples ou la documentation fournie dans ces URLs."
-                    
-                    # Construction du prompt pour la génération de code avec les résultats des outils MCP
-                    prompt_step2 = f"""
-                    Générez le code *complet* de l'application basé sur le prompt et la structure ci-dessous.
+                    try:
+                        tool_args = json.loads(tool_args_str)
+                        
+                        # Exécuter l'outil via le client MCP
+                        tool_query = f"Exécuter {tool_name} avec {tool_args}"
+                        tool_result = asyncio.run(run_mcp_query(mcp_client, tool_query))
+                        
+                        if tool_result:
+                            # Stocker les résultats des outils
+                            if 'tool_results' not in process_state:
+                                process_state['tool_results'] = {}
+                            
+                            process_state['tool_results'][tool_name] = {
+                                "args": tool_args,
+                                "result": tool_result.get("text", "")
+                            }
+                            
+                            # Construire un prompt de suivi avec les résultats de l'outil
+                            processed_result = handle_tool_results(tool_name, tool_result.get("text", ""))
+                            
+                            follow_up_prompt = f"""
+                            J'ai utilisé {tool_name} pour recueillir des informations supplémentaires pour la génération de code.
+                            
+                            L'outil a retourné ces informations:
+                            
+                            {processed_result}
+                            
+                            Veuillez utiliser ces informations supplémentaires pour améliorer la génération de code.
+                            Continuez à générer le code en utilisant le même format:
+                            `--- FILE: chemin/vers/nomfichier ---`
+                            
+                            Et n'oubliez pas d'inclure tous les fichiers de la structure.
+                            """
+                            
+                            # Faire un autre appel API avec le prompt de suivi
+                            follow_up_messages = messages_code_gen + [
+                                {"role": "assistant", "content": code_response_text},
+                                {"role": "user", "content": follow_up_prompt}
+                            ]
+                            
+                            update_progress(4, f"🔍 Utilisation des informations de {tool_name} pour améliorer le code...", 85)
+                            
+                            # Vérifier la limite de taux
+                            if is_free_model(selected_model):
+                                current_time = time.time()
+                                time_since_last_call = time.time() - process_state.get('last_api_call_time', 0)
+                                if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
+                                    wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
+                                    update_progress(4, f"⏳ Attente de {wait_time:.1f}s avant de continuer...", 85)
+                                    time.sleep(wait_time)
+                            
+                            # Faire l'appel de suivi
+                            follow_up_response = call_openrouter_api(
+                                api_key, 
+                                selected_model, 
+                                follow_up_messages, 
+                                temperature=0.4
+                            )
+                            process_state['last_api_call_time'] = time.time()
+                            
+                            if follow_up_response and follow_up_response.get("choices"):
+                                # Mettre à jour la réponse de code avec la version améliorée
+                                enhanced_code = follow_up_response["choices"][0]["message"]["content"]
+                                code_response_text = enhanced_code
+                    except Exception as e:
+                        logging.warning(f"Erreur lors du traitement de l'outil {tool_name}: {e}")
+            
+            process_state['last_code_generation_response'] = code_response_text
+            update_progress(4, "✅ Réponse de génération de code reçue.", 90)
 
-                    **Prompt Détaillé:**
-                    {st.session_state.reformulated_prompt}
-                    
-                    {tool_results_text if tool_results_text else ""}
-                    
-                    {url_reference if url_reference else ""}
-                    
-                    {url_context if url_context else ""}
+            # == ÉTAPE 5: Écriture du Code dans les Fichiers ==
+            update_progress(5, "Écriture du code dans les fichiers...", 90)
+            files_written = []
+            errors = []
+            generation_incomplete = False
+            
+            files_written, errors, generation_incomplete = parse_and_write_code(target_directory, code_response_text)
 
-                    **Structure du Projet (uniquement pour référence):**
-                    ```
-                    {chr(10).join(st.session_state.project_structure)}
-                    ```
+            if files_written or errors:
+                update_progress(5, "✅ Traitement de la réponse terminé.", 95)
+                
+                # Journaliser les résultats
+                for f in files_written:
+                    logging.info(f"📄 Fichier écrit: {Path(f).relative_to(Path(target_directory))}")
+                for err in errors:
+                    logging.error(f"❌ {err}")
 
-                    **Instructions:**
-                    1. Fournissez le code complet pour *tous* les fichiers listés dans la structure.
-                    2. Utilisez le format EXACT `--- FILE: chemin/vers/nomfichier ---` sur une ligne par lui-même avant chaque bloc de code de fichier. Commencez la réponse *immédiatement* avec le premier marqueur. Aucun texte d'introduction.
-                    3. Assurez-vous que le code est fonctionnel, inclut les imports, la gestion des erreurs de base et des commentaires.
-                    4. Pour `requirements.txt` ou similaire, listez les dépendances.
-                    5. Pour `README.md`, fournissez des instructions de configuration/exécution.
-                    6. Si le code dépasse les limites de jetons, terminez la réponse *entière* *exactement* avec: `GENERATION_INCOMPLETE` (aucun autre texte après).{animation_instruction}
+                # == ÉTAPE 6: Vérifier les Fichiers Vides et Générer le Code Manquant ==
+                if not errors and (files_written or generation_incomplete):
+                    update_progress(6, "Vérification des fichiers vides...", 95)
                     
-                    IMPORTANT: SI un style, template ou documentation est fourni dans les URLs, utilisez-les comme référence primaire.
-
-                    Générez le code maintenant:
-                    """
-                    messages_step2 = [{"role": "user", "content": prompt_step2}]
-
-                    # Utiliser des outils pour la génération de code si activés
-                    if use_mcp_tools:
-                        response_step2 = call_openrouter_api(
+                    empty_files = identify_empty_files(target_directory, structure_lines)
+                    
+                    if empty_files:
+                        update_progress(6, f"Trouvé {len(empty_files)} fichiers vides qui nécessitent une génération de code.", 95)
+                        
+                        # Vérifier la limite de taux avant d'appeler l'API à nouveau
+                        if is_free_model(selected_model):
+                            current_time = time.time()
+                            time_since_last_call = time.time() - process_state.get('last_api_call_time', 0)
+                            if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
+                                wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
+                                update_progress(6, f"⏳ Modèle gratuit détecté. Attente de {wait_time:.1f} secondes avant de générer le code manquant...", 95)
+                                time.sleep(wait_time)
+                        
+                        update_progress(6, "Génération de code pour les fichiers vides...", 97)
+                        additional_files, additional_errors = generate_missing_code(
                             api_key, 
                             selected_model, 
-                            messages_step2, 
-                            temperature=0.4, 
-                            max_retries=2,
-                            tools=get_default_tools()
+                            empty_files, 
+                            reformulated_prompt, 
+                            structure_lines,
+                            code_response_text,
+                            target_directory
                         )
+                        process_state['last_api_call_time'] = time.time()
+                        
+                        if additional_files:
+                            update_progress(6, f"✅ Génération réussie de code pour {len(additional_files)} fichiers vides.", 98)
+                            # Ajouter à la liste principale de fichiers
+                            files_written.extend(additional_files)
+                        
+                        if additional_errors:
+                            for err in additional_errors:
+                                logging.error(f"❌ {err}")
+                            # Ajouter à la liste principale d'erreurs
+                            errors.extend(additional_errors)
                     else:
-                        # Utiliser une température plus basse pour la génération de code (moins de créativité/erreurs)
-                        response_step2 = call_openrouter_api(
-                            api_key, 
-                            selected_model, 
-                            messages_step2, 
-                            temperature=0.4, 
-                            max_retries=2
-                        )
-                    st.session_state.last_api_call_time = time.time()
-
-                if response_step2 and response_step2.get("choices"):
-                    code_response_text = response_step2["choices"][0]["message"]["content"]
+                        update_progress(6, "✅ Aucun fichier vide trouvé - tous les fichiers contiennent du code.", 98)
+                
+                # Message de succès final
+                if not errors:
+                    update_progress(7, "🎉 Application générée avec succès!", 100)
                     
-                    # Vérifier les appels d'outils
-                    if use_mcp_tools and response_step2["choices"][0]["message"].get("tool_calls"):
-                        status_placeholder_step3.info("🔍 L'IA utilise des outils pour améliorer la génération de code...")
-                        
-                        # Traiter chaque appel d'outil
-                        tool_calls = response_step2["choices"][0]["message"]["tool_calls"]
-                        for tool_call in tool_calls:
-                            function_info = tool_call.get("function", {})
-                            tool_name = function_info.get("name")
-                            tool_args_str = function_info.get("arguments", "{}")
-                            
-                            try:
-                                tool_args = json.loads(tool_args_str)
-                                
-                                # Exécuter l'outil via le client MCP
-                                tool_query = f"Exécuter {tool_name} avec {tool_args}"
-                                tool_result = asyncio.run(run_mcp_query(st.session_state.mcp_client, tool_query))
-                                
-                                if tool_result:
-                                    # Stocker les résultats des outils
-                                    st.session_state.tool_results[tool_name] = {
-                                        "args": tool_args,
-                                        "result": tool_result.get("text", "")
-                                    }
-                                    
-                                    # Construire un prompt de suivi avec les résultats de l'outil
-                                    processed_result = handle_tool_results(tool_name, tool_result.get("text", ""))
-                                    
-                                    follow_up_prompt = f"""
-                                    J'ai utilisé {tool_name} pour recueillir des informations supplémentaires pour la génération de code.
-                                    
-                                    L'outil a retourné ces informations:
-                                    
-                                    {processed_result}
-                                    
-                                    Veuillez utiliser ces informations supplémentaires pour améliorer la génération de code.
-                                    Continuez à générer le code en utilisant le même format:
-                                    `--- FILE: chemin/vers/nomfichier ---`
-                                    
-                                    Et n'oubliez pas d'inclure tous les fichiers de la structure.
-                                    """
-                                    
-                                    # Faire un autre appel API avec le prompt de suivi
-                                    follow_up_messages = messages_step2 + [
-                                        {"role": "assistant", "content": code_response_text},
-                                        {"role": "user", "content": follow_up_prompt}
-                                    ]
-                                    
-                                    status_placeholder_step3.info(f"🔍 Utilisation des informations de {tool_name} pour améliorer le code...")
-                                    
-                                    # Vérifier la limite de taux
-                                    if is_free_model(selected_model):
-                                        current_time = time.time()
-                                        time_since_last_call = time.time() - st.session_state.get('last_api_call_time', 0)
-                                        if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
-                                            wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
-                                            st.warning(f"⏳ Attente de {wait_time:.1f}s avant de continuer...")
-                                            time.sleep(wait_time)
-                                    
-                                    # Faire l'appel de suivi
-                                    follow_up_response = call_openrouter_api(
-                                        api_key, 
-                                        selected_model, 
-                                        follow_up_messages, 
-                                        temperature=0.4
-                                    )
-                                    st.session_state.last_api_call_time = time.time()
-                                    
-                                    if follow_up_response and follow_up_response.get("choices"):
-                                        # Mettre à jour la réponse de code avec la version améliorée
-                                        enhanced_code = follow_up_response["choices"][0]["message"]["content"]
-                                        code_response_text = enhanced_code
-                            except Exception as e:
-                                st.warning(f"Erreur lors du traitement de l'outil {tool_name}: {e}")
+                    # Sauvegarder le chemin pour le mode prévisualisation si on est dans un contexte Flask
+                    if current_app:
+                        current_app.config['last_generated_app_path'] = target_directory
                     
-                    st.session_state.last_code_generation_response = code_response_text  # Stocker pour affichage
-                    status_placeholder_step3.success("✅ Étape 3 terminée: Réponse de génération de code reçue.")
-
-                    # == ÉTAPE 4: Écriture du Code dans les Fichiers ==
-                    st.info("▶️ Étape 4: Écriture du Code dans les Fichiers...")
-                    status_placeholder_step4 = st.empty()
-                    files_written = []
-                    errors = []
-                    generation_incomplete = False
-                    with st.spinner("Analyse de la réponse et écriture du code..."):
-                        files_written, errors, generation_incomplete = parse_and_write_code(target_directory, code_response_text)
-
-                    if files_written or errors:
-                        status_placeholder_step4.success(f"✅ Étape 4 terminée: Traitement de la réponse terminé.")
-                        st.subheader("Résultats de l'écriture de fichiers:")
-                        for f in files_written:
-                            st.success(f"   📄 Fichier écrit: {Path(f).relative_to(Path(target_directory))}")
-                        for err in errors:
-                            st.error(f"   ❌ {err}")
-
-                        # == ÉTAPE 5: Vérifier les Fichiers Vides et Générer le Code Manquant ==
-                        empty_files_check = st.checkbox("Vérifier les fichiers vides et générer leur code", value=True)
-                        
-                        if empty_files_check and not errors and (files_written or generation_incomplete):
-                            st.info("▶️ Étape 5: Vérification des fichiers vides et génération du code manquant...")
-                            status_placeholder_step5 = st.empty()
-                            
-                            with st.spinner("Identification des fichiers vides..."):
-                                empty_files = identify_empty_files(target_directory, st.session_state.project_structure)
-                            
-                            if empty_files:
-                                status_placeholder_step5.warning(f"Trouvé {len(empty_files)} fichiers vides qui nécessitent une génération de code.")
-                                st.write("Fichiers vides:")
-                                for ef in empty_files:
-                                    st.info(f"   📄 Fichier vide: {ef}")
-                                
-                                # Vérifier la limite de taux avant d'appeler l'API à nouveau
-                                if is_free_model(selected_model):
-                                    current_time = time.time()
-                                    time_since_last_call = time.time() - st.session_state.get('last_api_call_time', 0)
-                                    if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
-                                        wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
-                                        st.warning(f"⏳ Modèle gratuit détecté. Attente de {wait_time:.1f} secondes avant de générer le code manquant...")
-                                        time.sleep(wait_time)
-                                
-                                with st.spinner("Génération de code pour les fichiers vides..."):
-                                    additional_files, additional_errors = generate_missing_code(
-                                        api_key, 
-                                        selected_model, 
-                                        empty_files, 
-                                        st.session_state.reformulated_prompt, 
-                                        st.session_state.project_structure,
-                                        st.session_state.last_code_generation_response,
-                                        target_directory
-                                    )
-                                    st.session_state.last_api_call_time = time.time()
-                                
-                                if additional_files:
-                                    status_placeholder_step5.success(f"✅ Génération réussie de code pour {len(additional_files)} fichiers vides.")
-                                    st.subheader("Fichiers supplémentaires remplis:")
-                                    for f in additional_files:
-                                        st.success(f"   📄 Fichier rempli: {Path(f).relative_to(Path(target_directory))}")
-                                    
-                                    # Ajouter à la liste principale de fichiers
-                                    files_written.extend(additional_files)
-                                
-                                if additional_errors:
-                                    for err in additional_errors:
-                                        st.error(f"   ❌ {err}")
-                                    
-                                    # Ajouter à la liste principale d'erreurs
-                                    errors.extend(additional_errors)
-                            else:
-                                status_placeholder_step5.success("✅ Aucun fichier vide trouvé - tous les fichiers contiennent du code.")
-                        
-                        # Afficher les résultats des outils si des outils ont été utilisés
-                        if use_mcp_tools and st.session_state.tool_results:
-                            with st.expander("Voir les Résultats des Outils MCP"):
-                                st.subheader("🔍 Résultats des Outils Utilisés")
-                                for tool_name, tool_info in st.session_state.tool_results.items():
-                                    st.write(f"**{tool_name}**")
-                                    st.write(f"Arguments: {tool_info.get('args', {})}")
-                                    if 'result' in tool_info:
-                                        with st.expander(f"Voir les résultats de {tool_name}"):
-                                            st.code(tool_info['result'])
-                        
-                        # Message de succès final
-                        if not errors:
-                            st.success("🎉 Application générée avec succès!")
-                            st.balloons()
-                            
-                            # Sauvegarder le chemin pour le mode prévisualisation
-                            st.session_state.last_generated_app_path = target_directory
-                            
-                            # Ajouter le bouton de prévisualisation
-                            preview_col1, preview_col2 = st.columns([3, 1])
-                            with preview_col1:
-                                st.info("Voulez-vous prévisualiser l'application générée directement dans l'interface?")
-                            with preview_col2:
-                                if st.button("🔍 Prévisualiser l'application", type="primary"):
-                                    # Définir les états de session pour la prévisualisation
-                                    launch_preview_mode(target_directory)
-                                    # Force le rechargement complet de l'application
-                                    st.experimental_rerun()
-                            return True
-                        elif len(errors) < len(files_written) / 2:  # Si les erreurs sont inférieures à la moitié des fichiers
-                            st.warning("🎯 Application générée avec quelques erreurs. Vérifiez les messages d'erreur ci-dessus.")
-                            
-                            # Proposer quand même la prévisualisation mais avec un avertissement
-                            st.session_state.last_generated_app_path = target_directory
-                            preview_col1, preview_col2 = st.columns([3, 1])
-                            with preview_col1:
-                                st.warning("L'application a été générée avec des erreurs. La prévisualisation pourrait ne pas fonctionner correctement.")
-                            with preview_col2:
-                                if st.button("🔍 Tenter la prévisualisation", type="primary"):
-                                    # Définir les états de session pour la prévisualisation
-                                    launch_preview_mode(target_directory)
-                                    # Force le rechargement complet de l'application
-                                    st.experimental_rerun()
-                            return True
-                        else:
-                            st.error("❗️ Plusieurs erreurs se sont produites pendant la génération de l'application.")
-                            return False
-
-                    else:
-                         status_placeholder_step4.error("❌ Étape 4 échouée: Aucun fichier n'a pu être écrit.")
-                         return False
-
+                    return True
                 else:
-                    status_placeholder_step3.error("❌ Étape 3 échouée: Échec de la récupération de la génération de code.")
-                    if response_step2: st.json(response_step2)  # Afficher la réponse d'erreur si disponible
-                    return False
-
-            else:  # Erreur lors de la création de la structure (gérée dans la fonction)
-               status_placeholder_step2.error("❌ Étape 2 échouée: Impossible de créer la structure du projet.")
-               return False
-
-        else:  # Erreur lors de l'analyse de l'étape 1
-            status_placeholder_step1.error("❌ Étape 1 échouée: Impossible d'analyser la réponse de l'IA (prompt/structure).")
-            if 'response_text_step1' in locals():
-                with st.expander("Voir la réponse brute de l'Étape 1"):
-                    st.code(response_text_step1, language='text')
+                    update_progress(7, f"⚠️ Application générée avec {len(errors)} erreurs.", 100)
+                    return len(files_written) > 0
+            else:
+                update_progress(5, "❌ Échec de l'écriture des fichiers.", 100)
+                return False
+        else:
+            update_progress(4, "❌ Échec de la génération de code.", 100)
             return False
-    else:  # Erreur lors de l'appel API à l'étape 1
-         status_placeholder_step1.error("❌ Étape 1 échouée: Échec de l'appel API pour la reformulation/structure.")
-         if response_step1: st.json(response_step1)  # Afficher la réponse d'erreur si disponible
-         return False
-
-    st.session_state.process_running = False  # Réactiver le bouton
-    st.info("🏁 Processus terminé.")  # Indiquer la fin globale
-    return True
+    else:
+        update_progress(3, "❌ Échec de la création de la structure.", 100)
+        return False
 
