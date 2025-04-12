@@ -10,6 +10,8 @@ from pathlib import Path
 from functools import wraps
 from threading import Thread
 from typing import Dict, List, Union, Optional, Any
+import zipfile
+import io
 
 import requests
 from flask import (
@@ -923,6 +925,60 @@ def iterate_application_thread(task_id, api_key, model, reformulated_prompt, fee
         app.logger.error(f"Erreur lors de l'itération: {str(e)}")
         generation_tasks[task_id]['error'] = str(e)
         generation_tasks[task_id]['status'] = 'failed'
+
+@app.route('/download_zip', methods=['GET'])
+def download_zip():
+    """Créer et télécharger un fichier ZIP du projet généré"""
+    if 'generation_result' not in session:
+        flash("Aucun résultat de génération trouvé. Veuillez d'abord générer une application.", "warning")
+        return redirect(url_for('index'))
+    
+    target_dir = session['generation_result'].get('target_directory')
+    if not target_dir or not Path(target_dir).is_dir():
+        flash("Répertoire cible introuvable", "danger")
+        return redirect(url_for('result'))
+    
+    try:
+        # Créer un buffer mémoire pour stocker le zip
+        memory_file = io.BytesIO()
+        
+        # Créer l'archive ZIP en mémoire
+        with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # Parcourir le répertoire et ajouter tous les fichiers
+            for root, dirs, files in os.walk(target_dir):
+                for file in files:
+                    # Ignorer les fichiers cachés et __pycache__
+                    if file.startswith('.') or '__pycache__' in root:
+                        continue
+                    
+                    # Chemin absolu du fichier
+                    file_path = os.path.join(root, file)
+                    
+                    # Chemin relatif pour le zip (enlever le chemin de base)
+                    rel_path = os.path.relpath(file_path, target_dir)
+                    
+                    # Ajout du fichier au zip
+                    zipf.write(file_path, rel_path)
+        
+        # Revenir au début du fichier mémoire
+        memory_file.seek(0)
+        
+        # Extraire le nom du dossier pour nommer le fichier zip
+        dir_name = os.path.basename(os.path.normpath(target_dir))
+        zip_filename = f"{dir_name}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.zip"
+        
+        # Envoyer le fichier
+        return send_file(
+            memory_file,
+            as_attachment=True,
+            download_name=zip_filename,
+            mimetype='application/zip'
+        )
+    
+    except Exception as e:
+        app.logger.error(f"Erreur lors de la création du ZIP: {str(e)}")
+        flash(f"Erreur lors de la création du fichier ZIP: {str(e)}", "danger")
+        return redirect(url_for('result'))
 
 # Gestion des erreurs
 @app.errorhandler(404)
