@@ -230,48 +230,116 @@
             });
         });
         
-        // Simulate loading directory structure
-        setTimeout(() => {
+        // Charger la structure réelle du projet
+        function loadProjectStructure() {
             const directoryTree = document.getElementById('directoryTree');
+            directoryTree.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin me-2"></i>Chargement de la structure...</div>';
             
-            // Sample structure - in a real app, this would come from the server
-            directoryTree.innerHTML = `
-                <li class="folder-item"><i class="fas fa-folder"></i> <span>src/</span>
-                    <ul>
-                        <li class="folder-item"><i class="fas fa-folder"></i> <span>api/</span>
-                            <ul>
-                                <li class="file-item"><i class="fas fa-file-code"></i> <span>__init__.py</span></li>
-                                <li class="file-item"><i class="fas fa-file-code"></i> <span>routes.py</span></li>
-                            </ul>
-                        </li>
-                        <li class="folder-item"><i class="fas fa-folder"></i> <span>models/</span>
-                            <ul>
-                                <li class="file-item"><i class="fas fa-file-code"></i> <span>__init__.py</span></li>
-                                <li class="file-item"><i class="fas fa-file-code"></i> <span>user.py</span></li>
-                            </ul>
-                        </li>
-                        <li class="folder-item"><i class="fas fa-folder"></i> <span>static/</span>
-                            <ul>
-                                <li class="folder-item"><i class="fas fa-folder"></i> <span>css/</span></li>
-                                <li class="folder-item"><i class="fas fa-folder"></i> <span>js/</span></li>
-                            </ul>
-                        </li>
-                        <li class="folder-item"><i class="fas fa-folder"></i> <span>templates/</span></li>
-                        <li class="file-item"><i class="fas fa-file-code"></i> <span>__init__.py</span></li>
-                        <li class="file-item"><i class="fas fa-file-code"></i> <span>app.py</span></li>
-                    </ul>
-                </li>
-                <li class="file-item"><i class="fas fa-file-alt"></i> <span>README.md</span></li>
-                <li class="file-item"><i class="fas fa-file-alt"></i> <span>requirements.txt</span></li>
-            `;
-            
-            // Make folders collapsible
-            document.querySelectorAll('.folder-item > span').forEach(folder => {
-                folder.addEventListener('click', function() {
-                    this.parentElement.classList.toggle('collapsed');
-                });
+            // Appel à l'API pour récupérer la structure du projet
+            fetch('/get_project_structure', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    project_dir: '{{ target_dir }}'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success' && data.structure) {
+                    // Effacer le contenu actuel
+                    directoryTree.innerHTML = '';
+                    
+                    // Fonction récursive pour construire l'arborescence
+                    function buildTreeHTML(items, parentElement) {
+                        const ul = document.createElement('ul');
+                        
+                        items.forEach(item => {
+                            const li = document.createElement('li');
+                            
+                            if (item.type === 'folder') {
+                                li.className = 'folder-item';
+                                li.innerHTML = `<i class="fas fa-folder"></i> <span>${item.name}/</span>`;
+                                
+                                // Ajouter les enfants du dossier
+                                if (item.children && item.children.length > 0) {
+                                    buildTreeHTML(item.children, li);
+                                } else {
+                                    // Dossier vide
+                                    const emptyUl = document.createElement('ul');
+                                    const emptyLi = document.createElement('li');
+                                    emptyLi.className = 'text-muted small';
+                                    emptyLi.innerHTML = '<i class="fas fa-info-circle"></i> Dossier vide';
+                                    emptyUl.appendChild(emptyLi);
+                                    li.appendChild(emptyUl);
+                                }
+                            } else {
+                                // C'est un fichier
+                                li.className = 'file-item';
+                                
+                                // Déterminer l'icône en fonction de l'extension
+                                let fileIcon = 'fa-file';
+                                const extension = item.name.split('.').pop().toLowerCase();
+                                
+                                if (['html', 'htm', 'jsx', 'tsx', 'xml'].includes(extension)) {
+                                    fileIcon = 'fa-file-code';
+                                } else if (['js', 'ts', 'py', 'java', 'c', 'cpp', 'cs', 'go', 'php', 'rb'].includes(extension)) {
+                                    fileIcon = 'fa-file-code';
+                                } else if (['css', 'scss', 'sass', 'less'].includes(extension)) {
+                                    fileIcon = 'fa-file-code';
+                                } else if (['json', 'yaml', 'yml', 'toml'].includes(extension)) {
+                                    fileIcon = 'fa-file-code';
+                                } else if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(extension)) {
+                                    fileIcon = 'fa-file-image';
+                                } else if (['pdf'].includes(extension)) {
+                                    fileIcon = 'fa-file-pdf';
+                                } else if (['md', 'txt', 'rtf'].includes(extension)) {
+                                    fileIcon = 'fa-file-alt';
+                                }
+                                
+                                li.innerHTML = `<i class="fas ${fileIcon}"></i> <span>${item.name}</span>`;
+                            }
+                            
+                            ul.appendChild(li);
+                        });
+                        
+                        parentElement.appendChild(ul);
+                    }
+                    
+                    // Construire l'arborescence
+                    buildTreeHTML(data.structure, directoryTree);
+                    
+                    // Ajouter les écouteurs d'événements pour les dossiers
+                    document.querySelectorAll('.folder-item > span').forEach(folderLabel => {
+                        folderLabel.addEventListener('click', function() {
+                            this.parentElement.classList.toggle('collapsed');
+                        });
+                    });
+                } else {
+                    directoryTree.innerHTML = `
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Impossible de charger la structure du projet: ${data.message || 'Erreur inconnue'}
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Erreur lors du chargement de la structure:', error);
+                directoryTree.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Erreur lors de la récupération de la structure: ${error.message}
+                    </div>
+                `;
             });
-        }, 1000);
+        }
+        
+        // Charger la structure du projet lorsque l'onglet structure est affiché
+        document.getElementById('structure-tab').addEventListener('shown.bs.tab', function(e) {
+            loadProjectStructure();
+        });
         
         // Download button functionality
         document.getElementById('downloadBtn').addEventListener('click', function() {

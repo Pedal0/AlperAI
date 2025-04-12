@@ -12,6 +12,7 @@ import subprocess
 import threading
 import platform
 import tempfile
+import socket
 from pathlib import Path
 from typing import Dict, Optional, Tuple, List
 
@@ -22,6 +23,8 @@ logger = logging.getLogger(__name__)
 # Variables globales pour stocker les processus en cours d'exécution
 running_processes = {}
 process_logs = {}
+# Dictionnaire pour stocker les ports utilisés par session
+session_ports = {}
 
 class ProjectType:
     """Types de projets supportés pour la prévisualisation"""
@@ -32,6 +35,28 @@ class ProjectType:
     ANGULAR = "angular"
     STATIC = "static"
     UNKNOWN = "unknown"
+
+def find_free_port(start_port=3000, max_attempts=100):
+    """
+    Trouve un port disponible en commençant par start_port.
+    
+    Args:
+        start_port (int): Port de départ pour la recherche
+        max_attempts (int): Nombre maximum de tentatives
+        
+    Returns:
+        int: Numéro de port disponible ou None si aucun port n'est disponible
+    """
+    port = start_port
+    for _ in range(max_attempts):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('', port))
+                return port
+        except OSError:
+            port += 1
+    
+    return None
 
 def detect_project_type(project_dir: str) -> str:
     """
@@ -161,13 +186,14 @@ def prepare_environment(project_dir: str, project_type: str) -> Tuple[bool, str]
         logger.error(f"Erreur lors de la préparation de l'environnement: {str(e)}")
         return False, f"Erreur: {str(e)}"
 
-def get_start_command(project_dir: str, project_type: str) -> Tuple[List[str], Optional[Dict]]:
+def get_start_command(project_dir: str, project_type: str, session_id: str = None) -> Tuple[List[str], Optional[Dict]]:
     """
     Détermine la commande pour démarrer l'application.
     
     Args:
         project_dir (str): Chemin du répertoire du projet
         project_type (str): Type de projet détecté
+        session_id (str, optional): Identifiant de session pour récupérer le port dynamique
         
     Returns:
         Tuple[List[str], Optional[Dict]]: Commande sous forme de liste et variables d'environnement
@@ -253,6 +279,16 @@ def get_start_command(project_dir: str, project_type: str) -> Tuple[List[str], O
     elif project_type == ProjectType.STATIC:
         # Pour les sites statiques, nous avons plusieurs options
         
+        # Trouver un port disponible
+        port = find_free_port()
+        if port is None:
+            logger.error("Impossible de trouver un port disponible pour le serveur statique")
+            port = 3000  # Utiliser 3000 comme fallback, même s'il risque d'échouer
+        
+        # Mémoriser le port pour cette session
+        if session_id:
+            session_ports[session_id] = port
+            
         # 1. Vérifier si python est disponible
         try:
             # Vérifier si python est installé et disponible
@@ -266,8 +302,8 @@ import socketserver
 
 handler = http.server.SimpleHTTPRequestHandler
 handler.directory = r'{0}'
-socketserver.TCPServer(('0.0.0.0', 3000), handler).serve_forever()
-""".format(project_dir)
+socketserver.TCPServer(('0.0.0.0', {1}), handler).serve_forever()
+""".format(project_dir, port)
                 return ["python", "-c", python_code], env
             else:
                 # Pour Linux/Mac, utiliser une approche similaire
@@ -277,8 +313,8 @@ import socketserver
 
 handler = http.server.SimpleHTTPRequestHandler
 handler.directory = r'{0}'
-socketserver.TCPServer(('0.0.0.0', 3000), handler).serve_forever()
-""".format(project_dir)
+socketserver.TCPServer(('0.0.0.0', {1}), handler).serve_forever()
+""".format(project_dir, port)
                 return ["python3", "-c", python_code], env
         except (subprocess.SubprocessError, FileNotFoundError):
             # Python n'est pas disponible, essayons Node.js
@@ -291,7 +327,7 @@ socketserver.TCPServer(('0.0.0.0', 3000), handler).serve_forever()
                     # Vérifier si npx est disponible
                     subprocess.check_output(["npx", "--version"], stderr=subprocess.STDOUT)
                     # Utiliser npx serve
-                    return ["npx", "serve", "-s", str(project_dir), "-p", "3000"], env
+                    return ["npx", "serve", "-s", str(project_dir), "-p", str(port)], env
                 except (subprocess.SubprocessError, FileNotFoundError):
                     # npx n'est pas disponible, mais node oui
                     # On va créer un petit script node pour servir les fichiers statiques
@@ -299,9 +335,9 @@ socketserver.TCPServer(('0.0.0.0', 3000), handler).serve_forever()
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const port = 3000;
+const port = {0};
 
-const mimeTypes = {
+const mimeTypes = {{
   '.html': 'text/html',
   '.js': 'text/javascript',
   '.css': 'text/css',
@@ -318,83 +354,83 @@ const mimeTypes = {
   '.eot': 'application/vnd.ms-fontobject',
   '.otf': 'application/font-otf',
   '.wasm': 'application/wasm'
-};
+}};
 
-const server = http.createServer((req, res) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+const server = http.createServer((req, res) => {{
+  console.log(`${{new Date().toISOString()}} - ${{req.method}} ${{req.url}}`);
   
   // normalize the URL and remove query parameters
   let url = req.url;
   const queryIndex = url.indexOf('?');
-  if (queryIndex !== -1) {
+  if (queryIndex !== -1) {{
     url = url.substring(0, queryIndex);
-  }
+  }}
   
   // Normalize URL to serve index.html for '/'
-  if (url === '/') {
+  if (url === '/') {{
     url = '/index.html';
-  }
+  }}
 
   // Remove leading slash to get relative file path
   const filePath = path.join(process.cwd(), url);
   
   // Check if the file exists
-  fs.stat(filePath, (err, stats) => {
-    if (err) {
+  fs.stat(filePath, (err, stats) => {{
+    if (err) {{
       // If the requested file doesn't exist, try to send index.html for SPA routing
-      if (url !== '/index.html') {
-        fs.readFile(path.join(process.cwd(), 'index.html'), (err, data) => {
-          if (err) {
-            res.writeHead(404, { 'Content-Type': 'text/plain' });
+      if (url !== '/index.html') {{
+        fs.readFile(path.join(process.cwd(), 'index.html'), (err, data) => {{
+          if (err) {{
+            res.writeHead(404, {{ 'Content-Type': 'text/plain' }});
             res.end('404 Not Found');
             return;
-          }
-          res.writeHead(200, { 'Content-Type': 'text/html' });
+          }}
+          res.writeHead(200, {{ 'Content-Type': 'text/html' }});
           res.end(data);
-        });
+        }});
         return;
-      }
+      }}
       
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.writeHead(404, {{ 'Content-Type': 'text/plain' }});
       res.end('404 Not Found');
       return;
-    }
+    }}
 
     // If it's a directory, try to serve the index.html
-    if (stats.isDirectory()) {
-      fs.readFile(path.join(filePath, 'index.html'), (err, data) => {
-        if (err) {
-          res.writeHead(404, { 'Content-Type': 'text/plain' });
+    if (stats.isDirectory()) {{
+      fs.readFile(path.join(filePath, 'index.html'), (err, data) => {{
+        if (err) {{
+          res.writeHead(404, {{ 'Content-Type': 'text/plain' }});
           res.end('404 Not Found');
           return;
-        }
-        res.writeHead(200, { 'Content-Type': 'text/html' });
+        }}
+        res.writeHead(200, {{ 'Content-Type': 'text/html' }});
         res.end(data);
-      });
+      }});
       return;
-    }
+    }}
 
     // Get the file extension to determine MIME type
     const ext = path.extname(filePath);
     const contentType = mimeTypes[ext] || 'application/octet-stream';
 
     // Read and serve the file
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        res.writeHead(500, { 'Content-Type': 'text/plain' });
+    fs.readFile(filePath, (err, data) => {{
+      if (err) {{
+        res.writeHead(500, {{ 'Content-Type': 'text/plain' }});
         res.end('Internal Server Error');
         return;
-      }
-      res.writeHead(200, { 'Content-Type': contentType });
+      }}
+      res.writeHead(200, {{ 'Content-Type': contentType }});
       res.end(data);
-    });
-  });
-});
+    }});
+  }});
+}});
 
-server.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}/`);
-});
-"""
+server.listen(port, () => {{
+  console.log(`Server running at http://localhost:${{port}}/`);
+}});
+""".format(port)
                     # Créer un fichier temporaire pour le script
                     temp_dir = tempfile.gettempdir()
                     server_script_path = os.path.join(temp_dir, "simple_http_server.js")
@@ -410,9 +446,9 @@ server.listen(port, () => {
                 # qui échouera probablement, mais avec un message d'erreur utile
                 logger.warning("Ni Python ni Node.js ne sont disponibles pour servir des fichiers statiques.")
                 if platform.system() == "Windows":
-                    return ["python", "-m", "http.server", "3000"], env
+                    return ["python", "-m", "http.server", str(port)], env
                 else:
-                    return ["python3", "-m", "http.server", "3000"], env
+                    return ["python3", "-m", "http.server", str(port)], env
     
     else:
         # Pour les types inconnus, essayer python app.py par défaut
@@ -449,7 +485,7 @@ def start_preview(project_dir: str, session_id: str) -> Tuple[bool, str, Dict]:
             return False, message, {"project_type": project_type}
         
         # Obtenir la commande de démarrage
-        command, env = get_start_command(project_dir, project_type)
+        command, env = get_start_command(project_dir, project_type, session_id)
         log_entry(session_id, "INFO", f"Commande de démarrage: {' '.join(command)}")
         
         # Démarrer le processus
@@ -509,7 +545,7 @@ def start_preview(project_dir: str, session_id: str) -> Tuple[bool, str, Dict]:
             }
         
         # Déterminer l'URL d'accès à l'application
-        app_url = get_app_url(project_type)
+        app_url = get_app_url(project_type, session_id)
         
         return True, "Application démarrée avec succès", {
             "project_type": project_type,
@@ -555,12 +591,13 @@ def log_entry(session_id: str, level: str, message: str):
     else:
         logger.info(f"[{session_id}] {message}")
 
-def get_app_url(project_type: str) -> str:
+def get_app_url(project_type: str, session_id: str = None) -> str:
     """
     Retourne l'URL de prévisualisation en fonction du type de projet.
     
     Args:
         project_type (str): Type de projet
+        session_id (str, optional): Identifiant de session pour récupérer le port dynamique
         
     Returns:
         str: URL de prévisualisation
@@ -576,6 +613,10 @@ def get_app_url(project_type: str) -> str:
     elif project_type == ProjectType.ANGULAR:
         return "http://localhost:4200"
     elif project_type == ProjectType.STATIC:
+        # Utiliser le port dynamique pour les sites statiques si disponible
+        if session_id and session_id in session_ports:
+            port = session_ports[session_id]
+            return f"http://localhost:{port}"
         return "http://localhost:3000"
     else:
         return "http://localhost:5000"  # Par défaut
@@ -622,6 +663,11 @@ def stop_preview(session_id: str) -> Tuple[bool, str]:
         # Conserver les logs mais supprimer le processus
         del running_processes[session_id]
         
+        # Supprimer le port utilisé si c'était un site statique
+        if session_id in session_ports:
+            logger.info(f"Libération du port pour la session {session_id}")
+            del session_ports[session_id]
+        
         return True, "Application arrêtée avec succès"
         
     except Exception as e:
@@ -631,6 +677,10 @@ def stop_preview(session_id: str) -> Tuple[bool, str]:
         # En cas d'erreur, supprimer quand même l'entrée pour éviter les processus zombies
         if session_id in running_processes:
             del running_processes[session_id]
+        
+        # Supprimer également l'entrée de port en cas d'erreur
+        if session_id in session_ports:
+            del session_ports[session_id]
             
         return False, f"Erreur: {str(e)}"
 
@@ -678,7 +728,7 @@ def get_preview_status(session_id: str) -> Dict:
         "running": True,
         "project_type": process_info["project_type"],
         "project_dir": process_info["project_dir"],
-        "url": get_app_url(process_info["project_type"]),
+        "url": get_app_url(process_info["project_type"], session_id),
         "logs": process_logs.get(session_id, []),
         "pid": process.pid,
         "duration": time.time() - process_info["start_time"]
@@ -717,3 +767,29 @@ def cleanup_all_processes():
             stop_preview(session_id)
         except:
             pass
+    
+    # Nettoyer tous les ports restants (au cas où certains n'auraient pas été libérés)
+    global session_ports
+    if session_ports:
+        logger.info(f"Nettoyage final de {len(session_ports)} ports restants")
+        session_ports.clear()
+
+def cleanup_unused_ports():
+    """
+    Nettoie les entrées de port qui ne sont plus associées à des processus en cours d'exécution.
+    À appeler périodiquement ou lors de l'arrêt de certaines prévisualisations.
+    """
+    global session_ports
+    
+    # Identifier les sessions qui n'ont plus de processus en cours
+    sessions_to_remove = [session_id for session_id in session_ports if session_id not in running_processes]
+    
+    # Supprimer ces entrées du dictionnaire des ports
+    for session_id in sessions_to_remove:
+        logger.info(f"Nettoyage du port pour la session {session_id}")
+        del session_ports[session_id]
+    
+    if sessions_to_remove:
+        logger.info(f"Nettoyage terminé. {len(sessions_to_remove)} ports libérés.")
+    
+    return len(sessions_to_remove)

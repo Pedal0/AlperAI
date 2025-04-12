@@ -1,15 +1,26 @@
 import os
 import sys
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, abort
-from pathlib import Path
-import time
+import uuid
 import json
+import time
 import secrets
 import threading
+import traceback
+from pathlib import Path
+from functools import wraps
+from threading import Thread
+from typing import Dict, List, Union, Optional, Any
+
+import requests
+from flask import (
+    Flask, render_template, request, jsonify, redirect, 
+    url_for, session, flash, send_file, abort, Response
+)
+from werkzeug.utils import secure_filename
+
 from datetime import datetime
 import subprocess
 import tempfile
-import uuid
 
 # Import from restructured modules
 from src.config.constants import RATE_LIMIT_DELAY_SECONDS
@@ -54,49 +65,111 @@ def get_directory_path():
     """Récupérer le chemin complet d'un dossier à partir de son nom"""
     try:
         directory_name = request.form.get('directory_name', '')
+        use_selected_path = request.form.get('use_selected_path', 'false') == 'true'
+        file_path = request.form.get('file_path', '')
+        directory_path = request.form.get('directory_path', '')
+        
         if not directory_name:
             return jsonify({"error": "Nom de dossier manquant"}), 400
         
-        # Méthode Windows pour obtenir un chemin complet
-        if os.name == 'nt':
-            # Essayer d'obtenir l'emplacement des dossiers des utilisateurs avec PowerShell
+        # Si l'utilisateur demande explicitement d'utiliser le chemin sélectionné
+        if use_selected_path:
+            # Obtenir le chemin complet à partir du dossier parent du fichier sélectionné
             try:
-                # Créer un répertoire temporaire pour l'utilisateur s'il n'existe pas déjà
+                # Si un chemin de fichier ou de dossier a été fourni, l'utiliser pour construire le chemin complet
+                if file_path:
+                    # Pour les sélecteurs de fichiers traditionnels qui renvoient un chemin relatif
+                    # Récupérer le dossier de l'utilisateur et ajouter le nom du dossier sélectionné
+                    user_dir = os.path.expanduser("~")
+                    # Vérifier si le chemin existe déjà, sinon le créer
+                    target_path = os.path.join(user_dir, directory_name)
+                    if not os.path.exists(target_path):
+                        os.makedirs(target_path)
+                    return jsonify({"path": target_path})
+                
+                # Si aucun chemin n'est fourni, utiliser le dossier de l'utilisateur mais laisser 
+                # la possibilité à l'utilisateur de changer manuellement
                 user_dir = os.path.expanduser("~")
-                projects_dir = os.path.join(user_dir, "Projects")
-                if not os.path.exists(projects_dir):
-                    os.makedirs(projects_dir)
-                
-                target_path = os.path.join(projects_dir, directory_name)
-                
-                # Créer le dossier cible s'il n'existe pas
-                if not os.path.exists(target_path):
-                    os.makedirs(target_path)
-                
-                return jsonify({"path": target_path})
-                
+                return jsonify({"path": os.path.join(user_dir, directory_name)})
             except Exception as e:
-                app.logger.error(f"Erreur lors de la récupération du chemin avec PowerShell: {str(e)}")
-                # Fallback: utiliser un chemin par défaut
+                app.logger.error(f"Erreur lors du traitement du chemin: {str(e)}")
+                # Fallback en cas d'erreur
                 user_dir = os.path.expanduser("~")
-                return jsonify({"path": os.path.join(user_dir, "Projects", directory_name)})
+                return jsonify({"path": os.path.join(user_dir, directory_name)})
+        
+        # Si nous avons reçu le chemin du dossier directement de l'API File System Access
+        elif directory_path:
+            # Créer le dossier s'il n'existe pas encore
+            full_path = os.path.dirname(directory_path)
+            if not os.path.exists(full_path):
+                os.makedirs(full_path)
+            return jsonify({"path": full_path})
+        
+        # Méthode par défaut: permettre à l'utilisateur de créer ou choisir un dossier
+        # au lieu d'imposer un chemin par défaut
         else:
-            # Pour les systèmes Unix/Linux/Mac
+            # Sur Windows, revenir au dossier Documents de l'utilisateur comme suggestion
+            if os.name == 'nt':
+                # Obtenir le chemin du dossier Documents
+                import subprocess
+                try:
+                    # Essayer d'obtenir le dossier Documents avec PowerShell
+                    docs_dir = subprocess.check_output(
+                        ["powershell", "-command", "[Environment]::GetFolderPath('MyDocuments')"], 
+                        universal_newlines=True
+                    ).strip()
+                    
+                    # Si le répertoire Documents existe, renvoyer un chemin suggéré
+                    if os.path.exists(docs_dir):
+                        suggested_path = os.path.join(docs_dir, directory_name)
+                        return jsonify({"path": suggested_path})
+                    
+                except Exception:
+                    # En cas d'erreur, revenir au répertoire utilisateur
+                    pass
+            
+            # Pour tous les systèmes d'exploitation, revenir au répertoire de l'utilisateur
             user_dir = os.path.expanduser("~")
-            projects_dir = os.path.join(user_dir, "Projects")
-            if not os.path.exists(projects_dir):
-                os.makedirs(projects_dir)
-                
-            target_path = os.path.join(projects_dir, directory_name)
+            suggested_path = os.path.join(user_dir, directory_name)
+            return jsonify({"path": suggested_path})
             
-            # Créer le dossier cible s'il n'existe pas
-            if not os.path.exists(target_path):
-                os.makedirs(target_path)
-            
-            return jsonify({"path": target_path})
     except Exception as e:
         app.logger.error(f"Erreur lors de la récupération du chemin: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@app.route('/validate_directory_path', methods=['POST'])
+def validate_directory_path():
+    """Valider et créer si nécessaire un chemin de répertoire complet"""
+    try:
+        full_path = request.form.get('full_path', '')
+        create_if_missing = request.form.get('create_if_missing', 'false') == 'true'
+        
+        if not full_path:
+            return jsonify({"valid": False, "error": "Chemin non spécifié"}), 400
+        
+        # Normaliser le chemin pour s'assurer qu'il est dans le bon format
+        normalized_path = os.path.normpath(full_path)
+        
+        # Vérifier si le chemin existe déjà
+        if os.path.exists(normalized_path):
+            if os.path.isdir(normalized_path):
+                # Le chemin existe et c'est un dossier
+                return jsonify({"valid": True, "path": normalized_path})
+            else:
+                # Le chemin existe mais ce n'est pas un dossier
+                return jsonify({"valid": False, "error": "Le chemin spécifié existe mais n'est pas un dossier"})
+        elif create_if_missing:
+            # Essayer de créer le dossier
+            try:
+                os.makedirs(normalized_path, exist_ok=True)
+                return jsonify({"valid": True, "path": normalized_path})
+            except Exception as e:
+                return jsonify({"valid": False, "error": f"Impossible de créer le dossier: {str(e)}"})
+        else:
+            return jsonify({"valid": False, "error": "Le dossier spécifié n'existe pas"})
+    except Exception as e:
+        app.logger.error(f"Erreur lors de la validation du chemin: {str(e)}")
+        return jsonify({"valid": False, "error": str(e)}), 500
 
 @app.route('/list_files', methods=['GET'])
 def list_files():
@@ -150,6 +223,96 @@ def open_folder():
         return jsonify({"status": "success", "message": "Dossier ouvert avec succès"})
     except Exception as e:
         app.logger.error(f"Erreur lors de l'ouverture du dossier: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/open_folder_dialog', methods=['GET'])
+def open_folder_dialog():
+    """Ouvre un sélecteur de dossier natif Windows et renvoie le chemin sélectionné"""
+    try:
+        if os.name != 'nt':
+            return jsonify({"status": "error", "message": "Cette fonctionnalité n'est disponible que sur Windows"}), 400
+        
+        import subprocess
+        import tempfile
+        
+        # Script PowerShell pour ouvrir un sélecteur de dossier natif Windows
+        ps_script = """
+        Add-Type -AssemblyName System.Windows.Forms
+        $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+        $folderBrowser.Description = "Sélectionnez le dossier où vous souhaitez générer votre application"
+        $folderBrowser.RootFolder = [System.Environment+SpecialFolder]::Desktop
+        $folderBrowser.ShowNewFolderButton = $true
+        
+        if ($folderBrowser.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            $folderBrowser.SelectedPath
+        } else {
+            "CANCELED"
+        }
+        """
+        
+        # Écrire le script dans un fichier temporaire
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".ps1")
+        temp_file_path = temp_file.name
+        temp_file.write(ps_script.encode('utf-8'))
+        temp_file.close()
+        
+        # Exécuter le script PowerShell
+        result = subprocess.check_output(
+            ["powershell", "-ExecutionPolicy", "Bypass", "-File", temp_file_path],
+            universal_newlines=True
+        ).strip()
+        
+        # Supprimer le fichier temporaire
+        os.unlink(temp_file_path)
+        
+        if result == "CANCELED":
+            return jsonify({"status": "canceled", "message": "Sélection annulée par l'utilisateur"})
+        
+        # Vérifier si le chemin existe
+        if os.path.exists(result) and os.path.isdir(result):
+            return jsonify({"status": "success", "path": result})
+        else:
+            return jsonify({"status": "error", "message": "Le chemin sélectionné n'est pas valide"})
+            
+    except Exception as e:
+        app.logger.error(f"Erreur lors de l'ouverture du sélecteur de dossier: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/get_project_structure', methods=['POST'])
+def get_project_structure():
+    """Récupère la structure du projet généré"""
+    if 'generation_result' not in session:
+        return jsonify({"status": "error", "message": "Aucun résultat de génération trouvé"}), 400
+    
+    target_dir = session['generation_result'].get('target_directory')
+    if not target_dir or not Path(target_dir).is_dir():
+        return jsonify({"status": "error", "message": "Répertoire cible introuvable"}), 400
+    
+    # Fonction pour construire la structure de répertoire récursivement
+    def build_directory_structure(directory_path):
+        directory = Path(directory_path)
+        result = []
+        
+        for item in sorted(directory.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
+            if item.name.startswith('.') or '__pycache__' in str(item):
+                continue  # Ignorer les fichiers/dossiers cachés et __pycache__
+                
+            node = {'name': item.name, 'isFolder': item.is_dir()}
+            
+            if item.is_dir():
+                children = build_directory_structure(item)
+                if children:  # Ne pas inclure les dossiers vides
+                    node['children'] = children
+                    
+            result.append(node)
+            
+        return result
+    
+    try:
+        structure = build_directory_structure(target_dir)
+        return jsonify({"status": "success", "structure": structure})
+    except Exception as e:
+        app.logger.error(f"Erreur lors de la récupération de la structure: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 def generate_application_thread(task_id, api_key, model, prompt, target_dir, use_mcp, 
@@ -364,11 +527,17 @@ def preview():
 @app.route('/preview/start', methods=['POST'])
 def start_preview():
     """Démarre la prévisualisation de l'application"""
+    # Débogage de la session
+    app.logger.info(f"Contenu de la session: {dict(session)}")
+    
     if 'generation_result' not in session:
+        app.logger.error("Erreur: 'generation_result' n'est pas présent dans la session")
         return jsonify({"status": "error", "message": "Aucun résultat de génération trouvé"}), 400
     
+    app.logger.info(f"generation_result dans la session: {session['generation_result']}")
     target_dir = session['generation_result'].get('target_directory')
     if not target_dir or not Path(target_dir).is_dir():
+        app.logger.error(f"Erreur: Répertoire cible '{target_dir}' introuvable ou invalide")
         return jsonify({"status": "error", "message": "Répertoire cible introuvable"}), 400
     
     # Utiliser l'ID de session fourni ou celui de la session Flask
@@ -376,6 +545,12 @@ def start_preview():
     if not preview_session_id:
         preview_session_id = str(uuid.uuid4())
         session['preview_session_id'] = preview_session_id
+    
+    # Nettoyer les ports non utilisés avant de démarrer
+    from src.preview.preview_manager import cleanup_unused_ports
+    ports_cleaned = cleanup_unused_ports()
+    if ports_cleaned > 0:
+        app.logger.info(f"{ports_cleaned} ports libérés avant le démarrage")
     
     # Démarrer la prévisualisation avec le module preview_manager
     from src.preview.preview_manager import start_preview
@@ -456,6 +631,21 @@ def restart_preview():
             "status": "error", 
             "message": message,
             "logs": info.get("logs", [])
+        }), 500
+
+@app.route('/preview/refresh', methods=['POST'])
+def refresh_preview():
+    """Endpoint pour rafraîchir manuellement la prévisualisation"""
+    try:
+        return jsonify({
+            "status": "success",
+            "message": "Rafraîchissement manuel demandé"
+        })
+    except Exception as e:
+        app.logger.error(f"Erreur lors du rafraîchissement manuel: {str(e)}")
+        return jsonify({
+            "status": "error", 
+            "message": f"Erreur lors du rafraîchissement: {str(e)}"
         }), 500
 
 @app.route('/iterate', methods=['POST'])
@@ -763,4 +953,3 @@ def ping():
 
 if __name__ == '__main__':
     app.run(debug=True)
-

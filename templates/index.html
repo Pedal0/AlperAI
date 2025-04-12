@@ -42,8 +42,8 @@
                                     <option value="google/gemini-2.5-pro-preview-03-25" >Gemini 2.5 Pro Preview</option>
                                     <option value="openrouter/optimus-alpha">Optimus Alpha (Free)</option>
                                     <option value="google/gemini-2.5-pro-exp-03-25:free"selected>Gemini 2.5 Pro experimental (Free)</option>
-                                    <option value="meta-llama/llama-4-maverick:free">Llama 4 Maverick (Free)</option>
-                                    <option value="meta-llama/llama-4-scout:free">Llama 4 Scout (Free)</option>
+                                    <option value="meta-llama/llama-4-maverick:free">Llama 4 Maverick (Free No Tools)</option>
+                                    <option value="meta-llama/llama-4-scout:free">Llama 4 Scout (Free No Tools)</option>
                                     <option value="deepseek/deepseek-chat-v3-0324:free">DeepSeek Chat v3 (Free)</option>
                                     <option value="anthropic/claude-3.7-sonnet">Claude 3.7 Sonnet</option>
                                     <option value="custom">Autre modèle (personnalisé)...</option>
@@ -204,83 +204,135 @@
             });
         });
         
-        // Browse button - utiliser l'API File System Access si disponible
-        document.getElementById('browseButton').addEventListener('click', async function() {
-            try {
-                // Vérifier si l'API est supportée par le navigateur
-                if ('showDirectoryPicker' in window) {
-                    try {
-                        // Ouvrir le sélecteur de dossier natif
-                        const directoryHandle = await window.showDirectoryPicker();
-                        const path = directoryHandle.name;
+        // Sélection de dossier - utiliser le sélecteur natif Windows via une requête au serveur
+        document.getElementById('browseButton').addEventListener('click', function() {
+            // Afficher un indicateur de chargement
+            const currentValue = document.getElementById('target_directory').value;
+            document.getElementById('target_directory').value = "Sélection en cours...";
+            document.getElementById('target_directory').disabled = true;
+            document.getElementById('browseButton').disabled = true;
+            
+            // Appeler la nouvelle route qui lance un sélecteur de fichiers natif Windows
+            fetch('{{ url_for("open_folder_dialog") }}')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('browseButton').disabled = false;
+                    document.getElementById('target_directory').disabled = false;
+                    
+                    if (data.status === 'success') {
+                        // Mettre à jour le champ avec le chemin complet sélectionné
+                        document.getElementById('target_directory').value = data.path;
+                    } else if (data.status === 'canceled') {
+                        // Si l'utilisateur a annulé, remettre la valeur précédente
+                        document.getElementById('target_directory').value = currentValue || '';
+                    } else {
+                        // En cas d'erreur, afficher un message et remettre la valeur précédente
+                        console.error('Erreur:', data.message);
+                        document.getElementById('target_directory').value = currentValue || '';
                         
-                        // Obtenir le chemin complet via une requête au serveur
-                        const formData = new FormData();
-                        formData.append('directory_name', path);
-                        
-                        const response = await fetch('{{ url_for("get_directory_path") }}', {
-                            method: 'POST',
-                            body: formData
-                        });
-                        
-                        if (response.ok) {
-                            const data = await response.json();
-                            document.getElementById('target_directory').value = data.path;
-                        } else {
-                            throw new Error('Erreur lors de la récupération du chemin');
-                        }
-                    } catch (err) {
-                        console.error('Erreur lors de la sélection du dossier:', err);
-                        // Méthode alternative pour Windows
-                        openWindowsFolderPicker();
+                        // Proposer la méthode de saisie manuelle comme fallback
+                        openManualFolderDialog(currentValue);
                     }
-                } else {
-                    // Méthode alternative pour les navigateurs qui ne supportent pas l'API
-                    openWindowsFolderPicker();
-                }
-            } catch (err) {
-                console.error('Erreur lors de la sélection du dossier:', err);
-                alert('Une erreur est survenue lors de la sélection du dossier. Veuillez entrer le chemin manuellement.');
-            }
+                })
+                .catch(error => {
+                    console.error('Erreur lors de la communication avec le serveur:', error);
+                    document.getElementById('browseButton').disabled = false;
+                    document.getElementById('target_directory').disabled = false;
+                    document.getElementById('target_directory').value = currentValue || '';
+                    
+                    // Proposer la méthode de saisie manuelle comme fallback
+                    openManualFolderDialog(currentValue);
+                });
         });
         
-        // Méthode alternative pour Windows utilisant une iframe cachée
-        function openWindowsFolderPicker() {
-            // Créer un élément input de type file caché
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.webkitdirectory = true; // Pour Chrome et Safari
-            input.directory = true; // Pour Firefox
-            input.multiple = false;
+        // Fonction pour ouvrir une boîte de dialogue de saisie manuelle comme méthode alternative
+        function openManualFolderDialog(currentPath) {
+            // Créer une boîte de dialogue personnalisée
+            const dialog = document.createElement('div');
+            dialog.style.position = 'fixed';
+            dialog.style.left = '0';
+            dialog.style.top = '0';
+            dialog.style.width = '100%';
+            dialog.style.height = '100%';
+            dialog.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+            dialog.style.zIndex = '9999';
+            dialog.style.display = 'flex';
+            dialog.style.alignItems = 'center';
+            dialog.style.justifyContent = 'center';
             
-            // Ajouter l'écouteur d'événement pour capturer la sélection
-            input.addEventListener('change', function() {
-                if (this.files.length > 0) {
-                    // Extraire le chemin du dossier à partir du premier fichier
-                    const filePath = this.files[0].webkitRelativePath || this.files[0].name;
-                    const folderPath = filePath.split('/')[0];
-                    
-                    // Faire une requête au serveur pour obtenir le chemin complet
+            const dialogContent = document.createElement('div');
+            dialogContent.style.backgroundColor = 'white';
+            dialogContent.style.padding = '20px';
+            dialogContent.style.borderRadius = '5px';
+            dialogContent.style.width = '80%';
+            dialogContent.style.maxWidth = '600px';
+            dialogContent.innerHTML = `
+                <h5>Saisie manuelle du chemin</h5>
+                <p>Le sélecteur de dossier natif n'a pas fonctionné. Veuillez saisir manuellement le chemin complet du dossier :</p>
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="manualPath" value="${currentPath || ''}" placeholder="Ex: E:\\Dev_maison\\mon_projet">
+                </div>
+                <div class="form-text mb-3">
+                    Exemples de chemins valides: C:\\Users\\nom\\Projects\\MonProjet, E:\\Dev_maison\\test
+                </div>
+                <div class="d-flex justify-content-end">
+                    <button class="btn btn-secondary me-2" id="cancelPathBtn">Annuler</button>
+                    <button class="btn btn-primary" id="confirmPathBtn">Confirmer</button>
+                </div>
+            `;
+            
+            dialog.appendChild(dialogContent);
+            document.body.appendChild(dialog);
+            
+            // Focus sur l'input
+            setTimeout(() => {
+                document.getElementById('manualPath').focus();
+                document.getElementById('manualPath').select();
+            }, 100);
+            
+            // Bouton annuler
+            document.getElementById('cancelPathBtn').addEventListener('click', function() {
+                document.body.removeChild(dialog);
+            });
+            
+            // Bouton confirmer
+            document.getElementById('confirmPathBtn').addEventListener('click', function() {
+                const selectedPath = document.getElementById('manualPath').value.trim();
+                if (selectedPath) {
+                    // Vérifier si le chemin existe et le créer si nécessaire
                     const formData = new FormData();
-                    formData.append('directory_name', folderPath);
+                    formData.append('full_path', selectedPath);
+                    formData.append('create_if_missing', 'true');
                     
-                    fetch('{{ url_for("get_directory_path") }}', {
+                    fetch('{{ url_for("validate_directory_path") }}', {
                         method: 'POST',
                         body: formData
                     })
                     .then(response => response.json())
                     .then(data => {
-                        document.getElementById('target_directory').value = data.path;
+                        if (data.valid) {
+                            document.getElementById('target_directory').value = data.path;
+                            document.body.removeChild(dialog);
+                        } else {
+                            alert(data.error || 'Chemin invalide. Veuillez vérifier et réessayer.');
+                        }
                     })
                     .catch(error => {
                         console.error('Erreur:', error);
-                        alert('Une erreur est survenue. Veuillez entrer le chemin manuellement.');
+                        document.body.removeChild(dialog);
+                        alert('Une erreur est survenue lors de la validation du chemin');
                     });
+                } else {
+                    alert('Veuillez saisir un chemin valide');
                 }
             });
             
-            // Déclencher le clic sur l'input
-            input.click();
+            // Gérer la touche Entrée
+            document.getElementById('manualPath').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    document.getElementById('confirmPathBtn').click();
+                }
+            });
         }
         
         // Form submission with actual API call instead of simulation
@@ -446,3 +498,4 @@
     });
 </script>
 {% endblock %}
+``` 
