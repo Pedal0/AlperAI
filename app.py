@@ -1,4 +1,5 @@
 import os
+import sys
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash, abort
 from pathlib import Path
 import time
@@ -97,6 +98,60 @@ def get_directory_path():
         app.logger.error(f"Erreur lors de la récupération du chemin: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/list_files', methods=['GET'])
+def list_files():
+    """Liste les fichiers dans un répertoire spécifié"""
+    directory = request.args.get('directory')
+    if not directory or not os.path.isdir(directory):
+        return jsonify({"status": "error", "message": "Répertoire invalide"}), 400
+    
+    try:
+        # Lister les fichiers
+        files = []
+        for file in os.listdir(directory):
+            file_path = os.path.join(directory, file)
+            if os.path.isfile(file_path):
+                files.append(file)
+        
+        return jsonify({
+            "status": "success",
+            "directory": directory,
+            "files": files
+        })
+    except Exception as e:
+        app.logger.error(f"Erreur lors de la lecture du répertoire {directory}: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/open_folder', methods=['POST'])
+def open_folder():
+    """Ouvre un dossier dans l'explorateur de fichiers du système d'exploitation"""
+    try:
+        data = request.json
+        folder_path = data.get('folder_path')
+        
+        if not folder_path or not os.path.isdir(folder_path):
+            return jsonify({"status": "error", "message": "Chemin de dossier invalide"}), 400
+        
+        # Ouvrir le dossier selon le système d'exploitation
+        if os.name == 'nt':  # Windows
+            # Sur Windows, on utilise explorer.exe avec le chemin absolu
+            os.startfile(folder_path)
+        elif os.name == 'posix':  # Linux/Mac
+            try:
+                # Pour macOS, on utilise 'open'
+                if sys.platform == 'darwin':
+                    subprocess.Popen(['open', folder_path])
+                else:
+                    # Pour Linux, on utilise xdg-open
+                    subprocess.Popen(['xdg-open', folder_path])
+            except Exception as e:
+                return jsonify({"status": "error", "message": f"Erreur lors de l'ouverture du dossier: {str(e)}"}), 500
+        
+        return jsonify({"status": "success", "message": "Dossier ouvert avec succès"})
+    except Exception as e:
+        app.logger.error(f"Erreur lors de l'ouverture du dossier: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 def generate_application_thread(task_id, api_key, model, prompt, target_dir, use_mcp, 
                               frontend_framework, include_animations, empty_files_check):
     """Fonction exécutée dans un thread pour générer l'application"""
@@ -176,7 +231,10 @@ def generate():
         model = data.get('model', 'google/gemini-2.5-pro-exp-03-25:free')
         prompt = data.get('user_prompt', '')
         target_dir = data.get('target_directory', '')
-        use_mcp = data.get('use_mcp_tools', 'on') == 'on'
+        
+        # Correction de la récupération de l'état de la case à cocher pour les outils MCP
+        use_mcp = 'use_mcp_tools' in data
+        
         frontend_framework = data.get('frontend_framework', 'Auto-detect')
         include_animations = data.get('include_animations', 'on') == 'on'
         empty_files_check = data.get('empty_files_check', 'on') == 'on'
@@ -281,7 +339,7 @@ def result():
 
 @app.route('/preview')
 def preview():
-    """Preview the generated application"""
+    """Affiche la page de prévisualisation de l'application générée"""
     if 'generation_result' not in session or not session['generation_result'].get('success'):
         flash("Aucune génération réussie trouvée. Veuillez d'abord générer une application.", "warning")
         return redirect(url_for('index'))
@@ -290,10 +348,115 @@ def preview():
     if not target_dir or not Path(target_dir).is_dir():
         flash("Répertoire d'application généré introuvable.", "danger")
         return redirect(url_for('result'))
-        
+    
+    # Récupérer ou générer un ID de session pour la prévisualisation
+    if 'preview_session_id' not in session:
+        session['preview_session_id'] = str(uuid.uuid4())
+    
+    # Pour l'affichage initial, nous ne démarrons pas encore l'application
+    # Elle sera démarrée via une requête AJAX après le chargement de la page
+    
     return render_template('preview.html', 
                           target_dir=target_dir,
+                          preview_session_id=session['preview_session_id'],
                           prompt=session.get('prompt', ''))
+
+@app.route('/preview/start', methods=['POST'])
+def start_preview():
+    """Démarre la prévisualisation de l'application"""
+    if 'generation_result' not in session:
+        return jsonify({"status": "error", "message": "Aucun résultat de génération trouvé"}), 400
+    
+    target_dir = session['generation_result'].get('target_directory')
+    if not target_dir or not Path(target_dir).is_dir():
+        return jsonify({"status": "error", "message": "Répertoire cible introuvable"}), 400
+    
+    # Utiliser l'ID de session fourni ou celui de la session Flask
+    preview_session_id = request.json.get('session_id') if request.json else session.get('preview_session_id')
+    if not preview_session_id:
+        preview_session_id = str(uuid.uuid4())
+        session['preview_session_id'] = preview_session_id
+    
+    # Démarrer la prévisualisation avec le module preview_manager
+    from src.preview.preview_manager import start_preview
+    success, message, info = start_preview(target_dir, preview_session_id)
+    
+    if success:
+        return jsonify({
+            "status": "success", 
+            "message": message,
+            "url": info.get("url"),
+            "project_type": info.get("project_type"),
+            "logs": info.get("logs", [])
+        })
+    else:
+        return jsonify({
+            "status": "error", 
+            "message": message,
+            "logs": info.get("logs", [])
+        }), 500
+
+@app.route('/preview/status', methods=['GET'])
+def preview_status():
+    """Récupère le statut actuel de la prévisualisation"""
+    preview_session_id = session.get('preview_session_id')
+    if not preview_session_id:
+        return jsonify({"status": "error", "message": "Aucune session de prévisualisation trouvée"}), 400
+    
+    # Récupérer le statut depuis le module preview_manager
+    from src.preview.preview_manager import get_preview_status
+    status_info = get_preview_status(preview_session_id)
+    
+    return jsonify({
+        "status": "success",
+        "running": status_info.get("running", False),
+        "url": status_info.get("url"),
+        "project_type": status_info.get("project_type"),
+        "logs": status_info.get("logs", []),
+        "duration": status_info.get("duration")
+    })
+
+@app.route('/preview/stop', methods=['POST'])
+def stop_preview():
+    """Arrête la prévisualisation de l'application"""
+    preview_session_id = session.get('preview_session_id')
+    if not preview_session_id:
+        return jsonify({"status": "error", "message": "Aucune session de prévisualisation trouvée"}), 400
+    
+    # Arrêter la prévisualisation avec le module preview_manager
+    from src.preview.preview_manager import stop_preview
+    success, message = stop_preview(preview_session_id)
+    
+    if success:
+        return jsonify({"status": "success", "message": message})
+    else:
+        return jsonify({"status": "error", "message": message}), 500
+
+@app.route('/preview/restart', methods=['POST'])
+def restart_preview():
+    """Redémarre la prévisualisation de l'application"""
+    preview_session_id = session.get('preview_session_id')
+    if not preview_session_id:
+        return jsonify({"status": "error", "message": "Aucune session de prévisualisation trouvée"}), 400
+    
+    # Redémarrer la prévisualisation avec le module preview_manager
+    from src.preview.preview_manager import restart_preview
+    success, message, info = restart_preview(preview_session_id)
+    
+    if success:
+        return jsonify({
+            "status": "success", 
+            "message": message,
+            "url": info.get("url"),
+            "project_type": info.get("project_type"),
+            "logs": info.get("logs", [])
+        })
+    else:
+        return jsonify({
+            "status": "error", 
+            "message": message,
+            "logs": info.get("logs", [])
+        }), 500
 
 @app.route('/iterate', methods=['POST'])
 def iterate_generation():
