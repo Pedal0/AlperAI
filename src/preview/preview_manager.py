@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple, List
 
 # Configuration du logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname%s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Variables globales pour stocker les processus en cours d'exécution
@@ -94,20 +94,39 @@ def detect_project_type(project_dir: str) -> str:
             with open(project_dir / "package.json", "r", encoding="utf-8") as f:
                 package_json = json.load(f)
                 dependencies = package_json.get("dependencies", {})
+                devDependencies = package_json.get("devDependencies", {})
                 
-                if "express" in dependencies:
+                # Fusionner les dépendances normales et de développement pour la recherche
+                all_dependencies = {**dependencies, **devDependencies}
+                
+                if "express" in all_dependencies:
                     return ProjectType.EXPRESS
-                elif "react" in dependencies or "react-dom" in dependencies:
+                elif "react" in all_dependencies or "react-dom" in all_dependencies:
                     return ProjectType.REACT
-                elif "vue" in dependencies:
+                elif "vue" in all_dependencies:
                     return ProjectType.VUE
-                elif "angular" in dependencies or "@angular/core" in dependencies:
+                elif "angular" in all_dependencies or "@angular/core" in all_dependencies:
                     return ProjectType.ANGULAR
+                elif "tailwindcss" in all_dependencies:
+                    # Projets Tailwind CSS sont généralement des sites statiques avec npm
+                    return ProjectType.REACT  # Traitez-les comme des projets React
+                
+                # Si nous avons un package.json avec des dépendances mais pas de type spécifique
+                # détecté, on considère que c'est un projet Node.js générique
+                if dependencies or devDependencies:
+                    return ProjectType.REACT  # Type générique NodeJS traité comme React
         except:
-            pass
+            # Même si on ne peut pas lire le package.json correctement,
+            # sa présence indique un projet Node.js
+            return ProjectType.REACT  # Fallback à un projet Node.js générique
     
     # Vérifier s'il s'agit d'un site statique
-    if (project_dir / "index.html").exists():
+    if (project_dir / "index.html").exists() or (project_dir / "public" / "index.html").exists():
+        # Vérifier s'il y a des indices d'un projet frontend
+        if list(project_dir.glob("**/*.js")) or list(project_dir.glob("**/*.ts")):
+            if (project_dir / "package.json").exists():
+                # C'est probablement un projet frontend avec npm
+                return ProjectType.REACT  # Traiter comme React
         return ProjectType.STATIC
     
     # Type inconnu par défaut
@@ -176,11 +195,60 @@ def prepare_environment(project_dir: str, project_type: str) -> Tuple[bool, str]
             return True, "Dépendances Node.js installées."
             
         elif project_type == ProjectType.STATIC:
-            # Rien à préparer pour un site statique
+            # Vérifier s'il y a un package.json, même pour les sites statiques
+            if (project_dir / "package.json").exists():
+                # Si un package.json existe, c'est probablement un site statique avec des dépendances npm
+                logger.info("Site statique avec package.json détecté, installation des dépendances Node.js...")
+                
+                if (project_dir / "node_modules").exists():
+                    return True, "Les modules Node.js sont déjà installés."
+                
+                npm_process = subprocess.Popen(
+                    ["npm", "install"], 
+                    cwd=str(project_dir),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                
+                stdout, stderr = npm_process.communicate()
+                
+                if npm_process.returncode != 0:
+                    logger.warning(f"L'installation des dépendances a échoué, mais on continue avec le site statique: {stderr}")
+                    # On continue même en cas d'échec pour un site statique
+                
+                return True, "Site statique avec dépendances prêt."
+            
+            # Rien à préparer pour un site statique sans dépendances
             return True, "Site statique prêt."
             
         else:
-            return False, "Type de projet non supporté pour la préparation de l'environnement."
+            # Pour les types "unknown", on vérifie si package.json existe
+            if (project_dir / "package.json").exists():
+                logger.info("Projet de type inconnu avec package.json détecté, tentative d'installation des dépendances Node.js...")
+                
+                # Si un package.json existe, traiter comme un projet Node.js
+                if (project_dir / "node_modules").exists():
+                    return True, "Les modules Node.js sont déjà installés."
+                
+                npm_process = subprocess.Popen(
+                    ["npm", "install"], 
+                    cwd=str(project_dir),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                
+                stdout, stderr = npm_process.communicate()
+                
+                if npm_process.returncode != 0:
+                    return False, f"Erreur lors de l'installation des dépendances Node.js: {stderr}"
+                
+                return True, "Dépendances Node.js installées pour projet de type inconnu."
+            
+            # Pour les projets vraiment inconnus sans package.json
+            logger.warning("Type de projet non reconnu et pas de package.json trouvé, aucune préparation effectuée")
+            return True, "Aucune préparation nécessaire pour ce type de projet inconnu."
             
     except Exception as e:
         logger.error(f"Erreur lors de la préparation de l'environnement: {str(e)}")
@@ -273,11 +341,45 @@ def get_start_command(project_dir: str, project_type: str, session_id: str = Non
             return ["npm", "start"], env
     
     elif project_type == ProjectType.REACT or project_type == ProjectType.VUE or project_type == ProjectType.ANGULAR:
-        # Pour les frameworks frontend, utiliser npm start
+        # Vérifier si un script spécifique est défini dans package.json
+        if (project_dir / "package.json").exists():
+            try:
+                with open(project_dir / "package.json", "r", encoding="utf-8") as f:
+                    package_json = json.load(f)
+                    scripts = package_json.get("scripts", {})
+                    
+                    # Priorité: start > dev > serve
+                    if "start" in scripts:
+                        return ["npm", "start"], env
+                    elif "dev" in scripts:
+                        return ["npm", "run", "dev"], env
+                    elif "serve" in scripts:
+                        return ["npm", "run", "serve"], env
+            except:
+                pass
+                
+        # Utiliser npm start comme commande par défaut
         return ["npm", "start"], env
     
     elif project_type == ProjectType.STATIC:
-        # Pour les sites statiques, nous avons plusieurs options
+        # Vérifier d'abord si ce site statique a un package.json avec des scripts de démarrage
+        if (project_dir / "package.json").exists():
+            try:
+                with open(project_dir / "package.json", "r", encoding="utf-8") as f:
+                    package_json = json.load(f)
+                    scripts = package_json.get("scripts", {})
+                    
+                    # Si des scripts sont définis, essayer de les utiliser
+                    if "start" in scripts:
+                        return ["npm", "start"], env
+                    elif "dev" in scripts:
+                        return ["npm", "run", "dev"], env
+                    elif "serve" in scripts:
+                        return ["npm", "run", "serve"], env
+            except:
+                pass
+
+        # Pour les sites statiques sans scripts npm, utiliser un serveur HTTP
         
         # Trouver un port disponible
         port = find_free_port()
@@ -451,8 +553,55 @@ server.listen(port, () => {{
                     return ["python3", "-m", "http.server", str(port)], env
     
     else:
-        # Pour les types inconnus, essayer python app.py par défaut
-        return [sys.executable, "app.py"], env
+        # Pour les types inconnus, essayer de détecter la meilleure commande à utiliser
+        
+        # Vérifier s'il y a un package.json avec des scripts
+        if (project_dir / "package.json").exists():
+            try:
+                with open(project_dir / "package.json", "r", encoding="utf-8") as f:
+                    package_json = json.load(f)
+                    scripts = package_json.get("scripts", {})
+                    
+                    if "start" in scripts:
+                        logger.info("Script 'start' trouvé dans package.json, utilisation de npm start")
+                        return ["npm", "start"], env
+                    elif "dev" in scripts:
+                        logger.info("Script 'dev' trouvé dans package.json, utilisation de npm run dev")
+                        return ["npm", "run", "dev"], env
+                    elif "serve" in scripts:
+                        logger.info("Script 'serve' trouvé dans package.json, utilisation de npm run serve")
+                        return ["npm", "run", "serve"], env
+                    else:
+                        logger.info("Aucun script spécifique trouvé dans package.json, utilisation de npm start")
+                        return ["npm", "start"], env
+            except Exception as e:
+                logger.warning(f"Erreur lors de la lecture de package.json: {str(e)}")
+                # En cas d'erreur, utiliser npm start par défaut
+                return ["npm", "start"], env
+        
+        # Vérifier s'il y a des fichiers Python
+        main_py_files = ["app.py", "main.py", "server.py", "run.py"]
+        for file in main_py_files:
+            if (project_dir / file).exists():
+                logger.info(f"Fichier Python {file} trouvé, utilisation de Python")
+                return [sys.executable, str(project_dir / file)], env
+        
+        # Vérifier s'il y a des fichiers Node.js
+        main_js_files = ["server.js", "app.js", "index.js", "main.js"]
+        for file in main_js_files:
+            if (project_dir / file).exists():
+                logger.info(f"Fichier JavaScript {file} trouvé, utilisation de Node.js")
+                return ["node", str(project_dir / file)], env
+        
+        # Vérifier s'il y a index.html (site statique)
+        if (project_dir / "index.html").exists() or (project_dir / "public" / "index.html").exists():
+            logger.info("Fichier index.html trouvé, traitement comme site statique")
+            # Récupérer la commande pour un site statique (en réutilisant le code)
+            return get_start_command(project_dir, ProjectType.STATIC, session_id)
+        
+        # Si rien ne correspond, utiliser une commande par défaut
+        logger.warning("Aucun fichier de point d'entrée reconnu trouvé, tentative avec npm start")
+        return ["npm", "start"], env
 
 def start_preview(project_dir: str, session_id: str) -> Tuple[bool, str, Dict]:
     """
