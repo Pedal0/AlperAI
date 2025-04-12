@@ -187,7 +187,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
 
     IMPORTANT: Si l'utilisateur a fourni des URLs, lisez attentivement leur contenu et suivez les instructions ou inspirez-vous des exemples qui y sont présents.
 
-    Le format de sortie DOIT être exactement comme suit:
+    IMPORTANT:Le format de sortie DOIT être EXACTEMENT comme suit:
 
     ### REFORMULATED PROMPT ###
     [Prompt reformulé détaillé ici]
