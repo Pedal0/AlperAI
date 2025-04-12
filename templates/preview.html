@@ -57,7 +57,7 @@
                                 <span class="app-url" id="app-url">Adresse non disponible</span>
                             </div>
                             <div>
-                                <button class="btn btn-sm btn-outline-secondary me-2" id="refreshPreview" disabled>
+                                <button class="btn btn-sm btn-outline-secondary me-2" id="refreshPreviewBtn">
                                     <i class="fas fa-sync-alt me-1"></i> Actualiser
                                 </button>
                                 <button class="btn btn-sm btn-outline-primary" id="openInNewTab" disabled>
@@ -286,7 +286,7 @@
         const startAppBtn = document.getElementById('startAppBtn');
         const stopAppBtn = document.getElementById('stopAppBtn');
         const restartAppBtn = document.getElementById('restartAppBtn');
-        const refreshPreviewBtn = document.getElementById('refreshPreview');
+        const refreshPreviewBtn = document.getElementById('refreshPreviewBtn');
         const openInNewTabBtn = document.getElementById('openInNewTab');
         const projectPath = document.getElementById('project-path').textContent;
         const logsContent = document.getElementById('logsContent');
@@ -344,6 +344,9 @@
                 loadingSpinner.classList.add('d-none');
                 appError.classList.add('d-none');
                 previewFrame.classList.remove('d-none');
+                
+                // Masquer le message de chargement
+                document.querySelector('.loading-spinner').classList.add('d-none');
                 
                 // Mettre à jour l'URL
                 if (status.url) {
@@ -613,19 +616,36 @@
             // Arrêter tout sondage existant
             stopStatusPolling();
             
-            // Démarrer un nouveau sondage
+            // Mémoriser l'URL actuelle pour éviter les rechargements inutiles
+            let lastUrl = appStatus.url;
+            let lastFrameSrc = previewFrame.src;
+            let frameLoaded = false;
+            
+            // Indiquer que l'iframe s'est chargée
+            previewFrame.onload = function() {
+                frameLoaded = true;
+            };
+            
+            // Démarrer un nouveau sondage avec une fréquence plus basse pour économiser les ressources
             statusPollInterval = setInterval(() => {
                 fetch('/preview/status')
                     .then(response => response.json())
                     .then(data => {
                         if (data.status === 'success') {
-                            updateAppStatus({
+                            // Mettre à jour les logs et informations de statut
+                            const newStatus = {
                                 running: data.running,
                                 url: data.url,
                                 project_type: data.project_type,
                                 logs: data.logs || [],
                                 exit_code: data.exit_code
-                            });
+                            };
+                            
+                            // Ne plus mettre à jour automatiquement l'iframe - désactivé pour permettre à l'utilisateur de naviguer sans interruption
+                            // L'utilisateur peut utiliser le bouton "Actualiser" pour rafraîchir manuellement
+                            
+                            // Mettre à jour l'état de l'application
+                            updateAppStatus(newStatus);
                             
                             // Si l'application n'est plus en cours d'exécution, arrêter le sondage
                             if (!data.running) {
@@ -636,7 +656,7 @@
                     .catch(error => {
                         console.error('Erreur lors du sondage:', error);
                     });
-            }, 3000); // Toutes les 3 secondes
+            }, 5000); // Toutes les 5 secondes au lieu de 3
         }
 
         function stopStatusPolling() {
@@ -722,9 +742,43 @@
         });
         
         refreshPreviewBtn.addEventListener('click', function() {
-            if (previewFrame.contentWindow) {
-                previewFrame.contentWindow.location.reload();
-            }
+            // Mettre à jour le texte du bouton pour indiquer le rafraîchissement
+            const originalText = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Rafraîchissement...';
+            this.disabled = true;
+            
+            // Plutôt que d'essayer de recharger l'iframe directement (ce qui provoque l'erreur cross-origin)
+            // Nous allons recharger l'iframe en modifiant sa source
+            const currentSrc = previewFrame.src;
+            
+            // Appeler l'API pour rafraîchir manuellement
+            fetch('/preview/refresh', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Rafraîchir l'iframe en modifiant sa source
+                previewFrame.src = 'about:blank';
+                
+                // Réaffecter l'URL d'origine après un court délai
+                setTimeout(() => {
+                    previewFrame.src = currentSrc;
+                    
+                    // Restaurer le texte original après le rafraîchissement
+                    setTimeout(() => {
+                        this.innerHTML = originalText;
+                        this.disabled = false;
+                    }, 1000);
+                }, 100);
+            })
+            .catch(error => {
+                console.error('Erreur lors du rafraîchissement:', error);
+                this.innerHTML = originalText;
+                this.disabled = false;
+            });
         });
         
         openInNewTabBtn.addEventListener('click', function() {
