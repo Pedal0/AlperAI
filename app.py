@@ -622,7 +622,7 @@ def restart_preview():
     """Redémarre la prévisualisation de l'application"""
     preview_session_id = session.get('preview_session_id')
     if not preview_session_id:
-        return jsonify({"status": "error", "message": "Aucune session de prévisualisation trouvée"}), 400
+        return jsonify({"status": "error", "message": "Aucune session de prévisualisation trouvée"})
     
     # Redémarrer la prévisualisation avec le module preview_manager
     from src.preview.preview_manager import restart_preview
@@ -637,11 +637,12 @@ def restart_preview():
             "logs": info.get("logs", [])
         })
     else:
+        # Retourner un statut d'erreur mais toujours avec le code HTTP 200
         return jsonify({
             "status": "error", 
             "message": message,
             "logs": info.get("logs", [])
-        }), 500
+        })
 
 @app.route('/preview/refresh', methods=['POST'])
 def refresh_preview():
