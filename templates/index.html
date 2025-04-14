@@ -1,276 +1,407 @@
-{% extends "layout.html" %}
-
-{% block title %}AI Application Generator{% endblock %}
-
-{% block content %}
+{% extends "layout.html" %} {% block title %}AI Application Generator{% endblock
+%} {% block content %}
 <div class="hero-section mb-5">
-    <h1 class="animate__animated animate__fadeInDown">AI Application <span class="gradient-text">Generator</span></h1>
-    <p class="lead animate__animated animate__fadeIn animate__delay-1s">
-        Describe the application you want, and let AI generate it for you.
-        <br>No programming skills required!
-    </p>
+  <h1 class="animate__animated animate__fadeInDown">
+    AI Application <span class="gradient-text">Generator</span>
+  </h1>
+  <p class="lead animate__animated animate__fadeIn animate__delay-1s">
+    Describe the application you want, and let AI generate it for you.
+    <br />No programming skills required!
+  </p>
 </div>
 
 <div class="row justify-content-center">
-    <div class="col-lg-10">
-        <form id="appGeneratorForm" action="{{ url_for('generate') }}" method="post" class="animate__animated animate__fadeInUp">
-            <div class="card main-card">
-                <div class="row g-0">
-                    <!-- Configuration Panel -->
-                    <div class="col-lg-4 config-panel">
-                        <div class="p-4">
-                            <h3 class="mb-4">
-                                <i class="fas fa-cogs me-2"></i>Configuration
-                            </h3>
-                            
-                            <div class="mb-4">
-                                <label for="api_key" class="form-label">OpenRouter API Key</label>
-                                <div class="input-group">
-                                    <input type="password" class="form-control" id="api_key" name="api_key" value="{{ api_key }}" required>
-                                    <button class="btn btn-outline-secondary toggle-password" type="button">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                </div>
-                                <div class="form-text">
-                                    Get a key at <a href="https://openrouter.ai/" target="_blank">OpenRouter</a>
-                                </div>
-                            </div>
-                            
-                            <div class="mb-4">
-                                <label for="model" class="form-label">AI Model</label>
-                                <select class="form-select mb-2" id="model" name="model">
-                                    <option value="google/gemini-2.5-pro-preview-03-25" >Gemini 2.5 Pro Preview</option>
-                                    <option value="openrouter/optimus-alpha">Optimus Alpha (Free)</option>
-                                    <option value="google/gemini-2.5-pro-exp-03-25:free"selected>Gemini 2.5 Pro experimental (Free)</option>
-                                    <option value="meta-llama/llama-4-maverick:free">Llama 4 Maverick (Free No Tools)</option>
-                                    <option value="meta-llama/llama-4-scout:free">Llama 4 Scout (Free No Tools)</option>
-                                    <option value="deepseek/deepseek-chat-v3-0324:free">DeepSeek Chat v3 (Free)</option>
-                                    <option value="anthropic/claude-3.7-sonnet">Claude 3.7 Sonnet</option>
-                                    <option value="custom">Other model (custom)...</option>
-                                </select>
-                                <div id="customModelContainer" class="d-none">
-                                    <input type="text" class="form-control" id="customModel" name="customModel" 
-                                           placeholder="Enter the model identifier (e.g. organization/model:tag)">
-                                    <div class="form-text">
-                                        Format: organization/model:tag - Check on <a href="https://openrouter.ai/models" target="_blank">OpenRouter</a>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="mb-4">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="use_mcp_tools" name="use_mcp_tools" checked>
-                                    <label class="form-check-label" for="use_mcp_tools">Enable MCP tools</label>
-                                </div>
-                                <div class="form-text">
-                                    Enhances generation with web searches and code resources
-                                </div>
-                            </div>
-                            
-                            <div id="frontendOptions" class="mb-4">
-                                <label class="form-label">Frontend Options</label>
-                                <select class="form-select mb-2" id="frontend_framework" name="frontend_framework">
-                                    <option value="Auto-detect" selected>Auto-detect</option>
-                                    <option value="Bootstrap">Bootstrap</option>
-                                    <option value="Tailwind CSS">Tailwind CSS</option>
-                                    <option value="Bulma">Bulma</option>
-                                    <option value="Material Design">Material Design</option>
-                                </select>
-                                
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="include_animations" name="include_animations" checked>
-                                    <label class="form-check-label" for="include_animations">
-                                        Include CSS animations
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Input Panel -->
-                    <div class="col-lg-8 input-panel">
-                        <div class="p-4">
-                            <h3 class="mb-4">
-                                <i class="fas fa-pencil-alt me-2"></i>Application Description
-                            </h3>
-                            
-                            <div class="mb-4">
-                                <textarea class="form-control" id="user_prompt" name="user_prompt" rows="6" placeholder="Example: Create a task management application with user authentication. Users should be able to add, edit and delete tasks, set priorities and due dates." required></textarea>
-                            </div>
-                            
-                            <div class="mb-4">
-                                <label for="target_directory" class="form-label">Target Directory</label>
-                                <div class="input-group">
-                                    <input type="text" class="form-control" id="target_directory" name="target_directory" placeholder="Ex: C:\Users\YourName\Projects\MyGeneratedApp" required>
-                                    <button class="btn btn-outline-secondary" type="button" id="browseButton">
-                                        <i class="fas fa-folder-open"></i>
-                                    </button>
-                                </div>
-                                <div class="form-text">
-                                    The folder must exist and you must have write permissions.
-                                </div>
-                            </div>
-                            
-                            <div class="examples-section mt-4">
-                                <h5>
-                                    <i class="fas fa-lightbulb me-2"></i>Example Prompts
-                                    <button type="button" class="btn btn-sm btn-link float-end" data-bs-toggle="collapse" data-bs-target="#examplesCollapse">
-                                        Show/Hide
-                                    </button>
-                                </h5>
-                                <div class="collapse" id="examplesCollapse">
-                                    <div class="card card-body mt-2">
-                                        <div class="example-chips d-flex flex-wrap gap-2">
-                                            <button type="button" class="btn btn-sm btn-outline-primary example-chip" data-example="Create a static portfolio website for a photographer with a home page, gallery, about, and contact. Include a responsive design with a modern look.">
-                                                Portfolio Site
-                                            </button>
-                                            <button type="button" class="btn btn-sm btn-outline-primary example-chip" data-example="Build a task management application with user authentication. Users should be able to create, edit, and delete tasks, set due dates, and mark tasks as completed.">
-                                                Task App
-                                            </button>
-                                            <button type="button" class="btn btn-sm btn-outline-primary example-chip" data-example="Create a RESTful API for a blog platform with endpoints for posts, comments, and users. Include authentication and proper error handling.">
-                                                RESTful API
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="card-footer p-4">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="empty_files_check" name="empty_files_check" checked>
-                                    <label class="form-check-label" for="empty_files_check">
-                                        Check and generate empty files
-                                    </label>
-                                </div>
-                                <button type="submit" class="btn btn-primary btn-lg" id="generateButton">
-                                    <i class="fas fa-rocket me-2"></i>Generate Application
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+  <div class="col-lg-10">
+    <form
+      id="appGeneratorForm"
+      action="{{ url_for('generate') }}"
+      method="post"
+      class="animate__animated animate__fadeInUp"
+    >
+      <div class="card main-card">
+        <div class="row g-0">
+          <!-- Configuration Panel -->
+          <div class="col-lg-4 config-panel">
+            <div class="p-4">
+              <h3 class="mb-4">
+                <i class="fas fa-cogs me-2"></i>Configuration
+              </h3>
+
+              <div class="mb-4">
+                <label for="api_key" class="form-label"
+                  >OpenRouter API Key</label
+                >
+                <div class="input-group">
+                  <input
+                    type="password"
+                    class="form-control"
+                    id="api_key"
+                    name="api_key"
+                    value="{{ api_key }}"
+                    required
+                  />
+                  <button
+                    class="btn btn-outline-secondary toggle-password"
+                    type="button"
+                  >
+                    <i class="fas fa-eye"></i>
+                  </button>
                 </div>
+                <div class="form-text">
+                  Get a key at
+                  <a href="https://openrouter.ai/" target="_blank"
+                    >OpenRouter</a
+                  >
+                </div>
+              </div>
+
+              <div class="mb-4">
+                <label for="model" class="form-label">AI Model</label>
+                <select class="form-select mb-2" id="model" name="model">
+                  <option value="google/gemini-2.5-pro-preview-03-25">
+                    Gemini 2.5 Pro Preview
+                  </option>
+                  <option value="anthropic/claude-3.7-sonnet">
+                    Claude 3.7 Sonnet
+                  </option>
+                  <option value="openrouter/optimus-alpha" selected>
+                    Optimus Alpha (Free)
+                  </option>
+                  <option value="google/gemini-2.5-pro-exp-03-25:free">
+                    Gemini 2.5 Pro experimental (Free)
+                  </option>
+                  <option value="agentica-org/deepcoder-14b-preview:free">
+                    Agentica Deepcoder (Free)
+                  </option>
+                  <option value="meta-llama/llama-4-maverick:free">
+                    Llama 4 Maverick (Free No Tools)
+                  </option>
+                  <option value="meta-llama/llama-4-scout:free">
+                    Llama 4 Scout (Free No Tools)
+                  </option>
+                  <option value="deepseek/deepseek-chat-v3-0324:free">
+                    DeepSeek Chat v3 (Free)
+                  </option>
+                  <option value="custom">Other model (custom)...</option>
+                </select>
+                <div id="customModelContainer" class="d-none">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="customModel"
+                    name="customModel"
+                    placeholder="Enter the model identifier (e.g. organization/model:tag)"
+                  />
+                  <div class="form-text">
+                    Format: organization/model:tag - Check on
+                    <a href="https://openrouter.ai/models" target="_blank"
+                      >OpenRouter</a
+                    >
+                  </div>
+                </div>
+              </div>
+
+              <div class="mb-4">
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="use_mcp_tools"
+                    name="use_mcp_tools"
+                    checked
+                  />
+                  <label class="form-check-label" for="use_mcp_tools"
+                    >Enable MCP tools</label
+                  >
+                </div>
+                <div class="form-text">
+                  Enhances generation with web searches and code resources
+                </div>
+              </div>
+
+              <div id="frontendOptions" class="mb-4">
+                <label class="form-label">Frontend Options</label>
+                <select
+                  class="form-select mb-2"
+                  id="frontend_framework"
+                  name="frontend_framework"
+                >
+                  <option value="Auto-detect" selected>Auto-detect</option>
+                  <option value="Bootstrap">Bootstrap</option>
+                  <option value="Tailwind CSS">Tailwind CSS</option>
+                  <option value="Bulma">Bulma</option>
+                  <option value="Material Design">Material Design</option>
+                </select>
+
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="include_animations"
+                    name="include_animations"
+                    checked
+                  />
+                  <label class="form-check-label" for="include_animations">
+                    Include CSS animations
+                  </label>
+                </div>
+              </div>
             </div>
-        </form>
-    </div>
+          </div>
+
+          <!-- Input Panel -->
+          <div class="col-lg-8 input-panel">
+            <div class="p-4">
+              <h3 class="mb-4">
+                <i class="fas fa-pencil-alt me-2"></i>Application Description
+              </h3>
+
+              <div class="mb-4">
+                <textarea
+                  class="form-control"
+                  id="user_prompt"
+                  name="user_prompt"
+                  rows="6"
+                  placeholder="Example: Create a task management application with user authentication. Users should be able to add, edit and delete tasks, set priorities and due dates."
+                  required
+                ></textarea>
+              </div>
+
+              <div class="mb-4">
+                <label for="target_directory" class="form-label"
+                  >Target Directory</label
+                >
+                <div class="input-group">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="target_directory"
+                    name="target_directory"
+                    placeholder="Ex: C:\Users\YourName\Projects\MyGeneratedApp"
+                    required
+                  />
+                  <button
+                    class="btn btn-outline-secondary"
+                    type="button"
+                    id="browseButton"
+                  >
+                    <i class="fas fa-folder-open"></i>
+                  </button>
+                </div>
+                <div class="form-text">
+                  The folder must exist and you must have write permissions.
+                </div>
+              </div>
+
+              <div class="examples-section mt-4">
+                <h5>
+                  <i class="fas fa-lightbulb me-2"></i>Example Prompts
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-link float-end"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#examplesCollapse"
+                  >
+                    Show/Hide
+                  </button>
+                </h5>
+                <div class="collapse" id="examplesCollapse">
+                  <div class="card card-body mt-2">
+                    <div class="example-chips d-flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary example-chip"
+                        data-example="Create a static portfolio website for a photographer with a home page, gallery, about, and contact. Include a responsive design with a modern look."
+                      >
+                        Portfolio Site
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary example-chip"
+                        data-example="Build a task management application with user authentication. Users should be able to create, edit, and delete tasks, set due dates, and mark tasks as completed."
+                      >
+                        Task App
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary example-chip"
+                        data-example="Create a RESTful API for a blog platform with endpoints for posts, comments, and users. Include authentication and proper error handling."
+                      >
+                        RESTful API
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-footer p-4">
+              <div class="d-flex justify-content-between align-items-center">
+                <div class="form-check form-switch">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="empty_files_check"
+                    name="empty_files_check"
+                    checked
+                  />
+                  <label class="form-check-label" for="empty_files_check">
+                    Check and generate empty files
+                  </label>
+                </div>
+                <button
+                  type="submit"
+                  class="btn btn-primary btn-lg"
+                  id="generateButton"
+                >
+                  <i class="fas fa-rocket me-2"></i>Generate Application
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
 </div>
 
 <!-- Loading Modal -->
-<div class="modal fade" id="loadingModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-body text-center p-4">
-                <div class="spinner-border text-primary mb-3" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <h4 id="loadingTitle">Generation in progress...</h4>
-                <p id="loadingMessage">Please wait while the AI generates your application.</p>
-                
-                <div class="progress mt-3">
-                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
-                </div>
-                <p class="mt-2"><span id="currentStep">Initializing...</span></p>
-                
-                <div class="alert alert-info mt-3 d-none" id="tipBox">
-                    <i class="fas fa-info-circle me-2"></i><span id="tipText"></span>
-                </div>
-            </div>
+<div
+  class="modal fade"
+  id="loadingModal"
+  tabindex="-1"
+  data-bs-backdrop="static"
+  data-bs-keyboard="false"
+>
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-body text-center p-4">
+        <div class="spinner-border text-primary mb-3" role="status">
+          <span class="visually-hidden">Loading...</span>
         </div>
-    </div>
-</div>
-{% endblock %}
+        <h4 id="loadingTitle">Generation in progress...</h4>
+        <p id="loadingMessage">
+          Please wait while the AI generates your application.
+        </p>
 
-{% block extra_js %}
+        <div class="progress mt-3">
+          <div
+            id="progressBar"
+            class="progress-bar progress-bar-striped progress-bar-animated"
+            role="progressbar"
+            style="width: 0%"
+          ></div>
+        </div>
+        <p class="mt-2"><span id="currentStep">Initializing...</span></p>
+
+        <div class="alert alert-info mt-3 d-none" id="tipBox">
+          <i class="fas fa-info-circle me-2"></i><span id="tipText"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Toggle password visibility
-        document.querySelector('.toggle-password').addEventListener('click', function() {
-            const apiKeyInput = document.getElementById('api_key');
-            const type = apiKeyInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            apiKeyInput.setAttribute('type', type);
-            
-            // Toggle eye icon
-            const icon = this.querySelector('i');
-            icon.classList.toggle('fa-eye');
-            icon.classList.toggle('fa-eye-slash');
-        });
-        
-        // Example chips
-        document.querySelectorAll('.example-chip').forEach(chip => {
-            chip.addEventListener('click', function() {
-                const example = this.getAttribute('data-example');
-                document.getElementById('user_prompt').value = example;
-            });
-        });
-        
-        // Folder selection - use native Windows selector via server request
-        document.getElementById('browseButton').addEventListener('click', function() {
-            // Show loading indicator
-            const currentValue = document.getElementById('target_directory').value;
-            document.getElementById('target_directory').value = "Selection in progress...";
-            document.getElementById('target_directory').disabled = true;
-            document.getElementById('browseButton').disabled = true;
-            
-            // Call the new route that launches a native Windows file selector
-            fetch('{{ url_for("open_folder_dialog") }}')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('browseButton').disabled = false;
-                    document.getElementById('target_directory').disabled = false;
-                    
-                    if (data.status === 'success') {
-                        // Update the field with the selected full path
-                        document.getElementById('target_directory').value = data.path;
-                    } else if (data.status === 'canceled') {
-                        // If the user canceled, restore the previous value
-                        document.getElementById('target_directory').value = currentValue || '';
-                    } else {
-                        // In case of error, display a message and restore the previous value
-                        console.error('Error:', data.message);
-                        document.getElementById('target_directory').value = currentValue || '';
-                        
-                        // Offer manual entry method as fallback
-                        openManualFolderDialog(currentValue);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error communicating with the server:', error);
-                    document.getElementById('browseButton').disabled = false;
-                    document.getElementById('target_directory').disabled = false;
-                    document.getElementById('target_directory').value = currentValue || '';
-                    
-                    // Offer manual entry method as fallback
-                    openManualFolderDialog(currentValue);
-                });
-        });
-        
-        // Function to open a manual entry dialog as an alternative method
-        function openManualFolderDialog(currentPath) {
-            // Create a custom dialog
-            const dialog = document.createElement('div');
-            dialog.style.position = 'fixed';
-            dialog.style.left = '0';
-            dialog.style.top = '0';
-            dialog.style.width = '100%';
-            dialog.style.height = '100%';
-            dialog.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-            dialog.style.zIndex = '9999';
-            dialog.style.display = 'flex';
-            dialog.style.alignItems = 'center';
-            dialog.style.justifyContent = 'center';
-            
-            const dialogContent = document.createElement('div');
-            dialogContent.style.backgroundColor = 'white';
-            dialogContent.style.padding = '20px';
-            dialogContent.style.borderRadius = '5px';
-            dialogContent.style.width = '80%';
-            dialogContent.style.maxWidth = '600px';
-            dialogContent.innerHTML = `
+  document.addEventListener("DOMContentLoaded", function () {
+    // Toggle password visibility
+    document
+      .querySelector(".toggle-password")
+      .addEventListener("click", function () {
+        const apiKeyInput = document.getElementById("api_key");
+        const type =
+          apiKeyInput.getAttribute("type") === "password" ? "text" : "password";
+        apiKeyInput.setAttribute("type", type);
+
+        // Toggle eye icon
+        const icon = this.querySelector("i");
+        icon.classList.toggle("fa-eye");
+        icon.classList.toggle("fa-eye-slash");
+      });
+
+    // Example chips
+    document.querySelectorAll(".example-chip").forEach((chip) => {
+      chip.addEventListener("click", function () {
+        const example = this.getAttribute("data-example");
+        document.getElementById("user_prompt").value = example;
+      });
+    });
+
+    // Folder selection - use native Windows selector via server request
+    document
+      .getElementById("browseButton")
+      .addEventListener("click", function () {
+        // Show loading indicator
+        const currentValue = document.getElementById("target_directory").value;
+        document.getElementById("target_directory").value =
+          "Selection in progress...";
+        document.getElementById("target_directory").disabled = true;
+        document.getElementById("browseButton").disabled = true;
+
+        // Call the new route that launches a native Windows file selector
+        fetch('{{ url_for("open_folder_dialog") }}')
+          .then((response) => response.json())
+          .then((data) => {
+            document.getElementById("browseButton").disabled = false;
+            document.getElementById("target_directory").disabled = false;
+
+            if (data.status === "success") {
+              // Update the field with the selected full path
+              document.getElementById("target_directory").value = data.path;
+            } else if (data.status === "canceled") {
+              // If the user canceled, restore the previous value
+              document.getElementById("target_directory").value =
+                currentValue || "";
+            } else {
+              // In case of error, display a message and restore the previous value
+              console.error("Error:", data.message);
+              document.getElementById("target_directory").value =
+                currentValue || "";
+
+              // Offer manual entry method as fallback
+              openManualFolderDialog(currentValue);
+            }
+          })
+          .catch((error) => {
+            console.error("Error communicating with the server:", error);
+            document.getElementById("browseButton").disabled = false;
+            document.getElementById("target_directory").disabled = false;
+            document.getElementById("target_directory").value =
+              currentValue || "";
+
+            // Offer manual entry method as fallback
+            openManualFolderDialog(currentValue);
+          });
+      });
+
+    // Function to open a manual entry dialog as an alternative method
+    function openManualFolderDialog(currentPath) {
+      // Create a custom dialog
+      const dialog = document.createElement("div");
+      dialog.style.position = "fixed";
+      dialog.style.left = "0";
+      dialog.style.top = "0";
+      dialog.style.width = "100%";
+      dialog.style.height = "100%";
+      dialog.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+      dialog.style.zIndex = "9999";
+      dialog.style.display = "flex";
+      dialog.style.alignItems = "center";
+      dialog.style.justifyContent = "center";
+
+      const dialogContent = document.createElement("div");
+      dialogContent.style.backgroundColor = "white";
+      dialogContent.style.padding = "20px";
+      dialogContent.style.borderRadius = "5px";
+      dialogContent.style.width = "80%";
+      dialogContent.style.maxWidth = "600px";
+      dialogContent.innerHTML = `
                 <h5>Manual Path Entry</h5>
                 <p>The native folder selector didn't work. Please manually enter the full folder path:</p>
                 <div class="input-group mb-3">
-                    <input type="text" class="form-control" id="manualPath" value="${currentPath || ''}" placeholder="Ex: E:\\Dev_maison\\my_project">
+                    <input type="text" class="form-control" id="manualPath" value="${
+                      currentPath || ""
+                    }" placeholder="Ex: E:\\Dev_maison\\my_project">
                 </div>
                 <div class="form-text mb-3">
                     Examples of valid paths: C:\\Users\\name\\Projects\\MyProject, E:\\Dev_maison\\test
@@ -280,221 +411,243 @@
                     <button class="btn btn-primary" id="confirmPathBtn">Confirm</button>
                 </div>
             `;
-            
-            dialog.appendChild(dialogContent);
-            document.body.appendChild(dialog);
-            
-            // Focus on the input
-            setTimeout(() => {
-                document.getElementById('manualPath').focus();
-                document.getElementById('manualPath').select();
-            }, 100);
-            
-            // Cancel button
-            document.getElementById('cancelPathBtn').addEventListener('click', function() {
+
+      dialog.appendChild(dialogContent);
+      document.body.appendChild(dialog);
+
+      // Focus on the input
+      setTimeout(() => {
+        document.getElementById("manualPath").focus();
+        document.getElementById("manualPath").select();
+      }, 100);
+
+      // Cancel button
+      document
+        .getElementById("cancelPathBtn")
+        .addEventListener("click", function () {
+          document.body.removeChild(dialog);
+        });
+
+      // Confirm button
+      document
+        .getElementById("confirmPathBtn")
+        .addEventListener("click", function () {
+          const selectedPath = document
+            .getElementById("manualPath")
+            .value.trim();
+          if (selectedPath) {
+            // Check if the path exists and create it if necessary
+            const formData = new FormData();
+            formData.append("full_path", selectedPath);
+            formData.append("create_if_missing", "true");
+
+            fetch('{{ url_for("validate_directory_path") }}', {
+              method: "POST",
+              body: formData,
+            })
+              .then((response) => response.json())
+              .then((data) => {
+                if (data.valid) {
+                  document.getElementById("target_directory").value = data.path;
+                  document.body.removeChild(dialog);
+                } else {
+                  alert(
+                    data.error || "Invalid path. Please check and try again."
+                  );
+                }
+              })
+              .catch((error) => {
+                console.error("Error:", error);
                 document.body.removeChild(dialog);
-            });
-            
-            // Confirm button
-            document.getElementById('confirmPathBtn').addEventListener('click', function() {
-                const selectedPath = document.getElementById('manualPath').value.trim();
-                if (selectedPath) {
-                    // Check if the path exists and create it if necessary
-                    const formData = new FormData();
-                    formData.append('full_path', selectedPath);
-                    formData.append('create_if_missing', 'true');
-                    
-                    fetch('{{ url_for("validate_directory_path") }}', {
-                        method: 'POST',
-                        body: formData
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.valid) {
-                            document.getElementById('target_directory').value = data.path;
-                            document.body.removeChild(dialog);
-                        } else {
-                            alert(data.error || 'Invalid path. Please check and try again.');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        document.body.removeChild(dialog);
-                        alert('An error occurred while validating the path');
-                    });
-                } else {
-                    alert('Please enter a valid path');
-                }
-            });
-            
-            // Handle Enter key
-            document.getElementById('manualPath').addEventListener('keydown', function(e) {
-                if (e.key === 'Enter') {
-                    document.getElementById('confirmPathBtn').click();
-                }
-            });
+                alert("An error occurred while validating the path");
+              });
+          } else {
+            alert("Please enter a valid path");
+          }
+        });
+
+      // Handle Enter key
+      document
+        .getElementById("manualPath")
+        .addEventListener("keydown", function (e) {
+          if (e.key === "Enter") {
+            document.getElementById("confirmPathBtn").click();
+          }
+        });
+    }
+
+    // Form submission with actual API call instead of simulation
+    const form = document.getElementById("appGeneratorForm");
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault(); // Prevent standard form submission
+
+      // Validate form
+      if (!form.checkValidity()) {
+        e.stopPropagation();
+        form.classList.add("was-validated");
+        return;
+      }
+
+      // Prepare form data
+      const formData = new FormData(form);
+
+      // Handle custom model option
+      if (document.getElementById("model").value === "custom") {
+        const customModelValue = document
+          .getElementById("customModel")
+          .value.trim();
+        if (customModelValue) {
+          formData.set("model", customModelValue);
+        } else {
+          alert("Please enter a valid model identifier");
+          return;
         }
-        
-        // Form submission with actual API call instead of simulation
-        const form = document.getElementById('appGeneratorForm');
-        
-        form.addEventListener('submit', function(e) {
-            e.preventDefault(); // Prevent standard form submission
-            
-            // Validate form
-            if (!form.checkValidity()) {
-                e.stopPropagation();
-                form.classList.add('was-validated');
-                return;
+      }
+
+      // Show loading modal
+      const loadingModal = new bootstrap.Modal(
+        document.getElementById("loadingModal")
+      );
+      loadingModal.show();
+
+      // Initialize progress elements
+      const progressBar = document.getElementById("progressBar");
+      const currentStep = document.getElementById("currentStep");
+      const tipBox = document.getElementById("tipBox");
+      const tipText = document.getElementById("tipText");
+
+      const tips = [
+        "Free models may take longer due to rate limits.",
+        "The more detailed the description, the better the code generation.",
+        "MCP tools allow AI to access external information to improve the generated code.",
+        "Generation can take from 30 seconds to 5 minutes depending on application complexity.",
+        "You can preview and test the application directly in the interface once generated.",
+      ];
+
+      // Show random tips
+      let tipIndex = 0;
+      tipBox.classList.remove("d-none");
+      tipText.textContent = tips[tipIndex];
+
+      const tipInterval = setInterval(() => {
+        tipIndex = (tipIndex + 1) % tips.length;
+        tipBox.classList.remove("d-none");
+        tipText.textContent = tips[tipIndex];
+      }, 12000); // Show a new tip every 12 seconds
+
+      // Make AJAX request to generate the application
+      fetch('{{ url_for("generate") }}', {
+        method: "POST",
+        body: formData,
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP Error: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then((data) => {
+          // Check response
+          if (data.status === "success") {
+            // Start progress tracking
+            pollGenerationProgress();
+          } else if (data.status === "error") {
+            // Display errors
+            clearInterval(tipInterval);
+            loadingModal.hide();
+
+            let errorMessage = "An error occurred during generation.";
+            if (data.errors && data.errors.length > 0) {
+              errorMessage = data.errors.join("<br>");
+            } else if (data.message) {
+              errorMessage = data.message;
             }
-            
-            // Prepare form data
-            const formData = new FormData(form);
-            
-            // Handle custom model option
-            if (document.getElementById('model').value === 'custom') {
-                const customModelValue = document.getElementById('customModel').value.trim();
-                if (customModelValue) {
-                    formData.set('model', customModelValue);
-                } else {
-                    alert('Please enter a valid model identifier');
-                    return;
-                }
-            }
-            
-            // Show loading modal
-            const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
-            loadingModal.show();
-            
-            // Initialize progress elements
-            const progressBar = document.getElementById('progressBar');
-            const currentStep = document.getElementById('currentStep');
-            const tipBox = document.getElementById('tipBox');
-            const tipText = document.getElementById('tipText');
-            
-            const tips = [
-                "Free models may take longer due to rate limits.",
-                "The more detailed the description, the better the code generation.",
-                "MCP tools allow AI to access external information to improve the generated code.",
-                "Generation can take from 30 seconds to 5 minutes depending on application complexity.",
-                "You can preview and test the application directly in the interface once generated."
-            ];
-            
-            // Show random tips
-            let tipIndex = 0;
-            tipBox.classList.remove('d-none');
-            tipText.textContent = tips[tipIndex];
-            
-            const tipInterval = setInterval(() => {
-                tipIndex = (tipIndex + 1) % tips.length;
-                tipBox.classList.remove('d-none');
-                tipText.textContent = tips[tipIndex];
-            }, 12000); // Show a new tip every 12 seconds
-            
-            // Make AJAX request to generate the application
-            fetch('{{ url_for("generate") }}', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP Error: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                // Check response
-                if (data.status === 'success') {
-                    // Start progress tracking
-                    pollGenerationProgress();
-                } else if (data.status === 'error') {
-                    // Display errors
-                    clearInterval(tipInterval);
-                    loadingModal.hide();
-                    
-                    let errorMessage = 'An error occurred during generation.';
-                    if (data.errors && data.errors.length > 0) {
-                        errorMessage = data.errors.join('<br>');
-                    } else if (data.message) {
-                        errorMessage = data.message;
-                    }
-                    
-                    alert(errorMessage);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
+
+            alert(errorMessage);
+          }
+        })
+        .catch((error) => {
+          console.error("Error:", error);
+          clearInterval(tipInterval);
+          loadingModal.hide();
+          alert(
+            "An error occurred while communicating with the server: " +
+              error.message
+          );
+        });
+
+      // Function to poll the server for generation progress
+      function pollGenerationProgress() {
+        let pollInterval = setInterval(() => {
+          fetch('{{ url_for("generation_progress") }}')
+            .then((response) => response.json())
+            .then((data) => {
+              // Update progress bar
+              const progress = data.progress || 0;
+              progressBar.style.width = `${progress}%`;
+
+              // Update current step
+              if (data.current_step) {
+                currentStep.textContent = data.current_step;
+              }
+
+              // If generation is complete
+              if (data.status === "completed") {
+                clearInterval(pollInterval);
+                clearInterval(tipInterval);
+                currentStep.textContent = "Generation complete!";
+
+                // Redirect to results page
+                setTimeout(() => {
+                  window.location.href =
+                    data.redirect_url || '{{ url_for("result") }}';
+                }, 1500);
+              }
+
+              // If generation failed
+              if (data.status === "failed") {
+                clearInterval(pollInterval);
                 clearInterval(tipInterval);
                 loadingModal.hide();
-                alert('An error occurred while communicating with the server: ' + error.message);
+                alert(
+                  "Error during generation: " + (data.error || "Unknown error")
+                );
+              }
+            })
+            .catch((error) => {
+              console.error("Error checking progress:", error);
             });
-            
-            // Function to poll the server for generation progress
-            function pollGenerationProgress() {
-                let pollInterval = setInterval(() => {
-                    fetch('{{ url_for("generation_progress") }}')
-                    .then(response => response.json())
-                    .then(data => {
-                        // Update progress bar
-                        const progress = data.progress || 0;
-                        progressBar.style.width = `${progress}%`;
-                        
-                        // Update current step
-                        if (data.current_step) {
-                            currentStep.textContent = data.current_step;
-                        }
-                        
-                        // If generation is complete
-                        if (data.status === 'completed') {
-                            clearInterval(pollInterval);
-                            clearInterval(tipInterval);
-                            currentStep.textContent = "Generation complete!";
-                            
-                            // Redirect to results page
-                            setTimeout(() => {
-                                window.location.href = data.redirect_url || '{{ url_for("result") }}';
-                            }, 1500);
-                        }
-                        
-                        // If generation failed
-                        if (data.status === 'failed') {
-                            clearInterval(pollInterval);
-                            clearInterval(tipInterval);
-                            loadingModal.hide();
-                            alert('Error during generation: ' + (data.error || 'Unknown error'));
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error checking progress:', error);
-                    });
-                }, 1500); // Check progress every 1.5 seconds
-            }
-        });
-        
-        // Toggle MCP dependencies
-        const mcpToolsCheckbox = document.getElementById('use_mcp_tools');
-        const frontendOptions = document.getElementById('frontendOptions');
-        
-        mcpToolsCheckbox.addEventListener('change', function() {
-            frontendOptions.style.display = this.checked ? 'block' : 'none';
-        });
-        
-        // Initialize state
-        frontendOptions.style.display = mcpToolsCheckbox.checked ? 'block' : 'none';
-        
-        // Toggle custom model input
-        const modelSelect = document.getElementById('model');
-        const customModelContainer = document.getElementById('customModelContainer');
-        modelSelect.addEventListener('change', function() {
-            if (this.value === 'custom') {
-                customModelContainer.classList.remove('d-none');
-            } else {
-                customModelContainer.classList.add('d-none');
-            }
-        });
+        }, 1500); // Check progress every 1.5 seconds
+      }
     });
+
+    // Toggle MCP dependencies
+    const mcpToolsCheckbox = document.getElementById("use_mcp_tools");
+    const frontendOptions = document.getElementById("frontendOptions");
+
+    mcpToolsCheckbox.addEventListener("change", function () {
+      frontendOptions.style.display = this.checked ? "block" : "none";
+    });
+
+    // Initialize state
+    frontendOptions.style.display = mcpToolsCheckbox.checked ? "block" : "none";
+
+    // Toggle custom model input
+    const modelSelect = document.getElementById("model");
+    const customModelContainer = document.getElementById(
+      "customModelContainer"
+    );
+    modelSelect.addEventListener("change", function () {
+      if (this.value === "custom") {
+        customModelContainer.classList.remove("d-none");
+      } else {
+        customModelContainer.classList.add("d-none");
+      }
+    });
+  });
 </script>
 {% endblock %}
