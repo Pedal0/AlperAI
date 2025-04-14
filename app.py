@@ -12,6 +12,7 @@ from threading import Thread
 from typing import Dict, List, Union, Optional, Any
 import zipfile
 import io
+import atexit
 
 import requests
 from flask import (
@@ -42,6 +43,18 @@ generation_tasks = {}
 
 # Load environment variables at startup
 load_env_vars()
+
+# Enregistrer la fonction de nettoyage des processus à l'arrêt de l'application
+@atexit.register
+def cleanup_on_exit():
+    """Nettoie tous les processus et ressources à l'arrêt de l'application Flask"""
+    app.logger.info("Arrêt de l'application, nettoyage des processus...")
+    try:
+        from src.preview.preview_manager import cleanup_all_processes
+        cleanup_all_processes()
+        app.logger.info("Nettoyage des processus terminé")
+    except Exception as e:
+        app.logger.error(f"Erreur lors du nettoyage des processus: {str(e)}")
 
 # Modifier le contexte Jinja2 pour ajouter des fonctions utiles
 @app.context_processor
@@ -563,6 +576,45 @@ def preview():
                           target_dir=target_dir,
                           preview_session_id=session['preview_session_id'],
                           prompt=session.get('prompt', ''))
+
+@app.route('/preview/stop_on_exit', methods=['POST'])
+def stop_preview_on_exit():
+    """Point d'entrée spécial pour gérer l'arrêt de prévisualisation lors de la navigation ou de la fermeture de page"""
+    try:
+        # Pour les requêtes sendBeacon, les données sont dans le corps de la requête brute
+        if request.data:
+            # Essayer de parser les données JSON
+            try:
+                data = json.loads(request.data)
+                session_id = data.get('session_id')
+            except:
+                # Fallback si les données ne sont pas en JSON
+                session_id = None
+        else:
+            # Pour les requêtes normales
+            session_id = request.json.get('session_id') if request.json else None
+        
+        # Utiliser la session stockée si l'ID n'est pas fourni dans la requête
+        if not session_id:
+            session_id = session.get('preview_session_id')
+            
+        # Aucune session trouvée, pas d'action à effectuer
+        if not session_id:
+            app.logger.warning("Tentative d'arrêt sans ID de session")
+            return '', 204  # Réponse "No Content" appropriée pour les requêtes sendBeacon
+        
+        # Arrêter la prévisualisation avec le module preview_manager
+        from src.preview.preview_manager import stop_preview
+        success, message = stop_preview(session_id)
+        
+        app.logger.info(f"Arrêt d'application sur sortie de page: {success}, {message}")
+        
+        # Toujours retourner un succès (même en cas d'échec) car c'est un nettoyage "best effort"
+        return '', 204  # Réponse "No Content" appropriée pour les requêtes sendBeacon
+        
+    except Exception as e:
+        app.logger.error(f"Erreur lors de l'arrêt sur sortie: {str(e)}")
+        return '', 204  # Même en cas d'erreur, on renvoie un succès pour ne pas bloquer la navigation
 
 @app.route('/preview/start', methods=['POST'])
 def start_preview():
