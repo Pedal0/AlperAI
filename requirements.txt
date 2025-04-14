@@ -1,0 +1,16 @@
+python-dotenv
+openai
+requests
+asyncio
+duckduckgo-search
+beautifulsoup4
+aiohttp
+flask
+flask-session
+pydantic
+openrouter
+websockets
+jinja2
+werkzeug
+itsdangerous
+click
