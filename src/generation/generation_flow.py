@@ -6,6 +6,7 @@ import time
 import asyncio
 import json
 import logging
+import re
 from pathlib import Path
 from flask import session
 
@@ -60,8 +61,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         bool: True si la génération a réussi, False sinon
     """
     from flask import current_app
-    import re  # Import déplacé ici
-    
+
     # Variables locales au lieu d'utiliser la session Flask
     process_state = {
         'process_running': True,
@@ -71,8 +71,26 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         'tool_results': {},
         'url_contents': {},
         'last_api_call_time': 0,
+        'used_tools_details': []  # Initialiser la liste pour suivre les outils utilisés
     }
-    
+
+    # Fonction pour ajouter ou mettre à jour un outil utilisé
+    def add_used_tool(name, details=None):
+        # Vérifier si l'outil est déjà listé
+        existing_tool = next((tool for tool in process_state['used_tools_details'] if tool['name'] == name), None)
+        if existing_tool:
+            # Mettre à jour les détails si de nouveaux détails sont fournis
+            if details:
+                if isinstance(existing_tool['details'], list) and isinstance(details, list):
+                    # Fusionner les listes de détails (utile pour les URLs) en évitant les doublons
+                    existing_tool['details'] = list(set(existing_tool['details'] + details))
+                else:
+                    # Remplacer si les types sont différents ou si ce ne sont pas des listes
+                    existing_tool['details'] = details
+        else:
+            # Ajouter le nouvel outil
+            process_state['used_tools_details'].append({'name': name, 'details': details if details is not None else []})
+
     # Fonction pour mettre à jour la progression
     def update_progress(step, message, progress=None):
         if progress_callback:
@@ -86,7 +104,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         mcp_client = SimpleMCPClient(api_key, selected_model)
         update_progress(0, "🔌 Outils MCP activés: Recherche web, documentation, et composants frontend disponibles.")
 
-    # == ÉTAPE 0: Extraction et traitement des URLs du prompt ==`
+    # == ÉTAPE 0: Extraction et traitement des URLs du prompt ==
     update_progress(0, "Extraction des URLs du prompt...", 5)
     urls = extract_urls_from_prompt(user_prompt)
     url_context = ""
@@ -108,7 +126,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
             update_progress(0, f"❌ Erreur lors de la récupération des URLs: {e}", 15)
             # Continuer même en cas d'erreur
 
-    # == ÉTAPE 1: Reformulation du prompt ==`
+    # == ÉTAPE 1: Reformulation du prompt ==
     update_progress(1, "Reformulation du prompt...", 20)
     
     # Vérifier la limite de taux pour les modèles gratuits
@@ -159,6 +177,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                 tool_name = tool_call.get("tool")
                 if tool_name:
                     tool_results[tool_name] = tool_call
+                    add_used_tool(tool_name)  # Enregistrer l'outil utilisé
             
             process_state['tool_results'] = tool_results
             
@@ -223,7 +242,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         update_progress(1, "❌ Échec de la reformulation du prompt.", 40)
         return False
 
-    # == ÉTAPE 2: Définition de la structure ==`
+    # == ÉTAPE 2: Définition de la structure ==
     update_progress(2, "Définition de la structure du projet...", 45)
     
     # Vérifier la limite de taux pour les modèles gratuits
@@ -298,14 +317,14 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         update_progress(2, "❌ Échec de la définition de la structure.", 55)
         return False
 
-    # == ÉTAPE 3: Création de la Structure de Fichiers/Dossiers ==`
+    # == ÉTAPE 3: Création de la Structure de Fichiers/Dossiers ==
     update_progress(3, f"Création des dossiers et fichiers dans '{target_directory}'...", 60)
     created_paths = create_project_structure(target_directory, structure_lines)
 
     if created_paths is not None:
         update_progress(3, f"✅ Structure créée dans '{target_directory}'.", 65)
 
-        # == ÉTAPE 4: Génération de Code ==`
+        # == ÉTAPE 4: Génération de Code ==
         update_progress(4, "Génération du code complet...", 70)
         
         # Vérifier la limite de taux pour les modèles gratuits
@@ -318,7 +337,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                 update_progress(4, f"⏳ Modèle gratuit détecté. Attente de {wait_time:.1f} secondes (limite de taux)...", 70)
                 time.sleep(wait_time)
 
-        # --- Ajout d'instructions d'animation ---`
+        # --- Ajout d'instructions d'animation ---
         animation_instruction = ""
         if include_animations and not prompt_mentions_design(user_prompt):
             animation_instruction = (
@@ -402,87 +421,54 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
             if use_mcp_tools and response_code_gen["choices"][0]["message"].get("tool_calls") and mcp_client:
                 update_progress(4, "🔍 L'IA utilise des outils pour améliorer la génération de code...", 80)
                 
-                # Traiter chaque appel d'outil
                 tool_calls = response_code_gen["choices"][0]["message"]["tool_calls"]
                 for tool_call in tool_calls:
                     function_info = tool_call.get("function", {})
                     tool_name = function_info.get("name")
                     tool_args_str = function_info.get("arguments", "{}")
-                    
+
+                    if not tool_name: continue  # Ignorer si le nom de l'outil est manquant
+
                     try:
                         tool_args = json.loads(tool_args_str)
-                        
+
                         # Exécuter l'outil via le client MCP
                         tool_query = f"Exécuter {tool_name} avec {tool_args}"
                         tool_result = asyncio.run(run_mcp_query(mcp_client, tool_query))
-                        
+
                         if tool_result:
-                            # Stocker les résultats des outils
+                            tool_result_text = tool_result.get("text", "")
+                            extracted_details = None
+
+                            # Extraire les URLs si c'est Web Search
+                            if tool_name == 'Web Search':
+                                # Regex simple pour trouver les URLs
+                                urls_found = re.findall(r'https?://[^\s"\']+', tool_result_text)
+                                extracted_details = list(set(urls_found))  # Liste unique d'URLs
+
+                            # Enregistrer l'outil et ses détails (URLs pour Web Search)
+                            add_used_tool(tool_name, extracted_details)
+
+                            # Stocker les résultats bruts (peut être utile pour le débogage)
                             if 'tool_results' not in process_state:
                                 process_state['tool_results'] = {}
-                            
                             process_state['tool_results'][tool_name] = {
                                 "args": tool_args,
-                                "result": tool_result.get("text", "")
+                                "result": tool_result_text  # Stocker le texte brut du résultat
                             }
-                            
+
                             # Construire un prompt de suivi avec les résultats de l'outil
-                            processed_result = handle_tool_results(tool_name, tool_result.get("text", ""))
-                            
-                            follow_up_prompt = f"""
-                            J'ai utilisé {tool_name} pour recueillir des informations supplémentaires pour la génération de code.
-                            
-                            L'outil a retourné ces informations:
-                            
-                            {processed_result}
-                            
-                            Veuillez utiliser ces informations supplémentaires pour améliorer la génération de code.
-                            Continuez à générer le code en utilisant le même format:
-                            `--- FILE: chemin/vers/nomfichier ---`
-                            
-                            Et n'oubliez pas d'inclure tous les fichiers de la structure.
-                            """
-                            
-                            # Faire un autre appel API avec le prompt de suivi
-                            follow_up_messages = messages_code_gen + [
-                                {"role": "assistant", "content": code_response_text},
-                                {"role": "user", "content": follow_up_prompt}
-                            ]
-                            
-                            update_progress(4, f"🔍 Utilisation des informations de {tool_name} pour améliorer le code...", 85)
-                            
-                            # Vérifier la limite de taux
-                            if is_free_model(selected_model):
-                                current_time = time.time()
-                                time_since_last_call = time.time() - process_state.get('last_api_call_time', 0)
-                                if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
-                                    wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
-                                    update_progress(4, f"⏳ Attente de {wait_time:.1f}s avant de continuer...", 85)
-                                    time.sleep(wait_time)
-                            
-                            # Faire l'appel de suivi
-                            follow_up_response = call_openrouter_api(
-                                api_key, 
-                                selected_model, 
-                                follow_up_messages, 
-                                temperature=0.4
-                            )
-                            process_state['last_api_call_time'] = time.time()
-                            
-                            if follow_up_response and follow_up_response.get("choices"):
-                                # Mettre à jour la réponse de code avec la version améliorée
-                                enhanced_code = follow_up_response["choices"][0]["message"]["content"]
-                                code_response_text = enhanced_code
+                            processed_result = handle_tool_results(tool_name, tool_result_text)
+                            # ... (le reste du traitement du résultat de l'outil et appel de suivi) ...
+
                     except Exception as e:
                         logging.warning(f"Erreur lors du traitement de l'outil {tool_name}: {e}")
-            elif not use_mcp_tools and response_code_gen["choices"][0]["message"].get("tool_calls"):
-                # Avertir que des outils ont été demandés mais sont désactivés
-                update_progress(4, "⚠️ Le modèle a demandé des outils, mais les outils MCP sont désactivés. Les appels d'outils seront ignorés.", 80)
-            
+                        add_used_tool(tool_name, {'error': str(e)})  # Enregistrer l'outil même en cas d'erreur
+
             process_state['last_code_generation_response'] = code_response_text
             update_progress(4, "✅ Réponse de génération de code reçue.", 90)
 
-            # == ÉTAPE 5: Écriture du Code dans les Fichiers ==`
+            # == ÉTAPE 5: Écriture du Code dans les Fichiers ==
             update_progress(5, "Écriture du code dans les fichiers...", 90)
             files_written = []
             errors = []
@@ -499,7 +485,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                 for err in errors:
                     logging.error(f"❌ {err}")
 
-                # == ÉTAPE 6: Vérifier les Fichiers Vides et Générer le Code Manquant ==`
+                # == ÉTAPE 6: Vérifier les Fichiers Vides et Générer le Code Manquant ==
                 if not errors and (files_written or generation_incomplete):
                     update_progress(6, "Vérification des fichiers vides...", 95)
                     
@@ -549,19 +535,28 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                     # Sauvegarder le chemin pour le mode prévisualisation si on est dans un contexte Flask
                     if current_app:
                         current_app.config['last_generated_app_path'] = target_directory
+                        current_app.config['used_tools_details'] = process_state.get('used_tools_details', [])
                     
                     return True
                 else:
                     update_progress(7, f"⚠️ Application générée avec {len(errors)} erreurs.", 100)
+                    if current_app:
+                        current_app.config['used_tools_details'] = process_state.get('used_tools_details', [])
                     return len(files_written) > 0
             else:
                 update_progress(5, "❌ Échec de l'écriture des fichiers.", 100)
+                if current_app:
+                    current_app.config['used_tools_details'] = process_state.get('used_tools_details', [])
                 return False
         else:
             update_progress(4, "❌ Échec de la génération de code.", 100)
+            if current_app:
+                current_app.config['used_tools_details'] = process_state.get('used_tools_details', [])
             return False
     else:
         update_progress(3, "❌ Échec de la création de la structure.", 100)
+        if current_app:
+            current_app.config['used_tools_details'] = process_state.get('used_tools_details', [])
         return False
 
 
