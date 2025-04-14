@@ -16,7 +16,7 @@ import io
 import requests
 from flask import (
     Flask, render_template, request, jsonify, redirect, 
-    url_for, session, flash, send_file, abort, Response
+    url_for, session, flash, send_file, abort, Response, current_app
 )
 from werkzeug.utils import secure_filename
 
@@ -285,31 +285,37 @@ def get_project_structure():
     """Récupère la structure du projet généré"""
     if 'generation_result' not in session:
         return jsonify({"status": "error", "message": "Aucun résultat de génération trouvé"}), 400
-    
+
     target_dir = session['generation_result'].get('target_directory')
     if not target_dir or not Path(target_dir).is_dir():
         return jsonify({"status": "error", "message": "Répertoire cible introuvable"}), 400
-    
+
     # Fonction pour construire la structure de répertoire récursivement
     def build_directory_structure(directory_path):
         directory = Path(directory_path)
         result = []
-        
-        for item in sorted(directory.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
-            if item.name.startswith('.') or '__pycache__' in str(item):
-                continue  # Ignorer les fichiers/dossiers cachés et __pycache__
-                
-            node = {'name': item.name, 'isFolder': item.is_dir()}
-            
+
+        # Trier pour afficher les dossiers en premier, puis les fichiers, par ordre alphabétique
+        items_sorted = sorted(directory.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower()))
+
+        for item in items_sorted:
+            # Ignorer les fichiers/dossiers cachés et les dossiers __pycache__
+            if item.name.startswith('.') or item.name == '__pycache__':
+                continue
+
+            # Utiliser 'type': 'folder'/'file' comme attendu par le frontend
+            node = {'name': item.name, 'type': 'folder' if item.is_dir() else 'file'}
+
             if item.is_dir():
+                # Appel récursif pour obtenir les enfants
                 children = build_directory_structure(item)
-                if children:  # Ne pas inclure les dossiers vides
-                    node['children'] = children
-                    
+                # Toujours ajouter la clé 'children', même si elle est vide
+                node['children'] = children
+
             result.append(node)
-            
+
         return result
-    
+
     try:
         structure = build_directory_structure(target_dir)
         return jsonify({"status": "success", "structure": structure})
@@ -320,72 +326,99 @@ def get_project_structure():
 def generate_application_thread(task_id, api_key, model, prompt, target_dir, use_mcp, 
                               frontend_framework, include_animations, empty_files_check):
     """Fonction exécutée dans un thread pour générer l'application"""
-    try:
-        from src.generation.generation_flow import generate_application
-        from src.utils.model_utils import is_free_model
-        
-        # Fonction de callback pour la mise à jour de la progression
-        def update_progress_callback(step, message, progress=None):
-            if progress is not None:
-                generation_tasks[task_id]['progress'] = progress
-            if message:
-                generation_tasks[task_id]['current_step'] = message
-            app.logger.info(f"[Étape {step}] {message}")
-        
-        # Appel à la fonction de génération avec le callback de progression
-        success = generate_application(
-            api_key=api_key,
-            selected_model=model,
-            user_prompt=prompt,
-            target_directory=target_dir,
-            use_mcp_tools=use_mcp,
-            frontend_framework=frontend_framework,
-            include_animations=include_animations,
-            progress_callback=update_progress_callback
-        )
-        
-        # En fonction du résultat de la génération
-        if success:
-            from pathlib import Path
-            
-            # Récupérer la liste des fichiers créés
-            files_written = []
-            files_still_empty = []
-            
-            for root, dirs, files in os.walk(target_dir):
-                for file in files:
-                    rel_path = os.path.relpath(os.path.join(root, file), target_dir)
-                    rel_path = os.path.normpath(rel_path)
-                    files_written.append(rel_path)
-                    if os.path.getsize(os.path.join(root, file)) == 0:
-                        files_still_empty.append(rel_path)
-            
-            # Mettre à jour l'état de la tâche
-            generation_tasks[task_id]['progress'] = 100
-            generation_tasks[task_id]['status'] = 'completed'
-            generation_tasks[task_id]['result'] = {
-                'success': True,
-                'target_directory': target_dir,
-                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'files_created': len(files_written),
-                'file_list': files_written,
-                'files_still_empty': files_still_empty,
-                'prompt': prompt,
-                'reformulated_prompt': app.config.get('reformulated_prompt', '')
-            }
-            
-            app.logger.info(f"Génération terminée. {len(files_written)} fichiers créés, {len(files_still_empty)} fichiers toujours vides.")
-        else:
+    # Utiliser le contexte de l'application pour accéder à app.config
+    with app.app_context():
+        try:
+            from src.generation.generation_flow import generate_application
+            from src.utils.model_utils import is_free_model
+
+            # Fonction de callback pour la mise à jour de la progression
+            def update_progress_callback(step, message, progress=None):
+                if progress is not None:
+                    generation_tasks[task_id]['progress'] = progress
+                if message:
+                    generation_tasks[task_id]['current_step'] = message
+                # Utiliser current_app.logger au lieu de app.logger dans le thread
+                current_app.logger.info(f"[Task {task_id} - Step {step}] {message}")
+
+            # Appel à la fonction de génération avec le callback de progression
+            success = generate_application(
+                api_key=api_key,
+                selected_model=model,
+                user_prompt=prompt,
+                target_directory=target_dir,
+                use_mcp_tools=use_mcp,
+                frontend_framework=frontend_framework,
+                include_animations=include_animations,
+                progress_callback=update_progress_callback
+            )
+
+            # Récupérer les détails des outils depuis app.config (même si success est False)
+            # Utiliser pop pour nettoyer app.config après récupération
+            used_tools = current_app.config.pop('used_tools_details', [])
+
+            # En fonction du résultat de la génération
+            if success:
+                from pathlib import Path
+
+                # Récupérer la liste des fichiers créés
+                files_written = []
+                files_still_empty = []
+
+                for root, dirs, files in os.walk(target_dir):
+                    # Ignorer __pycache__
+                    if '__pycache__' in dirs:
+                        dirs.remove('__pycache__')
+                    # Ignorer les dossiers cachés
+                    dirs[:] = [d for d in dirs if not d.startswith('.')]
+                    files[:] = [f for f in files if not f.startswith('.')]
+
+                    for file in files:
+                        rel_path = os.path.relpath(os.path.join(root, file), target_dir)
+                        rel_path = os.path.normpath(rel_path).replace(os.sep, '/') # Normaliser pour l'affichage
+                        files_written.append(rel_path)
+                        try:
+                            if os.path.getsize(os.path.join(root, file)) == 0:
+                                files_still_empty.append(rel_path)
+                        except OSError:
+                            # Ignorer les erreurs de taille (liens symboliques cassés, etc.)
+                            pass
+
+                # Mettre à jour l'état de la tâche
+                generation_tasks[task_id]['progress'] = 100
+                generation_tasks[task_id]['status'] = 'completed'
+                generation_tasks[task_id]['result'] = {
+                    'success': True,
+                    'target_directory': target_dir,
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'files_created': len(files_written),
+                    'file_list': sorted(files_written), # Trier pour la cohérence
+                    'files_still_empty': sorted(files_still_empty), # Trier
+                    'prompt': prompt,
+                    'reformulated_prompt': current_app.config.pop('reformulated_prompt', ''), # Récupérer et nettoyer
+                    'used_tools': used_tools # <<< NOUVEAU: Ajouter les outils utilisés
+                }
+
+
+                current_app.logger.info(f"[Task {task_id}] Génération terminée. {len(files_written)} fichiers créés, {len(files_still_empty)} fichiers toujours vides.")
+            else:
+                generation_tasks[task_id]['status'] = 'failed'
+                # L'erreur est déjà définie dans generate_application ou dans le bloc except
+                if 'error' not in generation_tasks[task_id]:
+                     generation_tasks[task_id]['error'] = "Échec de la génération de l'application (raison inconnue)"
+                # Ajouter quand même les outils utilisés s'ils existent
+                generation_tasks[task_id]['result'] = {'success': False, 'used_tools': used_tools}
+                current_app.logger.error(f"[Task {task_id}] Échec de la génération de l'application: {generation_tasks[task_id]['error']}")
+
+        except Exception as e:
+            import traceback
+            current_app.logger.error(f"[Task {task_id}] Erreur PENDANT la génération: {str(e)}")
+            current_app.logger.error(traceback.format_exc())
+            generation_tasks[task_id]['error'] = str(e)
             generation_tasks[task_id]['status'] = 'failed'
-            generation_tasks[task_id]['error'] = "Échec de la génération de l'application"
-            app.logger.error("Échec de la génération de l'application")
-            
-    except Exception as e:
-        import traceback
-        app.logger.error(f"Erreur lors de la génération: {str(e)}")
-        app.logger.error(traceback.format_exc())
-        generation_tasks[task_id]['error'] = str(e)
-        generation_tasks[task_id]['status'] = 'failed'
+            # Essayer de récupérer les outils même en cas d'exception majeure
+            used_tools_on_error = current_app.config.pop('used_tools_details', [])
+            generation_tasks[task_id]['result'] = {'success': False, 'used_tools': used_tools_on_error}
 
 @app.route('/generate', methods=['POST'])
 def generate():
@@ -496,11 +529,16 @@ def result():
     if 'generation_result' not in session:
         flash("Aucun résultat de génération trouvé. Veuillez d'abord générer une application.", "warning")
         return redirect(url_for('index'))
-        
-    return render_template('result.html', 
-                          result=session['generation_result'],
+
+    generation_result = session['generation_result']
+    # <<< NOUVEAU: Extraire les outils utilisés du résultat
+    used_tools = generation_result.get('used_tools', [])
+
+    return render_template('result.html',
+                          result=generation_result,
                           prompt=session.get('prompt', ''),
-                          target_dir=session.get('target_dir', ''))
+                          target_dir=session.get('target_dir', ''),
+                          used_tools=used_tools) # <<< NOUVEAU: Passer les outils au template
 
 @app.route('/preview')
 def preview():
