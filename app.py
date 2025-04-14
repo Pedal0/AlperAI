@@ -285,31 +285,37 @@ def get_project_structure():
     """Récupère la structure du projet généré"""
     if 'generation_result' not in session:
         return jsonify({"status": "error", "message": "Aucun résultat de génération trouvé"}), 400
-    
+
     target_dir = session['generation_result'].get('target_directory')
     if not target_dir or not Path(target_dir).is_dir():
         return jsonify({"status": "error", "message": "Répertoire cible introuvable"}), 400
-    
+
     # Fonction pour construire la structure de répertoire récursivement
     def build_directory_structure(directory_path):
         directory = Path(directory_path)
         result = []
-        
-        for item in sorted(directory.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
-            if item.name.startswith('.') or '__pycache__' in str(item):
-                continue  # Ignorer les fichiers/dossiers cachés et __pycache__
-                
-            node = {'name': item.name, 'isFolder': item.is_dir()}
-            
+
+        # Trier pour afficher les dossiers en premier, puis les fichiers, par ordre alphabétique
+        items_sorted = sorted(directory.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower()))
+
+        for item in items_sorted:
+            # Ignorer les fichiers/dossiers cachés et les dossiers __pycache__
+            if item.name.startswith('.') or item.name == '__pycache__':
+                continue
+
+            # Utiliser 'type': 'folder'/'file' comme attendu par le frontend
+            node = {'name': item.name, 'type': 'folder' if item.is_dir() else 'file'}
+
             if item.is_dir():
+                # Appel récursif pour obtenir les enfants
                 children = build_directory_structure(item)
-                if children:  # Ne pas inclure les dossiers vides
-                    node['children'] = children
-                    
+                # Toujours ajouter la clé 'children', même si elle est vide
+                node['children'] = children
+
             result.append(node)
-            
+
         return result
-    
+
     try:
         structure = build_directory_structure(target_dir)
         return jsonify({"status": "success", "structure": structure})
