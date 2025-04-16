@@ -48,7 +48,7 @@
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark">
       <div class="container">
-        <a class="navbar-brand" href="{{ url_for('index') }}">
+        <a class="navbar-brand" href="{{ url_for('ui.index') }}">
           <i class="fas fa-rocket me-2"></i>GenApp AI
         </a>
         <button
@@ -66,16 +66,16 @@
           <ul class="navbar-nav ms-auto">
             <li class="nav-item">
               <a
-                class="nav-link {{ 'active' if request.endpoint == 'index' }}"
-                href="{{ url_for('index') }}"
+                class="nav-link {% if request.endpoint == 'ui.index' %}active{% endif %}"
+                href="{{ url_for('ui.index') }}"
               >
                 <i class="fas fa-home me-1"></i> Home
               </a>
             </li>
             <li class="nav-item">
               <a
-                class="nav-link {{ 'active' if request.endpoint == 'about' }}"
-                href="{{ url_for('about') }}"
+                class="nav-link {% if request.endpoint == 'ui.about' %}active{% endif %}"
+                href="{{ url_for('ui.about') }}"
               >
                 <i class="fas fa-info-circle me-1"></i> About
               </a>
@@ -124,7 +124,7 @@
             </p>
           </div>
           <div class="col-md-6 text-md-end">
-            <a href="{{ url_for('about') }}" class="me-3">About</a>
+            <a href="{{ url_for('ui.about') }}" class="me-3">About</a>
             <a
               href="https://github.com/Pedal0/bot-project-creator"
               target="_blank"

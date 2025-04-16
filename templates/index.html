@@ -14,7 +14,7 @@
   <div class="col-lg-10">
     <form
       id="appGeneratorForm"
-      action="{{ url_for('generate') }}"
+      action="{{ url_for('generation.generate') }}"
       method="post"
       class="animate__animated animate__fadeInUp"
     >
@@ -179,7 +179,7 @@
                     class="form-control"
                     id="target_directory"
                     name="target_directory"
-                    placeholder="Ex: C:\Users\YourName\Projects\MyGeneratedApp"
+                    placeholder="e.g. C:\\Users\\YourName\\Projects\\MyGeneratedApp"
                     required
                   />
                   <button
@@ -341,7 +341,7 @@
         document.getElementById("browseButton").disabled = true;
 
         // Call the new route that launches a native Windows file selector
-        fetch('{{ url_for("open_folder_dialog") }}')
+        fetch('{{ url_for("ui.open_folder_dialog") }}')
           .then((response) => response.json())
           .then((data) => {
             document.getElementById("browseButton").disabled = false;
@@ -403,7 +403,7 @@
                 <div class="input-group mb-3">
                     <input type="text" class="form-control" id="manualPath" value="${
                       currentPath || ""
-                    }" placeholder="Ex: E:\\Dev_maison\\my_project">
+                    }" placeholder="e.g. E:\\Dev_maison\\my_project">
                 </div>
                 <div class="form-text mb-3">
                     Examples of valid paths: C:\\Users\\name\\Projects\\MyProject, E:\\Dev_maison\\test
@@ -443,7 +443,7 @@
             formData.append("full_path", selectedPath);
             formData.append("create_if_missing", "true");
 
-            fetch('{{ url_for("validate_directory_path") }}', {
+            fetch('{{ url_for("ui.validate_directory_path") }}', {
               method: "POST",
               body: formData,
             })
@@ -519,6 +519,21 @@
       const tipBox = document.getElementById("tipBox");
       const tipText = document.getElementById("tipText");
 
+      // Ajout : zone d'affichage MCP
+      let mcpMessage = null;
+      let mcpBox = document.getElementById("mcpBox");
+      if (!mcpBox) {
+        mcpBox = document.createElement("div");
+        mcpBox.className = "alert alert-success mt-3 d-none";
+        mcpBox.id = "mcpBox";
+        // Insérer juste après la barre de progression
+        const progressElem = progressBar.parentElement;
+        progressElem.parentElement.insertBefore(
+          mcpBox,
+          progressElem.nextSibling
+        );
+      }
+
       const tips = [
         "Free models may take longer due to rate limits.",
         "The more detailed the description, the better the code generation.",
@@ -539,7 +554,7 @@
       }, 12000); // Show a new tip every 12 seconds
 
       // Make AJAX request to generate the application
-      fetch('{{ url_for("generate") }}', {
+      fetch('{{ url_for("generation.generate") }}', {
         method: "POST",
         body: formData,
         headers: {
@@ -585,7 +600,7 @@
       // Function to poll the server for generation progress
       function pollGenerationProgress() {
         let pollInterval = setInterval(() => {
-          fetch('{{ url_for("generation_progress") }}')
+          fetch('{{ url_for("generation.generation_progress") }}')
             .then((response) => response.json())
             .then((data) => {
               // Update progress bar
@@ -595,6 +610,20 @@
               // Update current step
               if (data.current_step) {
                 currentStep.textContent = data.current_step;
+                // Ajout : détecter le message MCP
+                if (
+                  data.current_step.includes("Outils MCP activés") ||
+                  data.current_step.includes("MCP tools enabled")
+                ) {
+                  mcpMessage = data.current_step;
+                  mcpBox.textContent = mcpMessage;
+                  mcpBox.classList.remove("d-none");
+                }
+              }
+              // Afficher le message MCP si déjà détecté
+              if (mcpMessage) {
+                mcpBox.textContent = mcpMessage;
+                mcpBox.classList.remove("d-none");
               }
 
               // If generation is complete
@@ -602,11 +631,11 @@
                 clearInterval(pollInterval);
                 clearInterval(tipInterval);
                 currentStep.textContent = "Generation complete!";
-
+                mcpBox.classList.add("d-none"); // Masquer à la fin
                 // Redirect to results page
                 setTimeout(() => {
                   window.location.href =
-                    data.redirect_url || '{{ url_for("result") }}';
+                    data.redirect_url || '{{ url_for("generation.result") }}';
                 }, 1500);
               }
 
@@ -615,6 +644,7 @@
                 clearInterval(pollInterval);
                 clearInterval(tipInterval);
                 loadingModal.hide();
+                mcpBox.classList.add("d-none");
                 alert(
                   "Error during generation: " + (data.error || "Unknown error")
                 );
