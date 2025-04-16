@@ -124,7 +124,7 @@ block content %}
               <div class="col-md-4 text-center">
                 <div class="action-button">
                   <a
-                    href="{{ url_for('preview') }}"
+                    href="{{ url_for('preview.preview') }}"
                     class="btn btn-lg btn-outline-primary rounded-circle"
                   >
                     <i class="fas fa-play"></i>
@@ -136,7 +136,7 @@ block content %}
               <div class="col-md-4 text-center">
                 <div class="action-button">
                   <a
-                    href="{{ url_for('index') }}"
+                    href="{{ url_for('ui.index') }}"
                     class="btn btn-lg btn-outline-success rounded-circle"
                   >
                     <i class="fas fa-plus"></i>
@@ -256,7 +256,7 @@ block content %}
 
             <form
               id="iterationForm"
-              action="{{ url_for('continue_iteration') }}"
+              action="{{ url_for('generation.continue_iteration') }}"
               method="post"
             >
               <input
@@ -483,7 +483,7 @@ block content %}
     document
       .getElementById("downloadBtn")
       .addEventListener("click", function () {
-        window.location.href = "{{ url_for('download_zip') }}";
+        window.location.href = "{{ url_for('generation.download_zip') }}";
       });
 
     // Open folder button (this would require backend support in a real implementation)

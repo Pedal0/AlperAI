@@ -1,153 +1,220 @@
-{% extends "layout.html" %}
-
-{% block title %}About{% endblock %}
-
-{% block content %}
+{% extends "layout.html" %} {% block title %}About{% endblock %} {% block
+content %}
 <div class="row justify-content-center">
-    <div class="col-lg-10">
-        <div class="card about-card">
-            <div class="card-body p-5">
-                <h1 class="mb-4 text-center">
-                    <span class="gradient-text">About the AI Application Generator</span>
-                </h1>
-                
-                <div class="mb-5">
-                    <h3><i class="fas fa-info-circle me-2"></i>Project Overview</h3>
-                    <p>
-                        This project uses AI to generate complete and functional applications based on user descriptions. 
-                        It leverages the OpenRouter API to design, generate, and validate application code. 
-                        The Flask interface provides an intuitive way to create applications without writing code.
-                    </p>
-                </div>
-                
-                <div class="mb-5">
-                    <h3><i class="fas fa-cogs me-2"></i>Prerequisites</h3>
-                    <ul class="feature-list">
-                        <li>
-                            <span class="feature-icon"><i class="fab fa-python"></i></span>
-                            <div>
-                                <h5>Python 3.8 or higher</h5>
-                                <p>The main runtime environment for the application generator</p>
-                            </div>
-                        </li>
-                        <li>
-                            <span class="feature-icon"><i class="fas fa-box"></i></span>
-                            <div>
-                                <h5>Pipenv</h5>
-                                <p>Virtual environment and dependency management tool</p>
-                            </div>
-                        </li>
-                        <li>
-                            <span class="feature-icon"><i class="fas fa-key"></i></span>
-                            <div>
-                                <h5>OpenRouter API Key</h5>
-                                <p>Required to access AI models (<a href="https://openrouter.ai/" target="_blank">Get a key</a>)</p>
-                            </div>
-                        </li>
-                    </ul>
-                </div>
-                
-                <div class="mb-5">
-                    <h3><i class="fas fa-tools me-2"></i>MCP Features</h3>
-                    <p>
-                        This application now includes Model Context Protocol (MCP) tools integration to enhance code generation:
-                    </p>
-                    <div class="row mt-4">
-                        <div class="col-md-6 mb-4">
-                            <div class="card h-100 feature-card">
-                                <div class="card-body">
-                                    <h5 class="card-title"><i class="fas fa-search me-2"></i>Web Search</h5>
-                                    <p class="card-text">Searches for relevant information for your project on the web</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-4">
-                            <div class="card h-100 feature-card">
-                                <div class="card-body">
-                                    <h5 class="card-title"><i class="fas fa-book me-2"></i>Documentation Search</h5>
-                                    <p class="card-text">Retrieves documentation for specific technologies and frameworks</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-4">
-                            <div class="card h-100 feature-card">
-                                <div class="card-body">
-                                    <h5 class="card-title"><i class="fas fa-laptop-code me-2"></i>Frontend Components</h5>
-                                    <p class="card-text">Finds and suggests UI components for frontend development</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-4">
-                            <div class="card h-100 feature-card">
-                                <div class="card-body">
-                                    <h5 class="card-title"><i class="fas fa-paint-brush me-2"></i>Animation Resources</h5>
-                                    <p class="card-text">Provides CSS animations and transitions for a more engaging UI</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="mb-5">
-                    <h3><i class="fas fa-code me-2"></i>Usage Examples</h3>
-                    <p>For best results, try to be specific in your descriptions. Here are some examples:</p>
-                    
-                    <div class="accordion mt-3" id="examplesAccordion">
-                        <div class="accordion-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#example1">
-                                    Static Website
-                                </button>
-                            </h2>
-                            <div id="example1" class="accordion-collapse collapse show" data-bs-parent="#examplesAccordion">
-                                <div class="accordion-body">
-                                    <div class="example-prompt">
-                                        <pre>Create a static portfolio website for a photographer with a home page, gallery, about, and contact. Include a responsive design with a modern look.</pre>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="accordion-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#example2">
-                                    Web Application
-                                </button>
-                            </h2>
-                            <div id="example2" class="accordion-collapse collapse" data-bs-parent="#examplesAccordion">
-                                <div class="accordion-body">
-                                    <div class="example-prompt">
-                                        <pre>Build a task management application with user authentication. Users should be able to create, edit, and delete tasks, set due dates, and mark tasks as completed.</pre>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="accordion-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#example3">
-                                    API Service
-                                </button>
-                            </h2>
-                            <div id="example3" class="accordion-collapse collapse" data-bs-parent="#examplesAccordion">
-                                <div class="accordion-body">
-                                    <div class="example-prompt">
-                                        <pre>Create a RESTful API for a blog platform with endpoints for posts, comments, and users. Include authentication and proper error handling.</pre>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="text-center mt-5">
-                    <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">
-                        <i class="fas fa-rocket me-2"></i>Start Generating
-                    </a>
-                    <a href="https://github.com/Pedal0/bot-project-creator" target="_blank" class="btn btn-outline-dark btn-lg ms-3">
-                        <i class="fab fa-github me-2"></i>GitHub
-                    </a>
-                </div>
-            </div>
+  <div class="col-lg-10">
+    <div class="card about-card">
+      <div class="card-body p-5">
+        <h1 class="mb-4 text-center">
+          <span class="gradient-text">About the AI Application Generator</span>
+        </h1>
+
+        <div class="mb-5">
+          <h3><i class="fas fa-info-circle me-2"></i>Project Overview</h3>
+          <p>
+            This project uses AI to generate complete and functional
+            applications based on user descriptions. It leverages the OpenRouter
+            API to design, generate, and validate application code. The Flask
+            interface provides an intuitive way to create applications without
+            writing code.
+          </p>
         </div>
+
+        <div class="mb-5">
+          <h3><i class="fas fa-cogs me-2"></i>Prerequisites</h3>
+          <ul class="feature-list">
+            <li>
+              <span class="feature-icon"><i class="fab fa-python"></i></span>
+              <div>
+                <h5>Python 3.8 or higher</h5>
+                <p>
+                  The main runtime environment for the application generator
+                </p>
+              </div>
+            </li>
+            <li>
+              <span class="feature-icon"><i class="fas fa-box"></i></span>
+              <div>
+                <h5>Pipenv</h5>
+                <p>Virtual environment and dependency management tool</p>
+              </div>
+            </li>
+            <li>
+              <span class="feature-icon"><i class="fas fa-key"></i></span>
+              <div>
+                <h5>OpenRouter API Key</h5>
+                <p>
+                  Required to access AI models (<a
+                    href="https://openrouter.ai/"
+                    target="_blank"
+                    >Get a key</a
+                  >)
+                </p>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div class="mb-5">
+          <h3><i class="fas fa-tools me-2"></i>MCP Features</h3>
+          <p>
+            This application now includes Model Context Protocol (MCP) tools
+            integration to enhance code generation:
+          </p>
+          <div class="row mt-4">
+            <div class="col-md-6 mb-4">
+              <div class="card h-100 feature-card">
+                <div class="card-body">
+                  <h5 class="card-title">
+                    <i class="fas fa-search me-2"></i>Web Search
+                  </h5>
+                  <p class="card-text">
+                    Searches for relevant information for your project on the
+                    web
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6 mb-4">
+              <div class="card h-100 feature-card">
+                <div class="card-body">
+                  <h5 class="card-title">
+                    <i class="fas fa-book me-2"></i>Documentation Search
+                  </h5>
+                  <p class="card-text">
+                    Retrieves documentation for specific technologies and
+                    frameworks
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6 mb-4">
+              <div class="card h-100 feature-card">
+                <div class="card-body">
+                  <h5 class="card-title">
+                    <i class="fas fa-laptop-code me-2"></i>Frontend Components
+                  </h5>
+                  <p class="card-text">
+                    Finds and suggests UI components for frontend development
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6 mb-4">
+              <div class="card h-100 feature-card">
+                <div class="card-body">
+                  <h5 class="card-title">
+                    <i class="fas fa-paint-brush me-2"></i>Animation Resources
+                  </h5>
+                  <p class="card-text">
+                    Provides CSS animations and transitions for a more engaging
+                    UI
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-5">
+          <h3><i class="fas fa-code me-2"></i>Usage Examples</h3>
+          <p>
+            For best results, try to be specific in your descriptions. Here are
+            some examples:
+          </p>
+
+          <div class="accordion mt-3" id="examplesAccordion">
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button
+                  class="accordion-button"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#example1"
+                >
+                  Static Website
+                </button>
+              </h2>
+              <div
+                id="example1"
+                class="accordion-collapse collapse show"
+                data-bs-parent="#examplesAccordion"
+              >
+                <div class="accordion-body">
+                  <div class="example-prompt">
+                    <pre>
+Create a static portfolio website for a photographer with a home page, gallery, about, and contact. Include a responsive design with a modern look.</pre
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button
+                  class="accordion-button collapsed"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#example2"
+                >
+                  Web Application
+                </button>
+              </h2>
+              <div
+                id="example2"
+                class="accordion-collapse collapse"
+                data-bs-parent="#examplesAccordion"
+              >
+                <div class="accordion-body">
+                  <div class="example-prompt">
+                    <pre>
+Build a task management application with user authentication. Users should be able to create, edit, and delete tasks, set due dates, and mark tasks as completed.</pre
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button
+                  class="accordion-button collapsed"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#example3"
+                >
+                  API Service
+                </button>
+              </h2>
+              <div
+                id="example3"
+                class="accordion-collapse collapse"
+                data-bs-parent="#examplesAccordion"
+              >
+                <div class="accordion-body">
+                  <div class="example-prompt">
+                    <pre>
+Create a RESTful API for a blog platform with endpoints for posts, comments, and users. Include authentication and proper error handling.</pre
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="text-center mt-5">
+          <a href="{{ url_for('ui.index') }}" class="btn btn-outline-primary">
+            <i class="fas fa-arrow-left me-1"></i> Retour à l'accueil
+          </a>
+          <a
+            href="https://github.com/Pedal0/bot-project-creator"
+            target="_blank"
+            class="btn btn-outline-dark btn-lg ms-3"
+          >
+            <i class="fab fa-github me-2"></i>GitHub
+          </a>
+        </div>
+      </div>
     </div>
+  </div>
 </div>
 {% endblock %}
