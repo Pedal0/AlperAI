@@ -70,32 +70,32 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
     if use_mcp_tools:
         from src.mcp.clients import SimpleMCPClient
         mcp_client = SimpleMCPClient(api_key, selected_model)
-        update_progress(0, "🔌 Outils MCP activés: Recherche web, documentation, et composants frontend disponibles.", progress_callback)
+        update_progress(0, "🔌 MCP tools enabled: Web search, documentation, and frontend components available.", progress_callback)
 
-    # == ÉTAPE 0: Extraction et traitement des URLs du prompt ==
-    update_progress(0, "Extraction des URLs du prompt...", 5, progress_callback)
+    # == STEP 0: Extract and process URLs from prompt ==
+    update_progress(0, "Extracting URLs from prompt...", 5, progress_callback)
     urls = extract_urls_from_prompt(user_prompt)
     url_context = ""
     
     if urls:
-        update_progress(0, f"🔗 URLs détectées dans votre demande: {len(urls)} URL(s)", 10, progress_callback)
+        update_progress(0, f"🔗 URLs detected in your request: {len(urls)} URL(s)", 10, progress_callback)
         try:
             url_contents = asyncio.run(process_urls(urls))
             process_state['url_contents'] = url_contents
             
-            # Préparer le contexte des URLs
-            url_context = "\n\n### CONTENU DES URLS FOURNIES ###\n"
+            # Prepare context from URLs
+            url_context = "\n\n### CONTENT OF PROVIDED URLS ###\n"
             for url, content in url_contents.items():
                 truncated_content = content[:5000] + "..." if len(content) > 5000 else content
                 url_context += f"\nURL: {url}\n```\n{truncated_content}\n```\n"
             
-            update_progress(0, f"✅ Contenu récupéré pour {len(url_contents)} URL(s)", 15, progress_callback)
+            update_progress(0, f"✅ Content retrieved for {len(url_contents)} URL(s)", 15, progress_callback)
         except Exception as e:
-            update_progress(0, f"❌ Erreur lors de la récupération des URLs: {e}", 15, progress_callback)
-            # Continuer même en cas d'erreur
+            update_progress(0, f"❌ Error while retrieving URLs: {e}", 15, progress_callback)
+            # Continue even if error
 
-    # == ÉTAPE 1: Reformulation du prompt ==
-    update_progress(1, "Reformulation du prompt...", 20, progress_callback)
+    # == STEP 1: Reformulate prompt ==
+    update_progress(1, "Reformulating prompt...", 20, progress_callback)
     additional_context = ""
     tool_results_text = ""
     url_reference = ""
@@ -111,11 +111,11 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         process_state=process_state
     )
     if not reformulated_prompt:
-        update_progress(1, "❌ Échec de la reformulation du prompt.", 40, progress_callback)
+        update_progress(1, "❌ Failed to reformulate prompt.", 40, progress_callback)
         return False
 
-    # == ÉTAPE 2: Définition de la structure ==
-    update_progress(2, "Définition de la structure du projet...", 45, progress_callback)
+    # == STEP 2: Define project structure ==
+    update_progress(2, "Defining project structure...", 45, progress_callback)
     structure_lines = define_project_structure(
         api_key,
         selected_model,
@@ -127,30 +127,30 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
     if not structure_lines:
         return False
 
-    # == ÉTAPE 3: Création de la Structure de Fichiers/Dossiers ==
-    update_progress(3, f"Création des dossiers et fichiers dans '{target_directory}'...", 60, progress_callback)
+    # == STEP 3: Create file/folder structure ==
+    update_progress(3, f"Creating folders and files in '{target_directory}'...", 60, progress_callback)
     created_paths = create_project_structure(target_directory, structure_lines)
 
     if created_paths is not None:
-        update_progress(3, f"✅ Structure créée dans '{target_directory}'.", 65, progress_callback)
+        update_progress(3, f"✅ Structure created in '{target_directory}'.", 65, progress_callback)
 
-        # == ÉTAPE 4: Génération de Code ==
+        # == STEP 4: Code generation ==
         if include_animations and not prompt_mentions_design(user_prompt):
             animation_instruction = (
-                "\n7. **Animation & Fluidité:** Puisqu'aucun design spécifique n'a été demandé, "
-                "veuillez incorporer des animations CSS subtiles et des transitions (par exemple, effets hover, chargement/transitions fluides des sections, retour d'information subtil des boutons) "
-                "pour rendre l'interface utilisateur moderne, fluide et attrayante. Privilégiez l'utilisabilité et évitez les animations trop distrayantes."
+                "\n7. **Animation & Fluidity:** Since no specific design was requested, "
+                "please incorporate subtle CSS animations and transitions (e.g., hover effects, smooth section transitions, subtle button feedback) "
+                "to make the UI modern, smooth, and attractive. Prioritize usability and avoid overly distracting animations."
             )
-            update_progress(4, "ℹ️ Aucune instruction de design détectée, ajout d'une demande d'animations fluides.", 75, progress_callback)
+            update_progress(4, "ℹ️ No design instructions detected, adding a request for smooth animations.", 75, progress_callback)
         if use_mcp_tools and process_state.get('tool_results'):
-            tool_results_text = "\n**Résultats des Outils:** Les informations suivantes ont été recueillies pour aider au développement:\n"
+            tool_results_text = "\n**Tool Results:** The following information was gathered to assist development:\n"
             for tool_name, tool_info in process_state['tool_results'].items():
                 tool_results_text += f"\n- **{tool_name}**: {json.dumps(tool_info.get('args', {}))}\n"
                 if 'result' in tool_info:
-                    tool_results_text += f"Résultat: {tool_info['result'][:500]}...\n"
+                    tool_results_text += f"Result: {tool_info['result'][:500]}...\n"
         if process_state.get('url_contents'):
-            url_reference = "\n**URLs fournies:** Veuillez vous référer aux URLs fournies par l'utilisateur comme source d'inspiration ou documentation. Suivez autant que possible les exemples ou la documentation fournie dans ces URLs."
-        update_progress(4, "Génération du code complet...", 70, progress_callback)
+            url_reference = "\n**Provided URLs:** Please refer to the URLs provided by the user as inspiration or documentation. Follow examples or documentation from these URLs as much as possible."
+        update_progress(4, "Generating full code...", 70, progress_callback)
         response_code_gen = generate_code_step(
             api_key,
             selected_model,
@@ -171,9 +171,9 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         if response_code_gen and response_code_gen.get("choices"):
             code_response_text = response_code_gen["choices"][0]["message"]["content"]
             
-            # Vérifier les appels d'outils
+            # Tool calls
             if use_mcp_tools and response_code_gen["choices"][0]["message"].get("tool_calls") and mcp_client:
-                update_progress(4, "🔍 L'IA utilise des outils pour améliorer la génération de code...", 80, progress_callback)
+                update_progress(4, "🔍 AI is using tools to improve code generation...", 80, progress_callback)
                 
                 tool_calls = response_code_gen["choices"][0]["message"]["tool_calls"]
                 for tool_call in tool_calls:
@@ -181,49 +181,49 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                     tool_name = function_info.get("name")
                     tool_args_str = function_info.get("arguments", "{}")
 
-                    if not tool_name: continue  # Ignorer si le nom de l'outil est manquant
+                    if not tool_name: continue  # Ignore if tool name is missing
 
                     try:
                         tool_args = json.loads(tool_args_str)
 
-                        # Exécuter l'outil via le client MCP
-                        tool_query = f"Exécuter {tool_name} avec {tool_args}"
+                        # Execute the tool via the MCP client
+                        tool_query = f"Execute {tool_name} with {tool_args}"
                         tool_result = asyncio.run(run_mcp_query(mcp_client, tool_query))
 
                         if tool_result:
                             tool_result_text = tool_result.get("text", "")
                             extracted_details = None
 
-                            # Extraire les URLs si c'est Web Search
+                            # Extract URLs if it's Web Search
                             if tool_name == 'Web Search':
-                                # Regex simple pour trouver les URLs
+                                # Simple regex to find URLs
                                 urls_found = re.findall(r'https?://[^\s"\']+', tool_result_text)
-                                extracted_details = list(set(urls_found))  # Liste unique d'URLs
+                                extracted_details = list(set(urls_found))  # Unique list of URLs
 
-                            # Enregistrer l'outil et ses détails (URLs pour Web Search)
+                            # Record the tool and its details (URLs for Web Search)
                             add_used_tool(process_state, tool_name, extracted_details)
 
-                            # Stocker les résultats bruts (peut être utile pour le débogage)
+                            # Store raw results (may be useful for debugging)
                             if 'tool_results' not in process_state:
                                 process_state['tool_results'] = {}
                             process_state['tool_results'][tool_name] = {
                                 "args": tool_args,
-                                "result": tool_result_text  # Stocker le texte brut du résultat
+                                "result": tool_result_text  # Store raw result text
                             }
 
-                            # Construire un prompt de suivi avec les résultats de l'outil
+                            # Build a follow-up prompt with tool results
                             processed_result = handle_tool_results(tool_name, tool_result_text)
-                            # ... (le reste du traitement du résultat de l'outil et appel de suivi) ...
+                            # ... (rest of tool result processing and follow-up call) ...
 
                     except Exception as e:
-                        logging.warning(f"Erreur lors du traitement de l'outil {tool_name}: {e}")
-                        add_used_tool(process_state, tool_name, {'error': str(e)})  # Enregistrer l'outil même en cas d'erreur
+                        logging.warning(f"Error processing tool {tool_name}: {e}")
+                        add_used_tool(process_state, tool_name, {'error': str(e)})  # Record the tool even in case of error
 
             process_state['last_code_generation_response'] = code_response_text
-            update_progress(4, "✅ Réponse de génération de code reçue.", 90, progress_callback)
+            update_progress(4, "✅ Code generation response received.", 90, progress_callback)
 
-            # == ÉTAPE 5: Écriture du Code dans les Fichiers ==
-            update_progress(5, "Écriture du code dans les fichiers...", 90, progress_callback)
+            # == STEP 5: Write code to files ==
+            update_progress(5, "Writing code to files...", 90, progress_callback)
             files_written = []
             errors = []
             generation_incomplete = False
@@ -231,33 +231,33 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
             files_written, errors, generation_incomplete = parse_and_write_code(target_directory, code_response_text)
 
             if files_written or errors:
-                update_progress(5, "✅ Traitement de la réponse terminé.", 95, progress_callback)
+                update_progress(5, "✅ Response processing complete.", 95, progress_callback)
                 
-                # Journaliser les résultats
+                # Log results
                 for f in files_written:
-                    logging.info(f"📄 Fichier écrit: {Path(f).relative_to(Path(target_directory))}")
+                    logging.info(f"📄 File written: {Path(f).relative_to(Path(target_directory))}")
                 for err in errors:
                     logging.error(f"❌ {err}")
 
-                # == ÉTAPE 6: Vérifier les Fichiers Vides et Générer le Code Manquant ==
+                # == STEP 6: Check empty files and generate missing code ==
                 if not errors and (files_written or generation_incomplete):
-                    update_progress(6, "Vérification des fichiers vides...", 95, progress_callback)
+                    update_progress(6, "Checking for empty files...", 95, progress_callback)
                     
                     empty_files = identify_empty_files(target_directory, structure_lines)
                     
                     if empty_files:
-                        update_progress(6, f"Trouvé {len(empty_files)} fichiers vides qui nécessitent une génération de code.", 95, progress_callback)
+                        update_progress(6, f"Found {len(empty_files)} empty files that need code generation.", 95, progress_callback)
                         
-                        # Vérifier la limite de taux avant d'appeler l'API à nouveau
+                        # Check rate limit before calling the API again
                         if is_free_model(selected_model):
                             current_time = time.time()
                             time_since_last_call = time.time() - process_state.get('last_api_call_time', 0)
                             if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
                                 wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
-                                update_progress(6, f"⏳ Modèle gratuit détecté. Attente de {wait_time:.1f} secondes avant de générer le code manquant...", 95, progress_callback)
+                                update_progress(6, f"⏳ Free model detected. Waiting {wait_time:.1f} seconds before generating missing code...", 95, progress_callback)
                                 time.sleep(wait_time)
                         
-                        update_progress(6, "Génération de code pour les fichiers vides...", 97, progress_callback)
+                        update_progress(6, "Generating code for empty files...", 97, progress_callback)
                         additional_files, additional_errors = generate_missing_code(
                             api_key, 
                             selected_model, 
@@ -270,45 +270,45 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                         process_state['last_api_call_time'] = time.time()
                         
                         if additional_files:
-                            update_progress(6, f"✅ Génération réussie de code pour {len(additional_files)} fichiers vides.", 98, progress_callback)
-                            # Ajouter à la liste principale de fichiers
+                            update_progress(6, f"✅ Successfully generated code for {len(additional_files)} empty files.", 98, progress_callback)
+                            # Add to main file list
                             files_written.extend(additional_files)
                         
                         if additional_errors:
                             for err in additional_errors:
                                 logging.error(f"❌ {err}")
-                            # Ajouter à la liste principale d'erreurs
+                            # Add to main error list
                             errors.extend(additional_errors)
                     else:
-                        update_progress(6, "✅ Aucun fichier vide trouvé - tous les fichiers contiennent du code.", 98, progress_callback)
+                        update_progress(6, "✅ No empty files found - all files contain code.", 98, progress_callback)
                 
-                # Message de succès final
+                # Final success message
                 if not errors:
-                    update_progress(7, "🎉 Application générée avec succès!", 100, progress_callback)
+                    update_progress(7, "🎉 Application generated successfully!", 100, progress_callback)
                     
-                    # Sauvegarder le chemin pour le mode prévisualisation si on est dans un contexte Flask
+                    # Save path for preview mode if in Flask context
                     if current_app:
                         current_app.config['last_generated_app_path'] = target_directory
                         current_app.config['used_tools_details'] = process_state.get('used_tools_details', [])
                     
                     return True
                 else:
-                    update_progress(7, f"⚠️ Application générée avec {len(errors)} erreurs.", 100, progress_callback)
+                    update_progress(7, f"⚠️ Application generated with {len(errors)} errors.", 100, progress_callback)
                     if current_app:
                         current_app.config['used_tools_details'] = process_state.get('used_tools_details', [])
                     return len(files_written) > 0
             else:
-                update_progress(5, "❌ Échec de l'écriture des fichiers.", 100, progress_callback)
+                update_progress(5, "❌ Failed to write files.", 100, progress_callback)
                 if current_app:
                     current_app.config['used_tools_details'] = process_state.get('used_tools_details', [])
                 return False
         else:
-            update_progress(4, "❌ Échec de la génération de code.", 100, progress_callback)
+            update_progress(4, "❌ Code generation failed.", 100, progress_callback)
             if current_app:
                 current_app.config['used_tools_details'] = process_state.get('used_tools_details', [])
             return False
     else:
-        update_progress(3, "❌ Échec de la création de la structure.", 100, progress_callback)
+        update_progress(3, "❌ Failed to create structure.", 100, progress_callback)
         if current_app:
             current_app.config['used_tools_details'] = process_state.get('used_tools_details', [])
         return False

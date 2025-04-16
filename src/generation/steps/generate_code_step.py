@@ -25,25 +25,25 @@ def generate_code_step(api_key, selected_model, reformulated_prompt, structure_l
             time.sleep(wait_time)
 
     prompt_code_gen = f"""
-    Générez le code *complet* de l'application basé sur le prompt et la structure ci-dessous.
-    **Prompt Détaillé:**
+    Generate the *complete* code for the application based on the prompt and structure below.
+    **Detailed Prompt:**
     {reformulated_prompt}
     {tool_results_text if tool_results_text else ""}
     {url_reference if url_reference else ""}
     {url_context if url_context else ""}
-    **Structure du Projet (uniquement pour référence):**
+    **Project Structure (for reference only):**
     ```
     {chr(10).join(structure_lines)}
     ```
     **Instructions:**
-    1. Fournissez le code complet pour *tous* les fichiers listés dans la structure.
-    2. Utilisez le format EXACT `--- FILE: chemin/vers/nomfichier ---` sur une ligne par lui-même avant chaque bloc de code de fichier. Commencez la réponse *immédiatement* avec le premier marqueur. Aucun texte d'introduction.
-    3. Assurez-vous que le code est fonctionnel, inclut les imports, la gestion des erreurs de base et des commentaires.
-    4. Pour `requirements.txt` ou similaire, listez les dépendances.
-    5. Pour `README.md`, fournissez des instructions de configuration/exécution.
-    6. Si le code dépasse les limites de jetons, terminez la réponse *entière* *exactement* avec: `GENERATION_INCOMPLETE` (aucun autre texte après).{animation_instruction}
-    IMPORTANT: SI un style, template ou documentation est fourni dans les URLs, utilisez-les comme référence primaire.
-    Générez le code maintenant:
+    1. Provide the full code for *all* files listed in the structure.
+    2. Use the EXACT format `--- FILE: path/to/filename ---` on a line by itself before each file's code block. Start your response *immediately* with the first marker. No introduction text.
+    3. Ensure the code is functional, includes necessary imports, basic error handling, and comments.
+    4. For `requirements.txt` or similar, list the dependencies.
+    5. For `README.md`, provide setup/run instructions.
+    6. If the code exceeds token limits, end the *entire* response EXACTLY with: `GENERATION_INCOMPLETE` (no other text after).{animation_instruction}
+    IMPORTANT: If a style, template, or documentation is provided in the URLs, use them as the primary reference.
+    Generate the code now:
     """
     messages_code_gen = [{"role": "user", "content": prompt_code_gen}]
     if use_mcp_tools:

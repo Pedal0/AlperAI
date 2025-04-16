@@ -23,19 +23,22 @@ def define_project_structure(api_key, selected_model, reformulated_prompt, url_c
             time.sleep(wait_time)
 
     prompt_structure = f"""
-    Basé sur le prompt reformulé ci-dessous, votre tâche est de:
-    **Définir la Structure du Projet:** Proposez une structure complète et logique de fichiers/répertoires pour cette application. Listez chaque élément sur une nouvelle ligne. Utilisez des chemins relatifs. Marquez les répertoires avec un '/' final. N'incluez PAS de commentaires (#) ou de backticks (```) dans la liste de structure elle-même.
-    Prompt reformulé:
-    {reformulated_prompt}
-    {url_context if url_context else ""}
-    IMPORTANT: Si l'utilisateur a fourni des URLs, inspirez-vous des exemples ou de la structure qui y sont présents.
-    Le format de sortie DOIT être exactement comme suit:
+    Based on the reformulated prompt below, your task is to:
+    1. Propose a complete and logical file/folder structure for this application.
+    2. List each item on a new line. Use relative paths. Mark directories with a trailing '/'.
+    3. Do NOT include comments (#) or backticks (```) in the structure list itself.
+    4. If the user provided URLs, use any examples or structures found there as inspiration.
+    5. Your output MUST be EXACTLY in the following format:
     ### STRUCTURE ###
-    [Liste des fichiers/dossiers, un par ligne, ex.:
+    [List of files/folders, one per line, e.g.:
     src/
     src/main.py
     requirements.txt
     README.md]
+
+    Reformulated prompt:
+    {reformulated_prompt}
+    {url_context if url_context else ""}
     """
     messages_structure = [{"role": "user", "content": prompt_structure}]
     response_structure = call_openrouter_api(api_key, selected_model, messages_structure, temperature=0.6, max_retries=2)

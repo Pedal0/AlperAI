@@ -28,16 +28,30 @@ def reformulate_prompt(api_key, selected_model, user_prompt, url_context, additi
             time.sleep(wait_time)
 
     prompt_reformulation = f"""
-    Analysez la demande de l'utilisateur ci-dessous. Votre tâche est de:
-    **Reformuler la Demande:** Créez un prompt détaillé et précis décrivant les fonctionnalités, technologies (supposez des technologies web standard comme Python/Flask ou Node/Express si non spécifié, ou utilisez HTML/CSS/JS si simple), et exigences. Cela guidera la génération de code. Incluez des commentaires dans le code généré.
-    Demande de l'Utilisateur:
+    Analyze the user's request below. Your task is to:
+    1. Reformulate the request in a detailed and precise way to guide code generation.
+    2. Structure your reformulation into the following sections:
+       - Main features required
+       - Technologies/frameworks to use (or avoid)
+       - Specific constraints or preferences
+       - Example use cases or user flows
+    3. If the request is vague, make reasonable assumptions to fill in missing information.
+    4. If the user provided URLs, carefully read their content and follow any instructions or use examples as inspiration.
+    5. Your output MUST be EXACTLY in the following format:
+    ### REFORMULATED PROMPT ###
+    Features:
+    - ...
+    Technologies:
+    - ...
+    Constraints:
+    - ...
+    Example use cases:
+    - ...
+
+    User request:
     "{user_prompt}"
     {url_context if url_context else ""}
     {additional_context if additional_context else ""}
-    IMPORTANT: Si l'utilisateur a fourni des URLs, lisez attentivement leur contenu et suivez les instructions ou inspirez-vous des exemples qui y sont présents.
-    IMPORTANT:Le format de sortie DOIT être EXACTEMENT comme suit:
-    ### REFORMULATED PROMPT ###
-    [Prompt reformulé détaillé ici]
     """
     messages_reformulation = [{"role": "user", "content": prompt_reformulation}]
     response_reformulation = call_openrouter_api(api_key, selected_model, messages_reformulation, temperature=0.6, max_retries=2)
