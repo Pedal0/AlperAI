@@ -14,12 +14,12 @@ content %}
         </div>
         <div class="col-md-4 text-md-end">
           <a
-            href="{{ url_for('result') }}"
+            href="{{ url_for('generation.result') }}"
             class="btn btn-outline-primary me-2"
           >
             <i class="fas fa-arrow-left me-1"></i> Back to Results
           </a>
-          <a href="{{ url_for('index') }}" class="btn btn-primary">
+          <a href="{{ url_for('ui.index') }}" class="btn btn-primary">
             <i class="fas fa-home me-1"></i> Home
           </a>
         </div>
@@ -406,41 +406,49 @@ content %}
     let statusPollInterval = null;
 
     // Ajouter la détection de fermeture de page pour arrêter l'application
-    window.addEventListener("beforeunload", function() {
+    window.addEventListener("beforeunload", function () {
       // Vérifier si l'application est en cours d'exécution
       if (appStatus.running) {
         // Utiliser l'API sendBeacon pour s'assurer que la requête est envoyée même pendant la fermeture de la page
-        const previewSessionId = document.getElementById("preview-session-id").value;
-        navigator.sendBeacon("/preview/stop_on_exit", JSON.stringify({
-          session_id: previewSessionId
-        }));
+        const previewSessionId =
+          document.getElementById("preview-session-id").value;
+        navigator.sendBeacon(
+          "/preview/stop_on_exit",
+          JSON.stringify({
+            session_id: previewSessionId,
+          })
+        );
       }
     });
 
     // Hooks de navigation pour les liens qui quittent la page de prévisualisation
-    document.querySelectorAll('a[href]:not([target="_blank"])').forEach(link => {
-      link.addEventListener('click', function(e) {
-        // Ne pas intercepter les liens d'onglets dans la page de prévisualisation
-        if (this.getAttribute('data-bs-toggle') === 'tab') return;
-        
-        // Sinon, si l'application est en cours d'exécution, l'arrêter avant de naviguer
-        if (appStatus.running) {
-          e.preventDefault(); // Empêcher la navigation immédiate
-          
-          // Arrêter l'application
-          fetch("/preview/stop", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" }
-          }).then(() => {
-            // Continuer la navigation normale après l'arrêt
-            window.location.href = this.href;
-          }).catch(() => {
-            // En cas d'erreur, continuer quand même la navigation
-            window.location.href = this.href;
-          });
-        }
+    document
+      .querySelectorAll('a[href]:not([target="_blank"])')
+      .forEach((link) => {
+        link.addEventListener("click", function (e) {
+          // Ne pas intercepter les liens d'onglets dans la page de prévisualisation
+          if (this.getAttribute("data-bs-toggle") === "tab") return;
+
+          // Sinon, si l'application est en cours d'exécution, l'arrêter avant de naviguer
+          if (appStatus.running) {
+            e.preventDefault(); // Empêcher la navigation immédiate
+
+            // Arrêter l'application
+            fetch("/preview/stop", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+            })
+              .then(() => {
+                // Continuer la navigation normale après l'arrêt
+                window.location.href = this.href;
+              })
+              .catch(() => {
+                // En cas d'erreur, continuer quand même la navigation
+                window.location.href = this.href;
+              });
+          }
+        });
       });
-    });
 
     // Utility functions
     function showError(message) {
@@ -647,7 +655,6 @@ content %}
                 url: data.url,
                 project_type: data.project_type,
                 logs: data.logs || [],
-
               });
 
               // Start regular polling
@@ -893,7 +900,8 @@ content %}
       .getElementById("improveWithAIBtn")
       .addEventListener("click", function () {
         // Redirect to iteration page with necessary parameters
-        window.location.href = '{{ url_for("result") }}#iteration-section';
+        window.location.href =
+          '{{ url_for("generation.result") }}#iteration-section';
       });
 
     refreshPreviewBtn.addEventListener("click", function () {
@@ -1084,6 +1092,4 @@ content %}
       });
   });
 </script>
-{% endblock %}
-```
-</copilot-edited-file>
+{% endblock %} ```
