@@ -3,6 +3,7 @@ Prépare et lance un projet Python (venv, install, run).
 """
 import subprocess
 import sys
+import os
 from pathlib import Path
 
 def prepare_python_project(project_dir, main_file=None):
@@ -30,7 +31,16 @@ def prepare_python_project(project_dir, main_file=None):
                     break
         if main_file:
             python_path = venv_dir / ('Scripts' if sys.platform == 'win32' else 'bin') / 'python'
-            proc = subprocess.Popen([str(python_path), main_file], cwd=str(project_dir))
+            # Créer un environnement spécifique pour le sous-processus
+            env = os.environ.copy()
+            env['FLASK_DEBUG'] = '0' # Désactiver le mode debug et le reloader pour la prévisualisation
+            env['PYTHONUNBUFFERED'] = '1' # Assurer la sortie non bufferisée
+
+            proc = subprocess.Popen(
+                [str(python_path), main_file],
+                cwd=str(project_dir),
+                env=env # Passer l'environnement modifié
+            )
             return True, f"Projet Python lancé ({main_file}) sur PID {proc.pid}"
         return False, "Aucun fichier principal Python trouvé."
     except Exception as e:
