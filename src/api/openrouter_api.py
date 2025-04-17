@@ -17,7 +17,7 @@ from src.utils.model_utils import is_free_model
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def call_openrouter_api(api_key, model, messages, temperature=0.7, stream=False, max_retries=1, tools=None):
+def call_openrouter_api(api_key, model, messages, temperature=0.7, stream=False, max_retries=1, tools=None, response_format=None):
     """
     Call the OpenRouter API and handle basic errors.
     
@@ -29,6 +29,7 @@ def call_openrouter_api(api_key, model, messages, temperature=0.7, stream=False,
         stream (bool): Whether to stream the response
         max_retries (int): Maximum number of retries on failure
         tools (list, optional): List of tool definitions to include in the request
+        response_format (str, optional): Desired response format for structured output
         
     Returns:
         dict: JSON response or None on error
@@ -48,6 +49,10 @@ def call_openrouter_api(api_key, model, messages, temperature=0.7, stream=False,
     # Add tools if provided
     if tools:
         data["tools"] = tools
+    
+    # Add response_format if provided (for structured output)
+    if response_format:
+        data["response_format"] = response_format
     
     response = None # Initialize response to None
     
