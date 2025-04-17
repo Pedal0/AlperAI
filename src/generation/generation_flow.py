@@ -67,10 +67,27 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
 
     # Initialiser le client MCP si les outils sont activés
     mcp_client = None
+    mcp_context = ""
     if use_mcp_tools:
+        update_progress(0, "Using MCP tools to gather context and documentation...", 2, progress_callback)
         from src.mcp.clients import SimpleMCPClient
         mcp_client = SimpleMCPClient(api_key, selected_model)
         update_progress(0, "🔌 MCP tools enabled: Web search, documentation, and frontend components available.", progress_callback)
+
+        import asyncio
+        from src.generation.steps.run_mcp_query import run_mcp_query
+        web_query = f"Find the most relevant and up-to-date information, best practices, and documentation for building this type of project: {user_prompt}"
+        web_result = asyncio.run(run_mcp_query(mcp_client, web_query))
+        if web_result and web_result.get("text"):
+            mcp_context += "\n# Web Search Results\n" + web_result["text"]
+            update_progress(0, "Web search results integrated into context.", progress_callback)
+
+        if frontend_framework and frontend_framework.lower() not in ["auto-detect", "none", ""]:
+            doc_query = f"Find the official documentation and best practices for using the frontend framework: {frontend_framework}"
+            doc_result = asyncio.run(run_mcp_query(mcp_client, doc_query))
+            if doc_result and doc_result.get("text"):
+                mcp_context += f"\n# Documentation for {frontend_framework}\n" + doc_result["text"]
+                update_progress(0, f"Documentation for {frontend_framework} integrated into context.", progress_callback)
 
     # == STEP 0: Extract and process URLs from prompt ==
     update_progress(0, "Extracting URLs from prompt...", 5, progress_callback)
@@ -93,6 +110,13 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         except Exception as e:
             update_progress(0, f"❌ Error while retrieving URLs: {e}", 15, progress_callback)
             # Continue even if error
+
+    # Ajoute le contexte MCP à la reformulation du prompt si présent
+    if mcp_context:
+        if 'reformulated_prompt' in process_state:
+            process_state['reformulated_prompt'] += "\n" + mcp_context
+        else:
+            process_state['reformulated_prompt'] = mcp_context
 
     # == STEP 1: Reformulate prompt ==
     update_progress(1, "Reformulating prompt...", 20, progress_callback)
