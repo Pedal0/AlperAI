@@ -3,6 +3,7 @@ Utility functions for file operations, structure parsing, and code writing.
 """
 import re
 import logging
+import os
 from pathlib import Path
 
 def parse_structure_and_prompt(response_text):
@@ -81,23 +82,23 @@ def parse_structure_and_prompt(response_text):
     return reformulated_prompt, structure_lines
 
 
-def create_project_structure(base_path, structure_lines):
+def create_project_structure(target_directory, structure_lines):
     """
     Create folders and empty files based on the cleaned structure.
     
     Args:
-        base_path (str): Base directory path
+        target_directory (str): Base directory path
         structure_lines (list): List of file/directory paths
         
     Returns:
         list: List of created paths or None on error
     """
     created_paths = []
-    base_path = Path(base_path).resolve() # Get absolute and normalized path
-    logging.info(f"Attempting to create structure in: {base_path}")
+    target_directory = Path(target_directory).resolve() # Get absolute and normalized path
+    logging.info(f"Attempting to create structure in: {target_directory}")
 
-    if not base_path.is_dir():
-        logging.error(f"Base path '{base_path}' is not a valid folder or does not exist.")
+    if not target_directory.is_dir():
+        logging.error(f"Base path '{target_directory}' is not a valid folder or does not exist.")
         return None
 
     if not structure_lines:
@@ -106,7 +107,16 @@ def create_project_structure(base_path, structure_lines):
 
     try:
         for line in structure_lines:
-            line = line.strip() # Re-clean just in case
+            # Normalisation du chemin pour éviter les chemins absolus
+            rel_path = line.lstrip("/\\")
+            if not rel_path or rel_path in [".", ".."]:
+                continue
+            abs_path = os.path.abspath(os.path.join(target_directory, rel_path))
+            # Empêche d'écrire en dehors du dossier cible
+            if not abs_path.startswith(os.path.abspath(target_directory)):
+                continue
+
+            line = rel_path.strip() # Re-clean just in case
             if not line: continue # Ignore empty lines
 
             # Security: Check for '..' in path components
@@ -115,7 +125,7 @@ def create_project_structure(base_path, structure_lines):
                  logging.warning(f"⚠️ Path containing '..' ignored (security): '{line}'")
                  continue
 
-            item_path = base_path / relative_path
+            item_path = target_directory / relative_path
 
             try:
                 # Determine if it's a folder or file

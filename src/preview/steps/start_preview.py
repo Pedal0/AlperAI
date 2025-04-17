@@ -4,8 +4,8 @@ Démarre la prévisualisation de l'application générée.
 import time
 import subprocess
 import threading
-from src.preview.steps.detect_project_type import detect_project_type
-from src.preview.steps.prepare_environment import prepare_environment
+from src.preview.handler.detect_project_type import detect_project_type
+from src.preview.handler.prepare_and_launch_project import prepare_and_launch_project
 from src.preview.steps.get_start_command import get_start_command
 from src.preview.steps.get_app_url import get_app_url
 from src.preview.steps.log_entry import log_entry
@@ -19,13 +19,11 @@ def start_preview(project_dir: str, session_id: str, running_processes=None, pro
     try:
         process_logs[session_id] = []
         log_entry(session_id, "INFO", f"Démarrage de la prévisualisation pour le projet: {project_dir}")
-        project_type = detect_project_type(project_dir)
-        log_entry(session_id, "INFO", f"Type de projet détecté: {project_type}")
-        success, message = prepare_environment(project_dir, project_type)
+        success, message = prepare_and_launch_project(project_dir)
         log_entry(session_id, "INFO" if success else "ERROR", message)
         if not success:
-            return False, message, {"project_type": project_type}
-        command, env = get_start_command(project_dir, project_type, session_id)
+            return False, message, {"project_type": None}
+        command, env = get_start_command(project_dir, None, session_id)
         log_entry(session_id, "INFO", f"Commande de démarrage: {' '.join(command)}")
         process = subprocess.Popen(
             command,
@@ -40,7 +38,7 @@ def start_preview(project_dir: str, session_id: str, running_processes=None, pro
         running_processes[session_id] = {
             "process": process,
             "project_dir": project_dir,
-            "project_type": project_type,
+            "project_type": None,
             "command": command,
             "start_time": time.time()
         }
@@ -64,12 +62,12 @@ def start_preview(project_dir: str, session_id: str, running_processes=None, pro
                 log_entry(session_id, "ERROR", remaining_stderr)
             del running_processes[session_id]
             return False, f"Échec du démarrage du processus (code {return_code})", {
-                "project_type": project_type,
+                "project_type": None,
                 "logs": process_logs.get(session_id, [])
             }
-        app_url = get_app_url(project_type, session_id)
+        app_url = get_app_url(None, session_id)
         return True, "Application démarrée avec succès", {
-            "project_type": project_type,
+            "project_type": None,
             "url": app_url,
             "logs": process_logs.get(session_id, []),
             "pid": process.pid
