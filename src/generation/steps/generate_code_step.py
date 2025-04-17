@@ -42,6 +42,7 @@ def generate_code_step(api_key, selected_model, reformulated_prompt, structure_l
     4. For `requirements.txt` or similar, list the dependencies.
     5. For `README.md`, provide setup/run instructions.
     6. If the code exceeds token limits, end the *entire* response EXACTLY with: `GENERATION_INCOMPLETE` (no other text after).{animation_instruction}
+    7. IMPORTANT: For web frameworks (e.g., Flask, Django, Express), ensure the application entrypoint configures its listening port via environment variable or CLI argument, never hardcoding port 5000.
     IMPORTANT: If a style, template, or documentation is provided in the URLs, use them as the primary reference.
     Generate the code now:
     """

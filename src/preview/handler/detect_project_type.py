@@ -23,6 +23,31 @@ def detect_project_type(project_dir):
         types.append('php')
     if any((project_dir / d / 'index.html').exists() for d in ('', 'public', 'src')):
         types.append('static')
+    
+    # Détection explicite Flask : requirements.txt contient 'flask' OU un fichier .py contient 'from flask' ou 'import flask'
+    flask_detected = False
+    req_path = project_dir / 'requirements.txt'
+    if req_path.exists():
+        try:
+            with open(req_path, 'r', encoding='utf-8') as f:
+                content = f.read().lower()
+                if 'flask' in content:
+                    flask_detected = True
+        except Exception:
+            pass
+    if not flask_detected:
+        for py_file in project_dir.glob('*.py'):
+            try:
+                with open(py_file, 'r', encoding='utf-8') as f:
+                    py_content = f.read().lower()
+                    if 'from flask' in py_content or 'import flask' in py_content:
+                        flask_detected = True
+                        break
+            except Exception:
+                pass
+    if flask_detected and 'flask' not in types:
+        types.append('flask')
+
     # Multi-projet: front/back détectés
     for sub in ['client', 'frontend', 'front']:
         if (project_dir / sub).exists():
