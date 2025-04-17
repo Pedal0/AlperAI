@@ -39,15 +39,12 @@ def prepare_static_project(project_dir, port=None):
                 proc = subprocess.Popen(['npx', 'serve', '-l', str(port), str(serve_dir)], cwd=str(project_dir))
                 return True, f"Site statique servi sur http://localhost:{port} (PID {proc.pid}) via npx serve"
             except Exception as e:
-                # Fallback sys.executable puis python
-                py_cmds = [sys.executable]
-                if platform.system() == 'Windows':
-                    py_cmds.append('python')
-                for py_cmd in py_cmds:
-                    try:
-                        proc = subprocess.Popen([py_cmd, '-m', 'http.server', str(port)], cwd=str(serve_dir))
-                        return True, f"Site statique servi sur http://localhost:{port} (PID {proc.pid}) via {py_cmd} http.server"
-                    except Exception as e2:
-                        last_error = e2
-                return False, f"Erreur static: npx serve: {e} | python http.server: {last_error}"
+                # Fallback: Utiliser uniquement sys.executable
+                py_cmd = sys.executable
+                try:
+                    proc = subprocess.Popen([py_cmd, '-m', 'http.server', str(port)], cwd=str(serve_dir))
+                    return True, f"Site statique servi sur http://localhost:{port} (PID {proc.pid}) via {py_cmd} http.server"
+                except Exception as e2:
+                    last_error = e2
+                return False, f"Erreur static: npx serve: {e} | {py_cmd} http.server: {last_error}"
     return False, "Aucun index.html trouvé dans racine, public ou src."
