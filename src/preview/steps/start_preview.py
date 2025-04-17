@@ -23,7 +23,25 @@ def start_preview(project_dir: str, session_id: str, running_processes=None, pro
         log_entry(session_id, "INFO" if success else "ERROR", message)
         if not success:
             return False, message, {"project_type": None}
-        command, env = get_start_command(project_dir, None, session_id)
+        # Détecter le type de projet (pour Flask, React, etc.)
+        detected = detect_project_type(project_dir)
+        types = detected.get('types', [])
+        # On priorise flask si présent
+        if 'flask' in types:
+            project_type = 'flask'
+        elif 'node' in types:
+            project_type = 'express'
+        elif 'react' in types:
+            project_type = 'react'
+        elif 'vue' in types:
+            project_type = 'vue'
+        elif 'angular' in types:
+            project_type = 'angular'
+        elif 'static' in types:
+            project_type = 'static'
+        else:
+            project_type = None
+        command, env = get_start_command(project_dir, project_type, session_id)
         log_entry(session_id, "INFO", f"Commande de démarrage: {' '.join(command)}")
         process = subprocess.Popen(
             command,
@@ -38,7 +56,7 @@ def start_preview(project_dir: str, session_id: str, running_processes=None, pro
         running_processes[session_id] = {
             "process": process,
             "project_dir": project_dir,
-            "project_type": None,
+            "project_type": project_type,
             "command": command,
             "start_time": time.time()
         }
@@ -67,7 +85,7 @@ def start_preview(project_dir: str, session_id: str, running_processes=None, pro
             }
         app_url = get_app_url(None, session_id)
         return True, "Application démarrée avec succès", {
-            "project_type": None,
+            "project_type": project_type,
             "url": app_url,
             "logs": process_logs.get(session_id, []),
             "pid": process.pid

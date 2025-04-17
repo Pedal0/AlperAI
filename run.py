@@ -33,7 +33,7 @@ def main():
     
     # Démarrer l'application
     print(f"Démarrage de l'application sur http://localhost:{port}")
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
 
 if __name__ == "__main__":
     main()
