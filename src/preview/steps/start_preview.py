@@ -26,17 +26,23 @@ def start_preview(project_dir: str, session_id: str, running_processes=None, pro
         # Détecter le type de projet (pour Flask, React, etc.)
         detected = detect_project_type(project_dir)
         types = detected.get('types', [])
-        # On priorise flask si présent
+        # Choix du type de projet pour la commande de démarrage
         if 'flask' in types:
             project_type = 'flask'
-        elif 'node' in types:
+        elif 'express' in types:
             project_type = 'express'
+        elif 'php' in types:
+            project_type = 'php'
+        elif 'streamlit' in types:
+            project_type = 'streamlit'
         elif 'react' in types:
             project_type = 'react'
         elif 'vue' in types:
             project_type = 'vue'
         elif 'angular' in types:
             project_type = 'angular'
+        elif 'node' in types:
+            project_type = 'express'
         elif 'static' in types:
             project_type = 'static'
         else:
@@ -71,7 +77,15 @@ def start_preview(project_dir: str, session_id: str, running_processes=None, pro
         stderr_thread.daemon = True
         stdout_thread.start()
         stderr_thread.start()
-        time.sleep(2)
+        # Wait for application startup depending on framework
+        wait_time = 2
+        if project_type in ('react', 'vue', 'angular'):
+            wait_time = 10  # allow build/startup time for SPA frameworks
+        elif project_type == 'streamlit':
+            wait_time = 5  # extra time for Streamlit
+        elif project_type == 'express' or project_type == 'php':
+            wait_time = 3
+        time.sleep(wait_time)
         if process.poll() is not None:
             return_code = process.poll()
             log_entry(session_id, "ERROR", f"Le processus s'est terminé avec le code: {return_code}")

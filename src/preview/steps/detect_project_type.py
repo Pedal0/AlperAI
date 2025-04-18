@@ -12,4 +12,6 @@ class ProjectType:
     VUE = "vue"
     ANGULAR = "angular"
     STATIC = "static"
+    PHP = "php"
+    STREAMLIT = "streamlit"
     UNKNOWN = "unknown"

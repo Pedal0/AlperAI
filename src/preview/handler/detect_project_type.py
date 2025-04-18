@@ -2,6 +2,7 @@
 Détecte le(s) type(s) de projet dans un dossier donné.
 """
 import os
+import json
 from pathlib import Path
 
 def detect_project_type(project_dir):
@@ -15,10 +16,26 @@ def detect_project_type(project_dir):
     project_dir = Path(project_dir)
     types = []
     info = {}
-    if (project_dir / 'requirements.txt').exists():
-        types.append('python')
-    if (project_dir / 'package.json').exists():
-        types.append('node')
+    pkg_path = project_dir / 'package.json'
+
+    # À la place de la simple détection 'node', faites :
+    if pkg_path.exists():
+        try:
+            pkg = json.loads(pkg_path.read_text(encoding='utf-8'))
+            deps = {**pkg.get('dependencies', {}), **pkg.get('devDependencies', {})}
+            if 'react' in deps:
+                types.append('react')
+            elif 'vue' in deps:
+                types.append('vue')
+            elif '@angular/core' in deps or (project_dir / 'angular.json').exists():
+                types.append('angular')
+            elif 'express' in deps:
+                types.append('express')
+            else:
+                types.append('node')
+        except Exception:
+            types.append('node')
+
     if (project_dir / 'composer.json').exists() or any(f.suffix == '.php' for f in project_dir.rglob('*.php')):
         types.append('php')
     if any((project_dir / d / 'index.html').exists() for d in ('', 'public', 'src')):
@@ -47,6 +64,34 @@ def detect_project_type(project_dir):
                 pass
     if flask_detected and 'flask' not in types:
         types.append('flask')
+
+    # Streamlit detection: check requirements or imports
+    streamlit_detected = False
+    if req_path.exists():
+        try:
+            with open(req_path, 'r', encoding='utf-8') as f:
+                if 'streamlit' in f.read().lower():
+                    streamlit_detected = True
+        except:
+            pass
+    if not streamlit_detected:
+        for py_file in project_dir.glob('*.py'):
+            try:
+                with open(py_file, 'r', encoding='utf-8') as f:
+                    content = f.read().lower()
+                    if 'import streamlit' in content:
+                        streamlit_detected = True
+                        break
+            except:
+                pass
+    if streamlit_detected and 'streamlit' not in types:
+        types.append('streamlit')
+
+    # After explicit detections (Flask, Streamlit, PHP, Node, React, Vue, Angular, Static)
+    # Fallback Python detection: pure Python if nothing else
+    req_file = project_dir / 'requirements.txt'
+    if not types and req_file.exists() and any(project_dir.glob('*.py')):
+        types.append('python')
 
     # Multi-projet: front/back détectés
     for sub in ['client', 'frontend', 'front']:

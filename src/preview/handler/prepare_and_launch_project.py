@@ -21,10 +21,12 @@ def prepare_and_launch_project(project_dir):
     info = detection['info']
     if 'multi' in types:
         return prepare_multi_project(info.get('frontend'), info.get('backend'))
+    # Node-based projects (Express, React, Vue, Angular)
+    if any(t in types for t in ['express', 'node', 'react', 'vue', 'angular']):
+        return prepare_node_project(project_dir)
+    # Python projects
     if 'python' in types:
         return prepare_python_project(project_dir)
-    if 'node' in types:
-        return prepare_node_project(project_dir)
     if 'php' in types:
         return prepare_php_project(project_dir)
     if 'static' in types:
