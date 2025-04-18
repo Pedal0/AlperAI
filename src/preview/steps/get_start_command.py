@@ -7,146 +7,148 @@ import subprocess
 from pathlib import Path
 from .detect_project_type import ProjectType
 from .find_free_port import find_free_port
+from src.preview.steps.detect_project_type import ProjectType
+
+# Determine Windows platform
+is_windows = sys.platform.startswith("win")
+
+def _win_fix(cmd):
+    if is_windows and cmd and cmd[0] in ("npm", "npx"):
+        cmd[0] = cmd[0] + ".cmd"
+    return cmd
 
 def get_start_command(project_dir: str, project_type: str, session_id: str = None):
     project_dir = Path(project_dir)
     env = None
+    # Custom launch script detection: start.sh for macOS/Linux, start.bat for Windows
+    custom_sh = project_dir / 'start.sh'
+    custom_bat = project_dir / 'start.bat'
+    if custom_sh.exists():
+        return ['bash', str(custom_sh)], env
+    if custom_bat.exists():
+        return [str(custom_bat)], env
     if project_type == ProjectType.FLASK or (isinstance(project_type, str) and project_type.lower() == "flask"):
+        # Run Flask via project venv Python on script (run.py or app.py)
         port = find_free_port()
         if port == 5000:
             port = find_free_port(start_port=5001)
         if port is None:
             port = 3000
-        if session_id is not None:
+        if session_id:
+            from src.preview.preview_manager import session_ports
+            session_ports[session_id] = port
+        # Determine Python executable: use project venv if exists
+        venv_py = project_dir / 'venv' / ('Scripts' if is_windows else 'bin') / ('python.exe' if is_windows else 'python')
+        python_exec = str(venv_py) if venv_py.exists() else sys.executable
+        # Locate entry script
+        script = None
+        for candidate in ['run.py', 'app.py', 'main.py', 'server.py']:
+            if (project_dir / candidate).exists():
+                script = str(project_dir / candidate)
+                break
+        if script:
+            # Pass port as argument to script
+            return [python_exec, script, str(port)], env
+        # Fallback: use flask run with venv
+        return [python_exec, '-m', 'flask', 'run', '--host', '0.0.0.0', '--port', str(port)], env
+    # Streamlit projects: use 'streamlit run'
+    elif project_type == "streamlit" or (isinstance(project_type, str) and project_type.lower() == "streamlit"):
+        port = find_free_port()
+        if session_id:
+            from src.preview.preview_manager import session_ports
+            session_ports[session_id] = port
+        # find script
+        script = None
+        if (project_dir / "app.py").exists():
+            script = str(project_dir / "app.py")
+        else:
+            pyfs = list(project_dir.glob("*.py"))
+            if pyfs:
+                script = str(pyfs[0])
+        if script:
+            cmd = ["streamlit", "run", script, "--server.port", str(port)]
+            return _win_fix(cmd), env
+        else:
+            return [sys.executable, str(project_dir)], env
+    elif project_type == ProjectType.EXPRESS:
+        # Choose port and set environment
+        port = find_free_port()
+        if session_id:
             from src.preview.preview_manager import session_ports
             session_ports[session_id] = port
         import os
-        # Définir FLASK_RUN_PORT et FLASK_APP pour flask run
         env = os.environ.copy()
-        env["FLASK_RUN_PORT"] = str(port)
-        # Cherche le fichier principal et configure FLASK_APP
-        app_module = None
-        for file in ["app.py", "main.py", "server.py", "run.py"]:
-            if (project_dir / file).exists():
-                app_module = file
-                break
-        if app_module:
-            # Supprimer .py pour FLASK_APP
-            env["FLASK_APP"] = app_module.replace('.py', '')
-        # Utiliser flask run pour respecter FLASK_RUN_PORT
-        # Commande flask run pour forcer le port
-        return [sys.executable, "-m", "flask", "run", "--host", "0.0.0.0", "--port", str(port)], env
-    elif project_type == ProjectType.EXPRESS:
-        if (project_dir / "package.json").exists():
-            try:
-                with open(project_dir / "package.json", "r", encoding="utf-8") as f:
-                    package_json = json.load(f)
-                    scripts = package_json.get("scripts", {})
-                    if "start" in scripts:
-                        return ["npm", "start"], env
-                    elif "dev" in scripts:
-                        return ["npm", "run", "dev"], env
-            except:
-                pass
-        main_files = ["server.js", "app.js", "index.js"]
-        for file in main_files:
-            if (project_dir / file).exists():
-                return ["node", str(project_dir / file)], env
-        return ["npm", "start"], env
-    elif project_type in [ProjectType.REACT, ProjectType.VUE, ProjectType.ANGULAR]:
-        if (project_dir / "package.json").exists():
-            try:
-                with open(project_dir / "package.json", "r", encoding="utf-8") as f:
-                    package_json = json.load(f)
-                    scripts = package_json.get("scripts", {})
-                    if "start" in scripts:
-                        return ["npm", "start"], env
-                    elif "dev" in scripts:
-                        return ["npm", "run", "dev"], env
-                    elif "serve" in scripts:
-                        return ["npm", "run", "serve"], env
-            except:
-                pass
-        return ["npm", "start"], env
-    elif project_type == ProjectType.STATIC:
-        if (project_dir / "package.json").exists():
-            try:
-                with open(project_dir / "package.json", "r", encoding="utf-8") as f:
-                    package_json = json.load(f)
-                    scripts = package_json.get("scripts", {})
-                    if "start" in scripts:
-                        return ["npm", "start"], env
-                    elif "dev" in scripts:
-                        return ["npm", "run", "dev"], env
-                    elif "serve" in scripts:
-                        return ["npm", "run", "serve"], env
-            except:
-                pass
+        env["PORT"] = str(port)
+        # Direct node entrypoint if exists
+        for main in ["server.js", "app.js", "index.js"]:
+            if (project_dir / main).exists():
+                return _win_fix(["node", str(project_dir / main)]), env
+        # fallback on npm start if no entrypoint
+        return _win_fix(["npm", "start"]), env
+    # PHP projects: launch built-in server
+    elif project_type == ProjectType.PHP or (isinstance(project_type, str) and project_type.lower() == "php"):
         port = find_free_port()
-        if port is None:
-            port = 3000
         if session_id is not None:
             from src.preview.preview_manager import session_ports
             session_ports[session_id] = port
-        try:
-            subprocess.check_output(["python3", "--version"])
-            python_code = (
-                "import http.server, socketserver; "
-                f"handler = http.server.SimpleHTTPRequestHandler; "
-                f"handler.directory = r'{project_dir}'; "
-                f"socketserver.TCPServer(('0.0.0.0', {port}), handler).serve_forever()"
-            )
-            return ["python3", "-c", python_code], env
-        except (subprocess.SubprocessError, FileNotFoundError):
+        # Serve PHP built-in server
+        return ["php", "-S", f"0.0.0.0:{port}", "-t", str(project_dir)], env
+    elif project_type in [ProjectType.REACT, ProjectType.VUE, ProjectType.ANGULAR]:
+        # Use free port for SPA frameworks
+        port = find_free_port()
+        if session_id:
+            from src.preview.preview_manager import session_ports
+            session_ports[session_id] = port
+        import os
+        env = os.environ.copy()
+        env["PORT"] = str(port)
+        if (project_dir / "package.json").exists():
             try:
-                subprocess.check_output(["node", "--version"], stderr=subprocess.STDOUT)
-                try:
-                    subprocess.check_output(["npx", "--version"], stderr=subprocess.STDOUT)
-                    return ["npx", "serve", "-s", str(project_dir), "-p", str(port)], env
-                except (subprocess.SubprocessError, FileNotFoundError):
-                    http_server_script = f"""
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const port = {port};
-const mimeTypes = {{ '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpg', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.mp4': 'video/mp4', '.woff': 'application/font-woff', '.ttf': 'application/font-ttf', '.eot': 'application/vnd.ms-fontobject', '.otf': 'application/font-otf', '.wasm': 'application/wasm' }};
-const server = http.createServer((req, res) => {{
-  let url = req.url;
-  const queryIndex = url.indexOf('?');
-  if (queryIndex !== -1) url = url.substring(0, queryIndex);
-  if (url === '/') url = '/index.html';
-  const filePath = path.join(process.cwd(), url);
-  fs.stat(filePath, (err, stats) => {{
-    if (err) {{
-      if (url !== '/index.html') {{
-        fs.readFile(path.join(process.cwd(), 'index.html'), (err, data) => {{
-          if (err) {{ res.writeHead(404, {{ 'Content-Type': 'text/plain' }}); res.end('404 Not Found'); return; }}
-          res.writeHead(200, {{ 'Content-Type': 'text/html' }}); res.end(data); }});
-        return;
-      }}
-      res.writeHead(404, {{ 'Content-Type': 'text/plain' }}); res.end('404 Not Found'); return;
-    }}
-    if (stats.isDirectory()) {{
-      fs.readFile(path.join(filePath, 'index.html'), (err, data) => {{
-        if (err) {{ res.writeHead(404, {{ 'Content-Type': 'text/plain' }}); res.end('404 Not Found'); return; }}
-        res.writeHead(200, {{ 'Content-Type': 'text/html' }}); res.end(data); }});
-      return;
-    }}
-    const ext = path.extname(filePath);
-    const contentType = mimeTypes[ext] || 'application/octet-stream';
-    fs.readFile(filePath, (err, data) => {{
-      if (err) {{ res.writeHead(500, {{ 'Content-Type': 'text/plain' }}); res.end('Internal Server Error'); return; }}
-      res.writeHead(200, {{ 'Content-Type': contentType }}); res.end(data); }});
-  }});
-}});
-server.listen(port, () => {{ console.log(`Server running at http://localhost:${{port}}/`); }});
-"""
-                    node_script_path = project_dir / "serve_static.js"
-                    with open(node_script_path, "w", encoding="utf-8") as f:
-                        f.write(http_server_script)
-                    return ["node", str(node_script_path)], env
-            except Exception:
-                return ["python3", "-m", "http.server", str(port)], env
+                with open(project_dir / "package.json", "r", encoding="utf-8") as f:
+                    package_json = json.load(f)
+                    scripts = package_json.get("scripts", {})
+                    if "start" in scripts:
+                        return _win_fix(["npm", "start"]), env
+                    elif "dev" in scripts:
+                        return _win_fix(["npm", "run", "dev"]), env
+                    elif "serve" in scripts:
+                        return _win_fix(["npm", "run", "serve"]), env
+            except:
+                pass
+        # Pass PORT env to npm scripts
+        return _win_fix(["npm", "start"]), env
+    elif project_type == ProjectType.STATIC:
+        # Determine directory containing index.html
+        serve_dir = project_dir
+        for sub in ["public", "src"]:
+            if (project_dir / sub / "index.html").exists():
+                serve_dir = project_dir / sub
+                break
+        # If custom scripts available, use npm
+        if (project_dir / "package.json").exists():
+            try:
+                with open(project_dir / "package.json", "r", encoding="utf-8") as f:
+                    package_json = json.load(f)
+                    scripts = package_json.get("scripts", {})
+                    if "start" in scripts:
+                        return _win_fix(["npm", "start"]), env
+                    elif "dev" in scripts:
+                        return _win_fix(["npm", "run", "dev"]), env
+                    elif "serve" in scripts:
+                        return _win_fix(["npm", "run", "serve"]), env
+            except:
+                pass
+        # Serve via python http.server or npx serve
+        port = find_free_port()
+        if session_id is not None:
+            from src.preview.preview_manager import session_ports
+            session_ports[session_id] = port
+        # Try python handler
+        python_exec = sys.executable
+        try:
+            return [python_exec, "-m", "http.server", str(port), "--directory", str(serve_dir)], env
+        except:
+            return _win_fix(["npx", "serve", "-s", str(serve_dir), "-p", str(port)]), env
     else:
         if (project_dir / "package.json").exists():
             try:
@@ -154,13 +156,13 @@ server.listen(port, () => {{ console.log(`Server running at http://localhost:${{
                     package_json = json.load(f)
                     scripts = package_json.get("scripts", {})
                     if "start" in scripts:
-                        return ["npm", "start"], env
+                        return _win_fix(["npm", "start"]), env
                     elif "dev" in scripts:
-                        return ["npm", "run", "dev"], env
+                        return _win_fix(["npm", "run", "dev"]), env
                     elif "serve" in scripts:
-                        return ["npm", "run", "serve"], env
+                        return _win_fix(["npm", "run", "serve"]), env
             except Exception:
-                return ["npm", "start"], env
+                return _win_fix(["npm", "start"]), env
         main_py_files = ["app.py", "main.py", "server.py", "run.py"]
         for file in main_py_files:
             if (project_dir / file).exists():
@@ -171,4 +173,4 @@ server.listen(port, () => {{ console.log(`Server running at http://localhost:${{
                 return ["node", str(project_dir / file)], env
         if (project_dir / "index.html").exists() or (project_dir / "public" / "index.html").exists():
             return get_start_command(project_dir, ProjectType.STATIC, session_id)
-        return ["npm", "start"], env
+        return _win_fix(["npm", "start"]), env
