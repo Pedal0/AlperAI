@@ -159,13 +159,7 @@ def create_project_structure(target_directory, structure_lines):
 
 def clean_code_block(code_block):
     """
-    Remove markdown code block markers from the beginning and end of code blocks.
-    
-    Args:
-        code_block (str): The code block to clean
-        
-    Returns:
-        str: Cleaned code block without markdown markers
+    Remove markdown code block markers and end markers from the beginning and end of code blocks.
     """
     # Pattern for beginning: ```language or ```
     start_pattern = r'^```(?:\w+)?\n'
@@ -174,6 +168,9 @@ def clean_code_block(code_block):
     # Remove both patterns
     code_block = re.sub(start_pattern, '', code_block)
     code_block = re.sub(end_pattern, '', code_block)
+    # Remove custom end-of-file markers often inserted by AI
+    code_block = re.sub(r'^\s*--END FILE--.*$', '', code_block, flags=re.MULTILINE)
+    code_block = re.sub(r'^\s*--END--.*$', '', code_block, flags=re.MULTILINE)
     return code_block
 
 
