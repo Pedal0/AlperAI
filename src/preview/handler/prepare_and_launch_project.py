@@ -19,6 +19,9 @@ def prepare_and_launch_project(project_dir):
     detection = detect_project_type(project_dir)
     types = detection['types']
     info = detection['info']
+    # Flask apps run as Python projects
+    if 'flask' in types:
+        return prepare_python_project(project_dir)
     if 'multi' in types:
         return prepare_multi_project(info.get('frontend'), info.get('backend'))
     # Node-based projects (Express, React, Vue, Angular)

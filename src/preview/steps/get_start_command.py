@@ -21,30 +21,29 @@ def get_start_command(project_dir: str, project_type: str, session_id: str = Non
     project_dir = Path(project_dir)
     env = None
     if project_type == ProjectType.FLASK or (isinstance(project_type, str) and project_type.lower() == "flask"):
+        # Run Flask via project venv Python on script (run.py or app.py)
         port = find_free_port()
         if port == 5000:
             port = find_free_port(start_port=5001)
         if port is None:
             port = 3000
-        if session_id is not None:
+        if session_id:
             from src.preview.preview_manager import session_ports
             session_ports[session_id] = port
-        import os
-        # Définir FLASK_RUN_PORT et FLASK_APP pour flask run
-        env = os.environ.copy()
-        env["FLASK_RUN_PORT"] = str(port)
-        # Cherche le fichier principal et configure FLASK_APP
-        app_module = None
-        for file in ["app.py", "main.py", "server.py", "run.py"]:
-            if (project_dir / file).exists():
-                app_module = file
+        # Determine Python executable: use project venv if exists
+        venv_py = project_dir / 'venv' / ('Scripts' if is_windows else 'bin') / ('python.exe' if is_windows else 'python')
+        python_exec = str(venv_py) if venv_py.exists() else sys.executable
+        # Locate entry script
+        script = None
+        for candidate in ['run.py', 'app.py', 'main.py', 'server.py']:
+            if (project_dir / candidate).exists():
+                script = str(project_dir / candidate)
                 break
-        if app_module:
-            # Supprimer .py pour FLASK_APP
-            env["FLASK_APP"] = app_module.replace('.py', '')
-        # Utiliser flask run pour respecter FLASK_RUN_PORT
-        # Commande flask run pour forcer le port
-        return [sys.executable, "-m", "flask", "run", "--host", "0.0.0.0", "--port", str(port)], env
+        if script:
+            # Pass port as argument to script
+            return [python_exec, script, str(port)], env
+        # Fallback: use flask run with venv
+        return [python_exec, '-m', 'flask', 'run', '--host', '0.0.0.0', '--port', str(port)], env
     # Streamlit projects: use 'streamlit run'
     elif project_type == "streamlit" or (isinstance(project_type, str) and project_type.lower() == "streamlit"):
         port = find_free_port()

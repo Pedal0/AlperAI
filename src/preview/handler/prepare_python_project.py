@@ -24,24 +24,7 @@ def prepare_python_project(project_dir, main_file=None):
         req = project_dir / 'requirements.txt'
         if req.exists():
             subprocess.check_call([str(pip_path), 'install', '-r', str(req)])
-        if not main_file:
-            for f in ['app.py', 'main.py', 'index.py', 'server.py']:
-                if (project_dir / f).exists():
-                    main_file = f
-                    break
-        if main_file:
-            python_path = venv_dir / ('Scripts' if sys.platform == 'win32' else 'bin') / 'python'
-            # Créer un environnement spécifique pour le sous-processus
-            env = os.environ.copy()
-            env['FLASK_DEBUG'] = '0' # Désactiver le mode debug et le reloader pour la prévisualisation
-            env['PYTHONUNBUFFERED'] = '1' # Assurer la sortie non bufferisée
-
-            proc = subprocess.Popen(
-                [str(python_path), main_file],
-                cwd=str(project_dir),
-                env=env # Passer l'environnement modifié
-            )
-            return True, f"Projet Python lancé ({main_file}) sur PID {proc.pid}"
-        return False, "Aucun fichier principal Python trouvé."
+        # Dependencies installed; script execution will be handled by start_preview
+        return True, "Environnement Python préparé et dépendances installées."
     except Exception as e:
         return False, f"Erreur Python: {e}"
