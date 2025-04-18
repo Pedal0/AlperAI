@@ -4,6 +4,9 @@ Détecte le(s) type(s) de projet dans un dossier donné.
 import os
 import json
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 def detect_project_type(project_dir):
     """
@@ -102,4 +105,6 @@ def detect_project_type(project_dir):
             info['backend'] = str(project_dir / sub)
     if 'frontend' in info and 'backend' in info:
         types.append('multi')
+    
+    logger.debug(f"detect_project_type: project_dir={project_dir}, types={types}, info={info}")
     return {'types': types, 'info': info}

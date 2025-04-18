@@ -81,6 +81,8 @@ def start_preview(project_dir: str, session_id: str, running_processes=None, pro
         wait_time = 2
         if project_type in ('react', 'vue', 'angular'):
             wait_time = 10  # allow build/startup time for SPA frameworks
+        elif project_type == 'flask':
+            wait_time = 5  # extra time for Flask apps
         elif project_type == 'streamlit':
             wait_time = 5  # extra time for Streamlit
         elif project_type == 'express' or project_type == 'php':
