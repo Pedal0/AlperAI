@@ -20,6 +20,13 @@ def _win_fix(cmd):
 def get_start_command(project_dir: str, project_type: str, session_id: str = None):
     project_dir = Path(project_dir)
     env = None
+    # Custom launch script detection: start.sh for macOS/Linux, start.bat for Windows
+    custom_sh = project_dir / 'start.sh'
+    custom_bat = project_dir / 'start.bat'
+    if custom_sh.exists():
+        return ['bash', str(custom_sh)], env
+    if custom_bat.exists():
+        return [str(custom_bat)], env
     if project_type == ProjectType.FLASK or (isinstance(project_type, str) and project_type.lower() == "flask"):
         # Run Flask via project venv Python on script (run.py or app.py)
         port = find_free_port()
