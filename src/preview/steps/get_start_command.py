@@ -20,8 +20,12 @@ def _win_fix(cmd):
 def get_start_command(project_dir: str, project_type: str, session_id: str = None):
     project_dir = Path(project_dir)
     env = None
-    # Determine free port for the generated application and store in session
-    port = find_free_port()
+    # Determine free port for the generated application
+    # Use port >=8000 for static projects, else default starting at 3000
+    if project_type == ProjectType.STATIC or (isinstance(project_type, str) and project_type.lower() == 'static'):
+        port = find_free_port(start_port=8000)
+    else:
+        port = find_free_port()
     if port == 5000:
         port = find_free_port(start_port=5001)
     if session_id:
