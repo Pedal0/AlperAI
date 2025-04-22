@@ -309,6 +309,48 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                 # Final success message
                 if not errors:
                     update_progress(7, "🎉 Application generated successfully!", 100, progress_callback)
+                    # == STEP 8: Generate launch scripts ==
+                    update_progress(8, "🛠️ Generating launch scripts...", None, progress_callback)
+                    from src.api.openrouter_api import call_openrouter_api
+                    # parsed via top-level import: parse_and_write_code
+                    # from src.utils.file_utils import parse_and_write_code
+                    # Prepare the prompt for the AI
+                    config_files = {}
+                    for fname in ['requirements.txt','Pipfile','Pipfile.lock','package.json','.env']:
+                        p = Path(target_directory) / fname
+                        if p.exists():
+                            config_files[fname] = p.read_text(encoding='utf-8')
+                    structure_block = '\n'.join(structure_lines)
+                    launch_prompt = f"""
+Generate two launch scripts at the project root:
+--- FILE: start.sh ---
+ (bash script for macOS/Linux: create or activate environment, install dependencies, start the application)
+--- FILE: start.bat ---
+ (batch script for Windows: install dependencies, start the application)
+
+### Project structure ###
+{structure_block}
+
+### Configuration files content ###
+"""
+                    for name, content in config_files.items():
+                        launch_prompt += f"### {name}\n{content}\n"
+                    launch_prompt += """
+The scripts should:
+ - Create or activate the environment if needed
+ - Install dependencies (pip or npm)
+ - Launch the application using the port passed as argument
+Use exactly the FILE markers shown above.
+"""
+                    response = call_openrouter_api(
+                        api_key, selected_model,
+                        [{"role":"user","content":launch_prompt}],
+                        temperature=0.3, max_retries=2
+                    )
+                    if response and response.get('choices'):
+                        content = response['choices'][0]['message']['content']
+                        parse_and_write_code(target_directory, content)
+                    update_progress(8, "✅ Launch scripts created.", 100, progress_callback)
                     
                     # Save path for preview mode if in Flask context
                     if current_app:
