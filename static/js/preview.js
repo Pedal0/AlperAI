@@ -47,6 +47,11 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
+    // Add updateLogs to render log entries
+    function updateLogs(logs) {
+      logsContent.innerHTML = logs.map(entry => `<div>${entry}</div>`).join('');
+    }
+
     // Add beforeunload to stop preview
     window.addEventListener("beforeunload", function () {
       if (childWindow && !childWindow.closed) {
@@ -133,6 +138,64 @@ document.addEventListener("DOMContentLoaded", function () {
         })
         .catch((e) => alert("Error: " + e));
     }
+
+    // Iteration button handler
+    const iterateBtn = document.getElementById('iteratePreviewBtn');
+    const iterationStatus = document.getElementById('iterationStatus');
+    function startIteration() {
+      const feedback = document.getElementById('interactionInput').value.trim();
+      if (!feedback) {
+        alert('Please enter feedback for iteration.');
+        return;
+      }
+      iterateBtn.disabled = true;
+      iterationStatus.innerHTML = '<em>Iteration started...</em>';
+      const form = new FormData();
+      form.append('api_key', window.API_KEY);
+      form.append('model', window.MODEL);
+      form.append('feedback', feedback);
+      form.append('regenerate_code', 'off');
+      fetch(window.URL_CONTINUE_ITERATION, { method: 'POST', body: form })
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'success') {
+            pollIteration();
+          } else {
+            iterationStatus.textContent = data.message || 'Error starting iteration';
+            iterateBtn.disabled = false;
+          }
+        })
+        .catch(err => {
+          iterationStatus.textContent = 'Network error: ' + err;
+          iterateBtn.disabled = false;
+        });
+    }
+    function pollIteration() {
+      const interval = setInterval(() => {
+        fetch(window.URL_GENERATION_PROGRESS)
+          .then(res => res.json())
+          .then(data => {
+            iterationStatus.textContent = `Progress: ${data.progress}% - ${data.current_step}`;
+            if (data.status === 'completed' || data.status === 'failed') {
+              clearInterval(interval);
+              if (data.status === 'completed') {
+                iterationStatus.textContent = 'Iteration completed.';
+                // restart preview to apply changes without changing port
+                restartApp();
+              } else {
+                iterationStatus.textContent = 'Iteration failed: ' + (data.error || 'Unknown error');
+              }
+              iterateBtn.disabled = false;
+            }
+          })
+          .catch(err => {
+            clearInterval(interval);
+            iterationStatus.textContent = 'Error during polling: ' + err;
+            iterateBtn.disabled = false;
+          });
+      }, 2000);
+    }
+    iterateBtn.addEventListener('click', startIteration);
 
     // Initialize logs polling on start
     // Event Listeners

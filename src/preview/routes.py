@@ -8,11 +8,11 @@ bp_preview = Blueprint('preview', __name__)
 @bp_preview.route('/preview')
 def preview():
     if 'generation_result' not in session or not session['generation_result'].get('success'):
-        flash("Aucune génération réussie trouvée. Veuillez d'abord générer une application.", "warning")
+        flash("No successful generation found. Please generate an application first.", "warning")
         return redirect(url_for('ui.index'))
     target_dir = session['generation_result'].get('target_directory')
     if not target_dir or not Path(target_dir).is_dir():
-        flash("Répertoire d'application généré introuvable.", "danger")
+        flash("Generated application directory not found.", "danger")
         return redirect(url_for('generation.result', _external=True))
     if 'preview_session_id' not in session:
         session['preview_session_id'] = str(uuid.uuid4())
@@ -24,19 +24,19 @@ def preview():
 @bp_preview.route('/preview/start', methods=['POST'])
 def start_preview_route():
     if 'generation_result' not in session:
-        current_app.logger.error("Erreur: 'generation_result' n'est pas présent dans la session")
-        return jsonify({"status": "error", "message": "Aucun résultat de génération trouvé"}), 400
+        current_app.logger.error("Error: 'generation_result' not found in session")
+        return jsonify({"status": "error", "message": "No generation result found"}), 400
     target_dir = session['generation_result'].get('target_directory')
     if not target_dir or not Path(target_dir).is_dir():
-        current_app.logger.error(f"Erreur: Répertoire cible '{target_dir}' introuvable ou invalide")
-        return jsonify({"status": "error", "message": "Répertoire cible introuvable"}), 400
+        current_app.logger.error(f"Error: Target directory '{target_dir}' not found or invalid")
+        return jsonify({"status": "error", "message": "Target directory not found"}), 400
     preview_session_id = request.json.get('session_id') if request.json else session.get('preview_session_id')
     if not preview_session_id:
         preview_session_id = str(uuid.uuid4())
         session['preview_session_id'] = preview_session_id
     ports_cleaned = cleanup_unused_ports()
     if ports_cleaned > 0:
-        current_app.logger.info(f"{ports_cleaned} ports libérés avant le démarrage")
+        current_app.logger.info(f"{ports_cleaned} ports freed before starting")
     success, message, info = start_preview(target_dir, preview_session_id)
     if success:
         return jsonify({
@@ -79,7 +79,7 @@ def preview_status():
 def stop_preview_route():
     preview_session_id = session.get('preview_session_id')
     if not preview_session_id:
-        return jsonify({"status": "error", "message": "Aucune session de prévisualisation trouvée"}), 400
+        return jsonify({"status": "error", "message": "No preview session found"}), 400
     success, message = stop_preview(preview_session_id)
     if success:
         return jsonify({"status": "success", "message": message})
@@ -90,7 +90,7 @@ def stop_preview_route():
 def restart_preview_route():
     preview_session_id = session.get('preview_session_id')
     if not preview_session_id:
-        return jsonify({"status": "error", "message": "Aucune session de prévisualisation trouvée"})
+        return jsonify({"status": "error", "message": "No preview session found"})
     success, message, info = restart_preview(preview_session_id)
     if success:
         return jsonify({
@@ -112,13 +112,13 @@ def refresh_preview():
     try:
         return jsonify({
             "status": "success",
-            "message": "Rafraîchissement manuel demandé"
+            "message": "Manual refresh requested"
         })
     except Exception as e:
-        current_app.logger.error(f"Erreur lors du rafraîchissement manuel: {str(e)}")
+        current_app.logger.error(f"Error during manual refresh: {str(e)}")
         return jsonify({
             "status": "error", 
-            "message": f"Erreur lors du rafraîchissement: {str(e)}"
+            "message": f"Error during refresh: {str(e)}"
         }), 500
 
 @bp_preview.route('/preview/stop_on_exit', methods=['POST'])
@@ -137,13 +137,13 @@ def stop_preview_on_exit():
         if not session_id:
             session_id = session.get('preview_session_id')
         if not session_id:
-            current_app.logger.warning("Tentative d'arrêt sans ID de session")
+            current_app.logger.warning("Attempt to stop without session ID")
             return '', 204
         success, message = stop_preview(session_id)
-        current_app.logger.info(f"Arrêt d'application sur sortie de page: {success}, {message}")
+        current_app.logger.info(f"Stopped application on page exit: {success}, {message}")
         return '', 204
     except Exception as e:
-        current_app.logger.error(f"Erreur lors de l'arrêt sur sortie: {str(e)}")
+        current_app.logger.error(f"Error during stop on exit: {str(e)}")
         return '', 204
 
 @bp_preview.route('/list_files', methods=['GET'])
