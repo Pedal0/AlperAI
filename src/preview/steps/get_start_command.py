@@ -20,20 +20,29 @@ def _win_fix(cmd):
 def get_start_command(project_dir: str, project_type: str, session_id: str = None):
     project_dir = Path(project_dir)
     env = None
+    # Determine free port for the generated application and store in session
+    port = find_free_port()
+    if port == 5000:
+        port = find_free_port(start_port=5001)
+    if session_id:
+        from src.preview.preview_manager import session_ports
+        session_ports[session_id] = port
+
     # Custom launch script detection: start.sh for macOS/Linux, start.bat for Windows
     custom_sh = project_dir / 'start.sh'
     custom_bat = project_dir / 'start.bat'
+    # On Windows prefer batch script, otherwise bash script
+    if is_windows and custom_bat.exists():
+        # Run batch file through cmd with port argument
+        return ['cmd', '/c', str(custom_bat), str(port)], env
     if custom_sh.exists():
-        return ['bash', str(custom_sh)], env
+        # Run bash script with port argument
+        return ['bash', str(custom_sh), str(port)], env
     if custom_bat.exists():
-        return [str(custom_bat)], env
+        return [str(custom_bat), str(port)], env
+
     if project_type == ProjectType.FLASK or (isinstance(project_type, str) and project_type.lower() == "flask"):
         # Run Flask via project venv Python on script (run.py or app.py)
-        port = find_free_port()
-        if port == 5000:
-            port = find_free_port(start_port=5001)
-        if port is None:
-            port = 3000
         if session_id:
             from src.preview.preview_manager import session_ports
             session_ports[session_id] = port
@@ -53,7 +62,6 @@ def get_start_command(project_dir: str, project_type: str, session_id: str = Non
         return [python_exec, '-m', 'flask', 'run', '--host', '0.0.0.0', '--port', str(port)], env
     # Streamlit projects: use 'streamlit run'
     elif project_type == "streamlit" or (isinstance(project_type, str) and project_type.lower() == "streamlit"):
-        port = find_free_port()
         if session_id:
             from src.preview.preview_manager import session_ports
             session_ports[session_id] = port
@@ -72,7 +80,6 @@ def get_start_command(project_dir: str, project_type: str, session_id: str = Non
             return [sys.executable, str(project_dir)], env
     elif project_type == ProjectType.EXPRESS:
         # Choose port and set environment
-        port = find_free_port()
         if session_id:
             from src.preview.preview_manager import session_ports
             session_ports[session_id] = port
@@ -87,7 +94,6 @@ def get_start_command(project_dir: str, project_type: str, session_id: str = Non
         return _win_fix(["npm", "start"]), env
     # PHP projects: launch built-in server
     elif project_type == ProjectType.PHP or (isinstance(project_type, str) and project_type.lower() == "php"):
-        port = find_free_port()
         if session_id is not None:
             from src.preview.preview_manager import session_ports
             session_ports[session_id] = port
@@ -95,7 +101,6 @@ def get_start_command(project_dir: str, project_type: str, session_id: str = Non
         return ["php", "-S", f"0.0.0.0:{port}", "-t", str(project_dir)], env
     elif project_type in [ProjectType.REACT, ProjectType.VUE, ProjectType.ANGULAR]:
         # Use free port for SPA frameworks
-        port = find_free_port()
         if session_id:
             from src.preview.preview_manager import session_ports
             session_ports[session_id] = port
@@ -139,7 +144,6 @@ def get_start_command(project_dir: str, project_type: str, session_id: str = Non
             except:
                 pass
         # Serve via python http.server or npx serve
-        port = find_free_port()
         if session_id is not None:
             from src.preview.preview_manager import session_ports
             session_ports[session_id] = port
