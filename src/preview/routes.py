@@ -145,3 +145,18 @@ def stop_preview_on_exit():
     except Exception as e:
         current_app.logger.error(f"Erreur lors de l'arrêt sur sortie: {str(e)}")
         return '', 204
+
+@bp_preview.route('/list_files', methods=['GET'])
+def list_files_route():
+    """List all files in the given directory, relative paths."""
+    from flask import request
+    import os
+    dir_path = request.args.get('directory')
+    if not dir_path or not Path(dir_path).is_dir():
+        return jsonify(status="error", message="Invalid directory"), 400
+    file_list = []
+    for root, dirs, files in os.walk(dir_path):
+        for fname in files:
+            rel = os.path.relpath(os.path.join(root, fname), dir_path)
+            file_list.append(rel.replace('\\', '/'))
+    return jsonify(status="success", files=file_list)
