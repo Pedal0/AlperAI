@@ -64,6 +64,9 @@
                   <option value="google/gemini-2.5-flash-preview">
                     Gemini 2.5 Flash Preview
                   </option>
+                  <option value="qwen/qwen3-235b-a22b">
+                    Qwen 3.5 235B A22B (No Tools)
+                  </option>
                   <option value="anthropic/claude-3.7-sonnet">
                     Claude 3.7 Sonnet
                   </option>
@@ -311,7 +314,8 @@
   window.URL_OPEN_FOLDER_DIALOG = "{{ url_for('ui.open_folder_dialog') }}";
   window.URL_VALIDATE_DIRECTORY = "{{ url_for('ui.validate_directory_path') }}";
   window.URL_GENERATE = "{{ url_for('generation.generate') }}";
-  window.URL_GENERATION_PROGRESS = "{{ url_for('generation.generation_progress') }}";
+  window.URL_GENERATION_PROGRESS =
+    "{{ url_for('generation.generation_progress') }}";
   window.URL_GENERATION_RESULT = "{{ url_for('generation.result') }}";
 </script>
 <script src="{{ url_for('static', filename='js/index.js') }}"></script>
