@@ -4,6 +4,7 @@ Fonction d'étape : génération du code complet de l'application à partir du p
 import json
 import re
 import time
+from pathlib import Path
 from src.api.openrouter_api import call_openrouter_api
 from src.utils.model_utils import is_free_model
 from src.config.constants import RATE_LIMIT_DELAY_SECONDS
@@ -49,7 +50,22 @@ def generate_code_step(api_key, selected_model, reformulated_prompt, structure_l
     IMPORTANT: If a style, template, or documentation is provided in the URLs, use them as the primary reference.
     Generate the code now:
     """
-    messages_code_gen = [{"role": "user", "content": prompt_code_gen}]
+
+    # Load best system prompts for code generation as system message
+    config_file = Path(__file__).parents[3] / 'config' / 'best_system_prompts.json'
+    try:
+        with open(config_file, 'r', encoding='utf-8') as f:
+            best_prompts_list = json.load(f)
+        system_prompt_code = 'You are an AI code generator. Strictly adhere to these guidelines for output quality and format:\n' + ''.join(f'- {item}\n' for item in best_prompts_list)
+    except Exception:
+        system_prompt_code = 'You are an AI code generator. Follow best practices for clean, functional code.'
+
+    # Prepare messages with system prompt
+    messages_code_gen = [
+        {"role": "system", "content": system_prompt_code},
+        {"role": "user", "content": prompt_code_gen}
+    ]
+
     if use_mcp_tools:
         response_code_gen = call_openrouter_api(
             api_key, 

@@ -106,8 +106,9 @@ class SimpleMCPClient:
             resource_info += f"\nRelevant animation resources for {animation_type}:\n"
             animation_resources = get_animation_resource(animation_type)
             if animation_resources:
-                for key, info in animation_resources.items():
-                    resource_info += f"- {info['name']}: {info['url']} (CDN: {info['cdn']})\n"
+                # get_animation_resource returns a single resource dict
+                info = animation_resources
+                resource_info += f"- {info['name']}: {info['url']} (CDN: {info.get('cdn', 'N/A')})\n"
         
         # Create a special prompt for the tool execution
         tool_prompt = f"""

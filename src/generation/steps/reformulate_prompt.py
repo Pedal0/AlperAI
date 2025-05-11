@@ -2,6 +2,8 @@
 Fonction d'étape : reformulation du prompt utilisateur pour la génération d'application.
 """
 import re
+import json
+from pathlib import Path
 from src.api.openrouter_api import call_openrouter_api
 from src.utils.model_utils import is_free_model
 from src.config.constants import RATE_LIMIT_DELAY_SECONDS
@@ -26,6 +28,15 @@ def reformulate_prompt(api_key, selected_model, user_prompt, url_context, additi
             wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
             update_progress(1, f"⏳ Modèle gratuit détecté. Attente de {wait_time:.1f} secondes (limite de taux)...", 20)
             time.sleep(wait_time)
+
+    # Load and prepare best system prompts as a system message
+    config_file = Path(__file__).parents[2] / 'config' / 'best_system_prompts.json'
+    try:
+        with open(config_file, 'r', encoding='utf-8') as f:
+            best_prompts_list = json.load(f)
+        system_prompt = 'You are an AI assistant for code generation. Follow these best practices strictly:\n' + ''.join(f'- {item}\n' for item in best_prompts_list)
+    except Exception:
+        system_prompt = 'You are an AI assistant for code generation. Follow best practices for clear, maintainable, and secure code.'
 
     prompt_reformulation = f"""
     Analyze the user's request below. Your task is to:
@@ -53,7 +64,11 @@ def reformulate_prompt(api_key, selected_model, user_prompt, url_context, additi
     {url_context if url_context else ""}
     {additional_context if additional_context else ""}
     """
-    messages_reformulation = [{"role": "user", "content": prompt_reformulation}]
+    # Prepare messages with system prompt and user content
+    messages_reformulation = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": prompt_reformulation}
+    ]
     response_reformulation = call_openrouter_api(api_key, selected_model, messages_reformulation, temperature=0.6, max_retries=2)
     if process_state is not None:
         process_state['last_api_call_time'] = time.time()
