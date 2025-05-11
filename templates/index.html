@@ -75,9 +75,6 @@
                   <option value="openai/gpt-4.1-nano" selected>
                     GPT-4.1 Nano
                   </option>
-                  <option value="google/gemini-2.5-pro-exp-03-25:free">
-                    Gemini 2.5 Pro experimental (Free)
-                  </option>
                   <option value="agentica-org/deepcoder-14b-preview:free">
                     Agentica Deepcoder (Free)
                   </option>
@@ -109,7 +106,7 @@
                 </div>
               </div>
 
-              <div class="mb-4">
+              <div id="mcpToolsContainer" class="mb-4">
                 <div class="form-check form-switch">
                   <input
                     class="form-check-input"
@@ -309,6 +306,25 @@
     </div>
   </div>
 </div>
+
+<!-- Free Model Warning Modal -->
+<div class="modal fade" id="freeModelWarningModal" tabindex="-1" aria-labelledby="freeModelWarningLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="freeModelWarningLabel">Warning: Free Model Selected</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Using a free model may be slower or more likely to fail due to server limitations. If a request fails, you can try again.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Understood</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %} {% block extra_js %}
 <script>
   window.URL_OPEN_FOLDER_DIALOG = "{{ url_for('ui.open_folder_dialog') }}";

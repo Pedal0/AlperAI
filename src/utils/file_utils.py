@@ -328,16 +328,64 @@ def generate_missing_code(api_key, model, empty_files, reformulated_prompt, stru
     
     logging.info(f"Attempting to generate code for {len(empty_files)} empty files...")
     
-    # Prepare a condensed version of the previously generated code
-    # Only include the FILE markers and a brief indicator of content
-    condensed_code = ""
-    parts = re.split(r'(---\s*FILE:\s*(.*?)\s*---)', generated_code, flags=re.IGNORECASE)
-    for i in range(1, len(parts), 3):
-        if i+1 < len(parts):
-            file_path = parts[i+1].strip()
-            content_preview = parts[i+2].strip()[:100] + "..." if parts[i+2].strip() else "[Empty]"
-            condensed_code += f"--- FILE: {file_path} --- (Content length: {len(parts[i+2].strip())} chars)\n"
-    
+    # Build a summary of existing non-empty files on disk for context
+    existing_summary = ""
+    existing_list = []
+    detailed_previews = ""
+    # Extract language-agnostic signatures via regex for context
+    definitions_summary = ""
+    signature_patterns = {
+        '.py': [r'^\s*(def|class)\s+\w+.*$'],
+        '.js': [r'^\s*function\s+\w+.*$', r'^\s*class\s+\w+.*$'],
+        '.ts': [r'^\s*(?:export\s+)?(?:function|class)\s+\w+.*$'],
+        '.java': [r'^\s*(?:public|private|protected)?\s*(?:class|interface|enum)\s+\w+.*$', r'^\s*\w+\s+\w+\(.*\).*\{?$'],
+        '.go': [r'^\s*func\s+\w+.*$'],
+        '.cs': [r'^\s*(?:public|private|protected|internal)?\s*(?:class|interface|struct|enum|void|\w+)\s+\w+\(.*\).*'],
+        '.rb': [r'^\s*def\s+\w+.*$', r'^\s*class\s+\w+.*$'],
+        '.php': [r'^\s*function\s+\w+.*$'],
+    }
+    for root, dirs, files in os.walk(target_directory):
+        for fname in files:
+            rel = os.path.relpath(os.path.join(root, fname), target_directory).replace(os.sep, '/')
+            ext = Path(fname).suffix.lower()
+            patterns = signature_patterns.get(ext)
+            if not patterns:
+                continue
+            try:
+                lines = Path(root, fname).read_text(encoding='utf-8', errors='ignore').splitlines()
+                for line in lines:
+                    for pat in patterns:
+                        if re.match(pat, line):
+                            definitions_summary += f"- {line.strip()} in {rel}\n"
+                            break
+            except:
+                continue
+
+    for root, dirs, files in os.walk(target_directory):
+        for fname in files:
+            rel = os.path.relpath(os.path.join(root, fname), target_directory).replace(os.sep, '/')
+            if rel in empty_files:
+                continue
+            filepath = os.path.join(root, fname)
+            try:
+                size = os.path.getsize(filepath)
+                if size == 0:
+                    continue
+                existing_list.append(rel)
+                # For HTML/CSS, include brief preview to preserve style context
+                if rel.lower().endswith(('.html', '.css')):
+                    with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+                    snippet = content[:200] + ('...' if len(content) > 200 else '')
+                    detailed_previews += f"FILE: {rel}\n```\n{snippet}\n```\n"
+            except:
+                continue
+    existing_summary += "Existing files:\n" + "\n".join(existing_list) + "\n"
+    if definitions_summary:
+        existing_summary += "\nExisting definitions (signatures):\n" + definitions_summary
+    if detailed_previews:
+        existing_summary += "\nStyle/context previews:\n" + detailed_previews
+
     # Build the prompt for generating missing code
     prompt = f"""
     You need to complete code for files that were left empty in a previous generation.
@@ -350,8 +398,8 @@ def generate_missing_code(api_key, model, empty_files, reformulated_prompt, stru
     {chr(10).join(structure_lines)}
     ```
     
-    **Previously Generated Files (summary):**
-    {condensed_code}
+    **Existing Project Files (summary):**
+    {existing_summary}
     
     **Files to Complete:**
     {chr(10).join([f"- {f}" for f in empty_files])}
