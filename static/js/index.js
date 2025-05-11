@@ -174,6 +174,39 @@ document.addEventListener("DOMContentLoaded", function () {
     // Form submission with actual API call instead of simulation
     const form = document.getElementById("appGeneratorForm");
 
+    // Warn if Free model selected
+    document.getElementById('model').addEventListener('change', function() {
+      const val = this.value;
+      // Detect models tagged as free
+      if (val.includes(':free') || this.options[this.selectedIndex].text.includes('(Free)')) {
+        const modalEl = document.getElementById('freeModelWarningModal');
+        if (modalEl) {
+          const warningModal = new bootstrap.Modal(modalEl);
+          warningModal.show();
+        }
+      }
+    });
+
+    // Also disable tools if model label includes 'No Tools'
+    document.getElementById('model').addEventListener('change', function() {
+      const select = this;
+      const optionText = select.options[select.selectedIndex].text;
+      const useMcpToggle = document.getElementById('use_mcp_tools');
+      const mcpContainer = document.getElementById('mcpToolsContainer');
+      const frontendOptions = document.getElementById('frontendOptions');
+      if (optionText.includes('No Tools')) {
+        useMcpToggle.checked = false;
+        useMcpToggle.disabled = true;
+        if (mcpContainer) mcpContainer.style.display = 'none';
+        // Hide frontend options for models that don't support tools
+        if (frontendOptions) frontendOptions.style.display = 'none';
+      } else {
+        useMcpToggle.disabled = false;
+        if (mcpContainer) mcpContainer.style.display = '';
+        if (frontendOptions) frontendOptions.style.display = '';
+      }
+    });
+
     form.addEventListener("submit", function (e) {
       e.preventDefault(); // Prevent standard form submission
 
