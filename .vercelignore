@@ -1,0 +1,3 @@
+# Ignore Pipenv files so Vercel uses requirements-vercel.txt
+Pipfile
+Pipfile.lock
