@@ -1,7 +1,6 @@
 python-dotenv 
 openai 
 requests 
-asyncio 
 duckduckgo-search 
 beautifulsoup4 
 aiohttp 
@@ -13,4 +12,4 @@ websockets
 jinja2 
 werkzeug 
 itsdangerous 
-click 
+click
