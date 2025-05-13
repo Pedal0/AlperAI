@@ -2,7 +2,8 @@
 UI components for the Streamlit application.
 Contains functions for rendering different parts of the UI.
 """
-import streamlit as st
+
+
 from src.config.constants import DEFAULT_MODEL, RATE_LIMIT_DELAY_SECONDS
 from src.utils.env_utils import get_openrouter_api_key
 

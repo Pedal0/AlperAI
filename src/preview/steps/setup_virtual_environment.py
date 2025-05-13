@@ -5,7 +5,7 @@ import sys
 import os
 import subprocess
 from pathlib import Path
-import streamlit as st
+
 
 def setup_virtual_environment(project_dir, venv_command=None):
     try:

@@ -3,7 +3,6 @@ Handlers for different MCP tools to process their results and integrate them int
 """
 import re
 import json
-import streamlit as st
 from src.config.frontend_resources import (
     get_component_sources,
     get_library_info,
