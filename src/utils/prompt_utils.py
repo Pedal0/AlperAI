@@ -3,7 +3,6 @@ Utility functions for prompt handling and detection.
 """
 import re
 import asyncio
-import streamlit as st
 
 def prompt_mentions_design(prompt_text):
     """
