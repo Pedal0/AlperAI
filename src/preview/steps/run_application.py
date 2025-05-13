@@ -4,7 +4,7 @@ Exécute l'application générée.
 import os
 import time
 import subprocess
-import streamlit as st
+
 
 def run_application(project_dir, run_command, venv_path=None):
     try:

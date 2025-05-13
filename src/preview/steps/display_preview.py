@@ -1,7 +1,7 @@
 """
 Affiche la prévisualisation d'une application générée.
 """
-import streamlit as st
+
 import time
 import re
 from pathlib import Path

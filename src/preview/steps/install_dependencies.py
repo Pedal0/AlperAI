@@ -3,7 +3,7 @@ Installe les dépendances du projet.
 """
 import os
 import subprocess
-import streamlit as st
+
 
 def install_dependencies(project_dir, commands, venv_path=None):
     try:

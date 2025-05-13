@@ -4,7 +4,7 @@ Contient les fonctions pour exécuter et afficher les applications.
 """
 import re
 import time
-import streamlit as st
+
 import subprocess
 from pathlib import Path
 
