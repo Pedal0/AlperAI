@@ -170,9 +170,7 @@
                   placeholder="Example: Create a task management application with user authentication. Users should be able to add, edit and delete tasks, set priorities and due dates."
                   required
                 ></textarea>
-              </div>
-              {% if not is_vercel %}
-              <div class="mb-4">
+              </div>              <div class="mb-4">
                 <label for="target_directory" class="form-label"
                   >Target Directory</label
                 >
@@ -194,25 +192,25 @@
                     id="target_directory"
                     name="target_directory"
                     placeholder="e.g. C:\\Users\\YourName\\Projects\\MyGeneratedApp"
-                    required
-                  />
-                  {% endif %} {% if not is_vercel %}
+                    required                  />
+                  {% endif %}
+                  {% if not is_vercel %}
+                  <button
+                    class="btn btn-outline-secondary"
+                    type="button"
+                    id="browseButton">
+                    <i class="fas fa-folder-open"></i>
+                  </button>
+                  {% else %}
                   <button
                     class="btn btn-outline-secondary"
                     type="button"
                     id="browseButton"
-                    {%
-                    else
-                    %}
-                    <button
-                    class="btn btn-outline-secondary"
-                    type="button"
-                    id="browseButton"
                     disabled
-                    title="Browse function is disabled on Vercel"
-                    {%
-                    endif
-                    %}
+                    title="Browse function is disabled on Vercel">
+                    <i class="fas fa-folder-open"></i>
+                  </button>
+                  {% endif %}
                   >
                     <i class="fas fa-folder-open"></i>
                   </button>

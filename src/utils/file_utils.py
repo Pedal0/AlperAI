@@ -109,6 +109,7 @@ def create_project_structure(target_directory, structure_lines):
         list: List of created paths or None on error
     """
     created_paths = []
+    import uuid
     target_directory = Path(target_directory).resolve() # Get absolute and normalized path
     logging.info(f"Attempting to create structure in: {target_directory}")
 
@@ -119,8 +120,47 @@ def create_project_structure(target_directory, structure_lines):
     if not structure_lines:
         logging.warning("No structure lines provided to create.")
         return [] # Return empty list, not a fatal error
+        
+    # Vérifions d'abord si le répertoire cible est accessible en écriture
+    try:
+        test_file = target_directory / f"test_write_{uuid.uuid4().hex[:6]}.txt"
+        with open(test_file, 'w') as f:
+            f.write("test")
+        os.remove(test_file)
+        logging.info(f"Target directory {target_directory} is writable")
+    except Exception as e:
+        logging.error(f"Target directory {target_directory} is not writable: {e}")
+        # Sur Vercel, tenter d'utiliser /tmp en dernier recours
+        if os.environ.get('VERCEL', ''):
+            logging.warning("Trying to use /tmp directory on Vercel as fallback")
+            try:
+                tmp_dir = Path('/tmp/project_fallback')
+                tmp_dir.mkdir(parents=True, exist_ok=True)
+                if test_directory_writable(tmp_dir):
+                    target_directory = tmp_dir
+                    logging.info(f"Using fallback directory: {target_directory}")
+                else:
+                    logging.error("Could not find a writable directory on Vercel")
+                    return None
+            except Exception as e2:
+                logging.error(f"Failed to use fallback directory: {e2}")
+                return None
+        else:
+            # Non-Vercel environment, échec critique
+            return None
 
     try:
+        # Vérifier que le répertoire cible est accessible en écriture
+        try:
+            test_file = Path(target_directory) / f"test_write_{uuid.uuid4().hex[:6]}.txt"
+            with open(test_file, 'w') as f:
+                f.write("test")
+            os.remove(test_file)
+            logging.info(f"Target directory {target_directory} is writable")
+        except Exception as e:
+            logging.error(f"Target directory {target_directory} is not writable: {e}")
+            # Ne pas échouer immédiatement, essayer de continuer
+        
         for line in structure_lines:
             # Normalisation du chemin pour éviter les chemins absolus
             rel_path = line.lstrip("/\\")
@@ -129,6 +169,7 @@ def create_project_structure(target_directory, structure_lines):
             abs_path = os.path.abspath(os.path.join(target_directory, rel_path))
             # Empêche d'écrire en dehors du dossier cible
             if not abs_path.startswith(os.path.abspath(target_directory)):
+                logging.warning(f"Path {abs_path} is outside target directory, skipping")
                 continue
 
             line = rel_path.strip() # Re-clean just in case
@@ -499,10 +540,33 @@ def generate_vercel_project_path():
     
     # Génère un ID unique pour le projet
     project_id = f"project_{uuid.uuid4().hex[:10]}"
-      # Sur Vercel, utilisez /tmp/ qui est le seul répertoire accessible en écriture
+    
+    # Sur Vercel, utilisez /tmp/ qui est le seul répertoire accessible en écriture
     if os.environ.get('VERCEL', ''):
-        root_path = Path('/tmp')
-        logging.info(f"Vercel environment detected, using /tmp directory for project")
+        logging.info(f"Vercel environment detected")
+        
+        # Liste des répertoires à tester
+        directories_to_try = ['/tmp', '/tmp/vercel', '/tmp/projects']
+        root_path = None
+        
+        # Tester chaque répertoire jusqu'à en trouver un accessible en écriture
+        for directory in directories_to_try:
+            dir_path = Path(directory)
+            try:
+                if not dir_path.exists():
+                    dir_path.mkdir(parents=True, exist_ok=True)
+                
+                if test_directory_writable(dir_path):
+                    root_path = dir_path
+                    logging.info(f"Using directory: {root_path}")
+                    break
+            except Exception as e:
+                logging.error(f"Error with directory {directory}: {e}")
+        
+        # Si aucun répertoire n'est accessible, utiliser /tmp par défaut
+        if root_path is None:
+            root_path = Path('/tmp')
+            logging.warning(f"No writable directory found, defaulting to {root_path}")
     else:
         # Récupère le chemin racine de l'application (où se trouve app.py)
         root_path = Path(__file__).resolve().parents[2]  # 2 niveaux au-dessus: src/utils -> src -> racine
@@ -528,17 +592,82 @@ def cleanup_vercel_project(project_path):
     
     Args:
         project_path (Path): Chemin vers le projet à nettoyer
+        
+    Returns:
+        bool: True si le nettoyage a réussi, False sinon
     """
     import shutil
+    import os
+    
+    # Si project_path est une chaîne, la convertir en Path
+    if isinstance(project_path, str):
+        project_path = Path(project_path)
     
     try:
         if project_path.exists():
             logging.info(f"Nettoyage du projet temporaire: {project_path}")
-            shutil.rmtree(project_path)
-            logging.info(f"Projet temporaire nettoyé avec succès")
-            return True
+            
+            # Si le chemin est dans /tmp (Vercel), utiliser shutil.rmtree
+            if str(project_path).startswith('/tmp'):
+                shutil.rmtree(project_path)
+                logging.info(f"Projet temporaire Vercel nettoyé avec succès")
+                return True
+            else:
+                # Pour les autres environnements, vérifier les permissions avant de supprimer
+                try:
+                    # Vérifier si le dossier est accessible en écriture
+                    test_file = project_path / "test_cleanup.txt"
+                    with open(test_file, 'w') as f:
+                        f.write("test")
+                    os.remove(test_file)
+                    
+                    # Si le test réussit, supprimer le dossier
+                    shutil.rmtree(project_path)
+                    logging.info(f"Projet temporaire nettoyé avec succès")
+                    return True
+                except Exception as inner_e:
+                    logging.error(f"Erreur de permission lors du nettoyage: {inner_e}")
+                    # Si on ne peut pas supprimer le dossier entier, essayer de supprimer les fichiers individuellement
+                    try:
+                        file_count = 0
+                        for root, dirs, files in os.walk(project_path):
+                            for file in files:
+                                try:
+                                    os.remove(os.path.join(root, file))
+                                    file_count += 1
+                                except:
+                                    pass
+                        logging.info(f"Nettoyage partiel: {file_count} fichiers supprimés")
+                        return file_count > 0
+                    except Exception as e2:
+                        logging.error(f"Échec du nettoyage partiel: {e2}")
+                        return False
+        else:
+            logging.info(f"Aucun projet à nettoyer à {project_path}")
+            return True  # Considéré comme un succès car il n'y a rien à nettoyer
     except Exception as e:
-        print(f"Erreur lors du nettoyage du projet Vercel: {e}")
+        logging.error(f"Erreur lors du nettoyage du projet: {e}")
         return False
+
+def test_directory_writable(directory_path):
+    """
+    Vérifie si un répertoire est accessible en écriture.
     
-    return False
+    Args:
+        directory_path (str ou Path): Chemin du répertoire à vérifier
+    
+    Returns:
+        bool: True si le répertoire est accessible en écriture, False sinon
+    """
+    import uuid
+    try:
+        path = Path(directory_path)
+        test_file = path / f"test_write_{uuid.uuid4().hex[:6]}.txt"
+        with open(test_file, 'w') as f:
+            f.write("test")
+        os.remove(test_file)
+        logging.info(f"Directory {directory_path} is writable")
+        return True
+    except Exception as e:
+        logging.error(f"Directory {directory_path} is not writable: {e}")
+        return False

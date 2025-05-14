@@ -484,7 +484,6 @@ def continue_iteration():
 @bp_generation.route('/download_zip', methods=['GET'])
 def download_zip():
     from src.utils.env_utils import is_vercel_environment
-    from src.utils.file_utils import cleanup_vercel_project
     
     if 'generation_result' not in session:
         flash("No generation result found. Please generate an application first.", "warning")
@@ -509,14 +508,11 @@ def download_zip():
                     file_path = os.path.join(root, file)
                     rel_path = os.path.relpath(file_path, target_dir)
                     zipf.write(file_path, rel_path)
+        
         memory_file.seek(0)
         dir_name = os.path.basename(os.path.normpath(target_dir))
-          # Si on est sur Vercel et c'est un projet temporaire, nettoyer le dossier après téléchargement
-        def cleanup_after_send():
-            if is_vercel and is_vercel_project:
-                cleanup_vercel_project(Path(target_dir))
-                current_app.logger.info(f"Projet temporaire nettoyé: {target_dir}")
-                  # Nom du fichier zip avec horodatage
+        
+        # Nom du fichier zip avec horodatage
         zip_filename = f"{dir_name}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.zip"
         
         # Log des informations avant l'envoi
@@ -534,12 +530,47 @@ def download_zip():
         
         # Déclenchement du nettoyage si c'est un projet Vercel
         if is_vercel and is_vercel_project:
-            # Nous devons planifier le nettoyage pour qu'il se produise après l'envoi
-            logging.info(f"Planification du nettoyage du projet temporaire dans 2 secondes")
-            threading.Timer(2.0, cleanup_after_send).start()
+            # Utiliser notre nouvelle fonction pour planifier le nettoyage
+            cleanup_vercel_after_download(target_dir, delay=10)
+            
+            # Définir un en-tête pour suivre le téléchargement
+            response.headers["X-Vercel-Project"] = "true"
         
         return response
     except Exception as e:
         current_app.logger.error(f"Error creating ZIP: {str(e)}")
         flash(f"Error creating ZIP file: {str(e)}", "danger")
         return redirect(url_for('generation.result'))
+
+def cleanup_vercel_after_download(target_path, delay=5):
+    """
+    Nettoie un répertoire de projet temporaire après son téléchargement.
+    Crée un thread qui s'exécutera après un délai.
+    
+    Args:
+        target_path (str ou Path): Chemin du projet à nettoyer
+        delay (int): Délai en secondes avant le nettoyage
+    """
+    from src.utils.file_utils import cleanup_vercel_project
+    import threading
+    import logging
+    from pathlib import Path
+    
+    def do_cleanup():
+        try:
+            path_obj = Path(target_path) if isinstance(target_path, str) else target_path
+            if path_obj.exists():
+                logging.info(f"Nettoyage du projet temporaire: {path_obj}")
+                success = cleanup_vercel_project(path_obj)
+                if success:
+                    logging.info(f"Projet temporaire nettoyé avec succès: {path_obj}")
+                else:
+                    logging.error(f"Échec du nettoyage du projet temporaire: {path_obj}")
+            else:
+                logging.info(f"Le répertoire {path_obj} n'existe plus, rien à nettoyer")
+        except Exception as e:
+            logging.error(f"Erreur pendant le nettoyage différé: {e}")
+    
+    # Planifier le nettoyage
+    logging.info(f"Planification du nettoyage pour {target_path} dans {delay} secondes")
+    threading.Timer(delay, do_cleanup).start()
