@@ -467,3 +467,55 @@ def generate_missing_code(api_key, model, empty_files, reformulated_prompt, stru
     else:
         errors.append("Failed to generate code for empty files: No valid response from API")
         return files_written, errors
+
+
+def generate_vercel_project_path():
+    """
+    Génère un chemin de projet temporaire pour l'environnement Vercel.
+    Le chemin est situé au même niveau que app.py.
+    
+    Returns:
+        Path: Le chemin absolu du dossier de projet temporaire
+    """
+    import uuid
+    import os
+    from pathlib import Path
+    import shutil
+    
+    # Génère un ID unique pour le projet
+    project_id = f"project_{uuid.uuid4().hex[:10]}"
+    
+    # Récupère le chemin racine de l'application (où se trouve app.py)
+    root_path = Path(__file__).resolve().parents[2]  # 2 niveaux au-dessus: src/utils -> src -> racine
+    
+    # Crée le chemin du projet temporaire
+    project_path = root_path / project_id
+    
+    # Crée le dossier s'il n'existe pas déjà
+    if not project_path.exists():
+        project_path.mkdir(parents=True, exist_ok=True)
+    else:
+        # Si le dossier existe déjà, le nettoie
+        shutil.rmtree(project_path)
+        project_path.mkdir(parents=True, exist_ok=True)
+    
+    return project_path
+
+def cleanup_vercel_project(project_path):
+    """
+    Nettoie un projet temporaire après téléchargement.
+    
+    Args:
+        project_path (Path): Chemin vers le projet à nettoyer
+    """
+    import shutil
+    
+    try:
+        if project_path.exists():
+            shutil.rmtree(project_path)
+            return True
+    except Exception as e:
+        print(f"Erreur lors du nettoyage du projet Vercel: {e}")
+        return False
+    
+    return False

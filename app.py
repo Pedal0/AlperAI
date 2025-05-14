@@ -40,6 +40,7 @@ from src.ui.routes import bp_ui
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)  # Generate a secure secret key
 app.config['SESSION_TYPE'] = 'filesystem'
+app.config['is_vercel_project'] = False  # Par défaut, pas un projet temporaire Vercel
 
 # Register blueprints
 app.register_blueprint(bp_generation)
