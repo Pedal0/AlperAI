@@ -487,7 +487,7 @@ def generate_missing_code(api_key, model, empty_files, reformulated_prompt, stru
 def generate_vercel_project_path():
     """
     Génère un chemin de projet temporaire pour l'environnement Vercel.
-    Le chemin est situé au même niveau que app.py.
+    Sur Vercel, utilise le répertoire /tmp/ qui est accessible en écriture.
     
     Returns:
         Path: Le chemin absolu du dossier de projet temporaire
@@ -499,12 +499,18 @@ def generate_vercel_project_path():
     
     # Génère un ID unique pour le projet
     project_id = f"project_{uuid.uuid4().hex[:10]}"
-    
-    # Récupère le chemin racine de l'application (où se trouve app.py)
-    root_path = Path(__file__).resolve().parents[2]  # 2 niveaux au-dessus: src/utils -> src -> racine
+      # Sur Vercel, utilisez /tmp/ qui est le seul répertoire accessible en écriture
+    if os.environ.get('VERCEL', ''):
+        root_path = Path('/tmp')
+        logging.info(f"Vercel environment detected, using /tmp directory for project")
+    else:
+        # Récupère le chemin racine de l'application (où se trouve app.py)
+        root_path = Path(__file__).resolve().parents[2]  # 2 niveaux au-dessus: src/utils -> src -> racine
+        logging.info(f"Non-Vercel environment, using root path: {root_path}")
     
     # Crée le chemin du projet temporaire
     project_path = root_path / project_id
+    logging.info(f"Generated project path: {project_path}")
     
     # Crée le dossier s'il n'existe pas déjà
     if not project_path.exists():
@@ -527,7 +533,9 @@ def cleanup_vercel_project(project_path):
     
     try:
         if project_path.exists():
+            logging.info(f"Nettoyage du projet temporaire: {project_path}")
             shutil.rmtree(project_path)
+            logging.info(f"Projet temporaire nettoyé avec succès")
             return True
     except Exception as e:
         print(f"Erreur lors du nettoyage du projet Vercel: {e}")

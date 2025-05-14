@@ -19,6 +19,7 @@ import uuid
 import threading
 import zipfile
 import io
+import logging
 from pathlib import Path
 from datetime import datetime
 from src.generation.generation_flow import generate_application
@@ -234,14 +235,19 @@ def generate():
         include_animations = data.get('include_animations', 'on') == 'on'
         empty_files_check = data.get('empty_files_check', 'on') == 'on'
         errors = []
-        
-        # Vérifier si on est dans l'environnement Vercel
+          # Vérifier si on est dans l'environnement Vercel
         is_vercel = is_vercel_environment()
         
-        if is_vercel and target_dir == 'vercel_generated':
-            # Sur Vercel, utilisez un chemin temporaire avec un ID unique
+        # Ajouter des logs pour le débogage sur Vercel
+        logging.info(f"Environment: {'Vercel' if is_vercel else 'Local'}")
+        logging.info(f"Initial target_dir: {target_dir}")
+        
+        # Sur Vercel, toujours utiliser un chemin temporaire (/tmp)
+        if is_vercel:
+            logging.info("Generating Vercel project path in /tmp")
             project_path = generate_vercel_project_path()
             target_dir = str(project_path)
+            logging.info(f"Using Vercel project path: {target_dir}")
             current_app.config['is_vercel_project'] = True
         
         if not api_key:
@@ -510,9 +516,13 @@ def download_zip():
             if is_vercel and is_vercel_project:
                 cleanup_vercel_project(Path(target_dir))
                 current_app.logger.info(f"Projet temporaire nettoyé: {target_dir}")
-                
-        # Nom du fichier zip avec horodatage
+                  # Nom du fichier zip avec horodatage
         zip_filename = f"{dir_name}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.zip"
+        
+        # Log des informations avant l'envoi
+        logging.info(f"Préparation du téléchargement: {zip_filename}")
+        logging.info(f"Environnement Vercel: {is_vercel}, Projet Vercel: {is_vercel_project}")
+        logging.info(f"Taille du fichier ZIP: {memory_file.getbuffer().nbytes} octets")
         
         # Utilisation d'une fonction de rappel après l'envoi du fichier
         response = send_file(
@@ -525,6 +535,7 @@ def download_zip():
         # Déclenchement du nettoyage si c'est un projet Vercel
         if is_vercel and is_vercel_project:
             # Nous devons planifier le nettoyage pour qu'il se produise après l'envoi
+            logging.info(f"Planification du nettoyage du projet temporaire dans 2 secondes")
             threading.Timer(2.0, cleanup_after_send).start()
         
         return response

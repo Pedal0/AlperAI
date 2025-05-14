@@ -177,6 +177,17 @@
                   >Target Directory</label
                 >
                 <div class="input-group">
+                  {% if is_vercel %}
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="target_directory"
+                    name="target_directory"
+                    value="vercel_generated"
+                    readonly
+                    title="On Vercel, files are generated in a temporary location and available for download"
+                  />
+                  {% else %}
                   <input
                     type="text"
                     class="form-control"
@@ -185,10 +196,23 @@
                     placeholder="e.g. C:\\Users\\YourName\\Projects\\MyGeneratedApp"
                     required
                   />
+                  {% endif %} {% if not is_vercel %}
                   <button
                     class="btn btn-outline-secondary"
                     type="button"
                     id="browseButton"
+                    {%
+                    else
+                    %}
+                    <button
+                    class="btn btn-outline-secondary"
+                    type="button"
+                    id="browseButton"
+                    disabled
+                    title="Browse function is disabled on Vercel"
+                    {%
+                    endif
+                    %}
                   >
                     <i class="fas fa-folder-open"></i>
                   </button>
