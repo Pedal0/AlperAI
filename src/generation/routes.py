@@ -1,3 +1,18 @@
+# Copyright (C) 2025 Perey Alex
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>
+
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, session, flash, send_file, current_app
 import os
 import uuid
@@ -206,6 +221,9 @@ Followed by the complete content of the file after modifications. Do not truncat
 @bp_generation.route('/generate', methods=['POST'])
 def generate():
     try:
+        from src.utils.env_utils import is_vercel_environment
+        from src.utils.file_utils import generate_vercel_project_path
+        
         data = request.form
         api_key = data.get('api_key', '')
         model = data.get('model', 'google/gemini-2.5-pro-exp-03-25:free')
@@ -216,6 +234,16 @@ def generate():
         include_animations = data.get('include_animations', 'on') == 'on'
         empty_files_check = data.get('empty_files_check', 'on') == 'on'
         errors = []
+        
+        # Vérifier si on est dans l'environnement Vercel
+        is_vercel = is_vercel_environment()
+        
+        if is_vercel and target_dir == 'vercel_generated':
+            # Sur Vercel, utilisez un chemin temporaire avec un ID unique
+            project_path = generate_vercel_project_path()
+            target_dir = str(project_path)
+            current_app.config['is_vercel_project'] = True
+        
         if not api_key:
             errors.append("API key is required")
         if not prompt:
@@ -310,16 +338,24 @@ def generation_progress():
 
 @bp_generation.route('/result')
 def result():
+    from src.utils.env_utils import is_vercel_environment
+    
     if 'generation_result' not in session:
         flash("No generation result found. Please generate an application first.", "warning")
         return redirect(url_for('ui.index'))
+    
+    is_vercel = is_vercel_environment()
+    is_vercel_project = current_app.config.get('is_vercel_project', False)
     generation_result = session['generation_result']
     used_tools = generation_result.get('used_tools', [])
+    
     return render_template('result.html',
                           result=generation_result,
                           prompt=session.get('prompt', ''),
                           target_dir=session.get('target_dir', ''),
-                          used_tools=used_tools)
+                          used_tools=used_tools,
+                          is_vercel=is_vercel,
+                          is_vercel_project=is_vercel_project)
 
 @bp_generation.route('/iterate', methods=['POST'])
 def iterate_generation():
@@ -441,13 +477,22 @@ def continue_iteration():
 
 @bp_generation.route('/download_zip', methods=['GET'])
 def download_zip():
+    from src.utils.env_utils import is_vercel_environment
+    from src.utils.file_utils import cleanup_vercel_project
+    
     if 'generation_result' not in session:
         flash("No generation result found. Please generate an application first.", "warning")
         return redirect(url_for('ui.index'))
+    
     target_dir = session['generation_result'].get('target_directory')
     if not target_dir or not Path(target_dir).is_dir():
         flash("Target directory not found", "danger")
         return redirect(url_for('generation.result'))
+    
+    # Vérifier si c'est un projet Vercel temporaire
+    is_vercel = is_vercel_environment()
+    is_vercel_project = current_app.config.get('is_vercel_project', False)
+    
     try:
         memory_file = io.BytesIO()
         with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -460,13 +505,29 @@ def download_zip():
                     zipf.write(file_path, rel_path)
         memory_file.seek(0)
         dir_name = os.path.basename(os.path.normpath(target_dir))
+          # Si on est sur Vercel et c'est un projet temporaire, nettoyer le dossier après téléchargement
+        def cleanup_after_send():
+            if is_vercel and is_vercel_project:
+                cleanup_vercel_project(Path(target_dir))
+                current_app.logger.info(f"Projet temporaire nettoyé: {target_dir}")
+                
+        # Nom du fichier zip avec horodatage
         zip_filename = f"{dir_name}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.zip"
-        return send_file(
+        
+        # Utilisation d'une fonction de rappel après l'envoi du fichier
+        response = send_file(
             memory_file,
-            as_attachment=True,
+            as_attachment=True, 
             download_name=zip_filename,
             mimetype='application/zip'
         )
+        
+        # Déclenchement du nettoyage si c'est un projet Vercel
+        if is_vercel and is_vercel_project:
+            # Nous devons planifier le nettoyage pour qu'il se produise après l'envoi
+            threading.Timer(2.0, cleanup_after_send).start()
+        
+        return response
     except Exception as e:
         current_app.logger.error(f"Error creating ZIP: {str(e)}")
         flash(f"Error creating ZIP file: {str(e)}", "danger")

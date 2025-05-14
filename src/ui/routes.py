@@ -1,3 +1,18 @@
+# Copyright (C) 2025 Perey Alex
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>
+
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, session, flash, current_app, send_file
 import os
 import sys
@@ -9,8 +24,9 @@ bp_ui = Blueprint('ui', __name__)
 
 @bp_ui.route('/')
 def index():
-    from src.utils.env_utils import get_openrouter_api_key
-    return render_template('index.html', api_key=get_openrouter_api_key())
+    from src.utils.env_utils import get_openrouter_api_key, is_vercel_environment
+    is_vercel = is_vercel_environment()
+    return render_template('index.html', api_key=get_openrouter_api_key(), is_vercel=is_vercel)
 
 @bp_ui.route('/about')
 def about():

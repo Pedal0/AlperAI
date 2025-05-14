@@ -171,7 +171,7 @@
                   required
                 ></textarea>
               </div>
-
+              {% if not is_vercel %}
               <div class="mb-4">
                 <label for="target_directory" class="form-label"
                   >Target Directory</label
@@ -197,6 +197,23 @@
                   The folder must exist and you must have write permissions.
                 </div>
               </div>
+              {% else %}
+              <input
+                type="hidden"
+                id="target_directory"
+                name="target_directory"
+                value="vercel_generated"
+              />
+              <div class="mb-4">
+                <div class="alert alert-info">
+                  <i class="fas fa-cloud me-2"></i>
+                  <strong>Online version:</strong> The project will be generated
+                  in a temporary folder and made available for download. This
+                  folder will be automatically deleted after download to
+                  preserve server space.
+                </div>
+              </div>
+              {% endif %}
 
               <div class="examples-section mt-4">
                 <h5>
@@ -308,18 +325,34 @@
 </div>
 
 <!-- Free Model Warning Modal -->
-<div class="modal fade" id="freeModelWarningModal" tabindex="-1" aria-labelledby="freeModelWarningLabel" aria-hidden="true">
+<div
+  class="modal fade"
+  id="freeModelWarningModal"
+  tabindex="-1"
+  aria-labelledby="freeModelWarningLabel"
+  aria-hidden="true"
+>
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="freeModelWarningLabel">Warning: Free Model Selected</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <h5 class="modal-title" id="freeModelWarningLabel">
+          Warning: Free Model Selected
+        </h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
       </div>
       <div class="modal-body">
-        Using a free model may be slower or more likely to fail due to server limitations. If a request fails, you can try again.
+        Using a free model may be slower or more likely to fail due to server
+        limitations. If a request fails, you can try again.
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Understood</button>
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">
+          Understood
+        </button>
       </div>
     </div>
   </div>

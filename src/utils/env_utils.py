@@ -1,3 +1,18 @@
+# Copyright (C) 2025 Perey Alex
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>
+
 """
 Utility functions for loading and managing environment variables.
 """
@@ -34,3 +49,17 @@ def get_openrouter_api_key():
     
     # Return the API key if it exists
     return os.environ.get(OPENROUTER_API_KEY_ENV, "")
+
+def is_vercel_environment():
+    """
+    Détecte si l'application est déployée sur Vercel.
+    
+    Returns:
+        bool: True si l'application est sur Vercel, False sinon
+    """
+    # Vercel définit ces variables d'environnement
+    vercel_env = os.environ.get('VERCEL', '')
+    vercel_region = os.environ.get('VERCEL_REGION', '')
+    
+    # Si au moins une de ces variables existe, nous sommes sur Vercel
+    return bool(vercel_env or vercel_region)
