@@ -11,10 +11,26 @@ def stop_preview(session_id: str, running_processes=None, process_logs=None, ses
         from src.preview.preview_manager import running_processes, process_logs, session_ports, logger
     if session_id not in running_processes:
         return False, "Aucun processus en cours d'exécution pour cette session"
+    
     try:
         process_info = running_processes[session_id]
         process = process_info["process"]
         log_entry(session_id, "INFO", "Arrêt de l'application...")
+        
+        # Close the process streams before termination to avoid I/O errors
+        try:
+            if process.stdout and not process.stdout.closed:
+                process.stdout.close()
+        except:
+            pass
+            
+        try:
+            if process.stderr and not process.stderr.closed:
+                process.stderr.close()
+        except:
+            pass
+            
+        # Terminate the process
         if platform.system() == "Windows":
             subprocess.call(['taskkill', '/F', '/T', '/PID', str(process.pid)])
         else:
@@ -22,7 +38,12 @@ def stop_preview(session_id: str, running_processes=None, process_logs=None, ses
             time.sleep(1)
             if process.poll() is None:
                 process.kill()
-        process.wait(timeout=5)
+                
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            logger.warning(f"Process {process.pid} did not terminate within timeout")
+            
         log_entry(session_id, "INFO", "Application arrêtée avec succès")
         del running_processes[session_id]
         if session_id in session_ports:

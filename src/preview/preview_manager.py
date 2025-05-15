@@ -41,3 +41,4 @@ from src.preview.steps.start_preview import start_preview
 from src.preview.steps.stop_preview import stop_preview
 from src.preview.steps.get_preview_status import get_preview_status
 from src.preview.steps.restart_preview import restart_preview
+from src.preview.steps.improve_readme import improve_readme_for_preview

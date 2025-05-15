@@ -46,7 +46,7 @@ def parse_readme_instructions(readme_path):
         }
         
         # Recherche de blocs de code avec des instructions d'installation ou de configuration
-        code_blocks = re.findall(r'```(?:bash|sh|\w*\n|\n)(.*?)```', content, re.DOTALL)
+        code_blocks = re.findall(r'```(?:bash|sh|cmd|batch|\w*\n|\n)(.*?)```', content, re.DOTALL)
         
         for block in code_blocks:
             lines = block.strip().split('\n')
@@ -71,13 +71,45 @@ def parse_readme_instructions(readme_path):
                     instructions['setup_commands'].append(line)
                 
                 # Identifier les commandes d'exécution
-                elif any(run_cmd in line.lower() for run_cmd in ['python ', 'npm start', 'npm run', 'yarn start', 'flask run', 'streamlit run']):
+                elif any(run_cmd in line.lower() for run_cmd in ['python ', 'npm start', 'npm run', 'yarn start', 'flask run', 'streamlit run', 'node ']):
                     instructions['run_commands'].append(line)
                     # Essayer d'extraire le fichier principal pour les applications Python
                     if 'python ' in line.lower() or 'streamlit run' in line.lower():
                         file_match = re.search(r'(?:python|streamlit run)\s+([^\s]+)', line)
                         if file_match:
                             instructions['main_file'] = file_match.group(1)
+        
+        # Recherche aussi dans le texte normal du README (pas seulement les blocs de code)
+        # Cette étape est utile pour les README avec des instructions incomplètes
+        if not instructions['setup_commands'] and not instructions['run_commands']:
+            # Rechercher des commandes communes dans le texte
+            lines = content.split('\n')
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Chercher des commandes d'installation ou d'exécution dans le texte
+                if any(cmd in line.lower() for cmd in ['pip install', 'npm install', 'yarn install']) and not line.startswith('#') and not "```" in line:
+                    potential_cmd = re.search(r'`([^`]+)`', line)
+                    if potential_cmd:
+                        cmd_text = potential_cmd.group(1).strip()
+                        if 'pip install' in cmd_text.lower():
+                            instructions['setup_commands'].append(cmd_text)
+                        elif any(install_cmd in cmd_text.lower() for install_cmd in ['npm install', 'yarn install']):
+                            instructions['setup_commands'].append(cmd_text)
+                
+                # Chercher des commandes d'exécution
+                if any(cmd in line.lower() for cmd in ['python ', 'npm start', 'flask run', 'node ']) and not line.startswith('#') and not "```" in line:
+                    potential_cmd = re.search(r'`([^`]+)`', line)
+                    if potential_cmd:
+                        cmd_text = potential_cmd.group(1).strip()
+                        instructions['run_commands'].append(cmd_text)
+                        # Extraire le fichier principal pour Python
+                        if 'python ' in cmd_text.lower():
+                            file_match = re.search(r'python\s+([^\s]+)', cmd_text)
+                            if file_match:
+                                instructions['main_file'] = file_match.group(1)
         
         # Si aucune commande de configuration n'est trouvée mais qu'il y a un requirements.txt, ajouter la commande par défaut
         if not any('requirements.txt' in cmd for cmd in instructions['setup_commands']):
@@ -363,6 +395,14 @@ def display_preview(project_dir):
     readme_path = Path(project_dir) / "README.md"
     
     if readme_path.exists():
+        # Vérifier et améliorer le README si nécessaire
+        try:
+            from src.preview.steps.improve_readme import improve_readme_for_preview
+            improve_readme_for_preview(project_dir)
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to enhance README: {e}")
+        
         with st.expander("📝 Instructions du README.md", expanded=True):
             with open(readme_path, 'r', encoding='utf-8') as f:
                 st.markdown(f.read())
