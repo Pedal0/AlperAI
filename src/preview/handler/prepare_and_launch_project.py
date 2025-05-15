@@ -22,6 +22,7 @@ from .prepare_node_project import prepare_node_project
 from .prepare_php_project import prepare_php_project
 from .prepare_static_project import prepare_static_project
 from .prepare_multi_project import prepare_multi_project
+from .generate_start_scripts import generate_start_scripts
 
 def prepare_and_launch_project(project_dir):
     """
@@ -34,6 +35,10 @@ def prepare_and_launch_project(project_dir):
     detection = detect_project_type(project_dir)
     types = detection['types']
     info = detection['info']
+    
+    # Generate or ensure start scripts exist first
+    generate_start_scripts(project_dir)
+    
     # Flask apps run as Python projects
     if 'flask' in types:
         return prepare_python_project(project_dir)

@@ -48,6 +48,7 @@ from src.generation.steps.generate_code_step import generate_code_step
 from src.generation.steps.add_used_tool import add_used_tool
 from src.generation.steps.update_progress import update_progress
 from src.generation.steps.run_mcp_query import run_mcp_query
+from src.generation.steps.check_and_enhance_readme import check_and_enhance_readme
 
 def generate_application(api_key, selected_model, user_prompt, target_directory, use_mcp_tools=True, frontend_framework="Auto-detect", include_animations=True, progress_callback=None):
     """
@@ -320,52 +321,78 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                             errors.extend(additional_errors)
                     else:
                         update_progress(6, "✅ No empty files found - all files contain code.", 98, progress_callback)
-                
-                # Final success message
+                  # Final success message
                 if not errors:
                     update_progress(7, "🎉 Application generated successfully!", 100, progress_callback)
                     # == STEP 8: Generate launch scripts ==
-                    update_progress(8, "🛠️ Generating launch scripts...", None, progress_callback)
-                    from src.api.openrouter_api import call_openrouter_api
-                    # parsed via top-level import: parse_and_write_code
-                    # from src.utils.file_utils import parse_and_write_code
-                    # Prepare the prompt for the AI
-                    config_files = {}
-                    for fname in ['requirements.txt','Pipfile','Pipfile.lock','package.json','.env']:
-                        p = Path(target_directory) / fname
-                        if p.exists():
-                            config_files[fname] = p.read_text(encoding='utf-8')
-                    structure_block = '\n'.join(structure_lines)
-                    launch_prompt = f"""
-Generate two launch scripts at the project root:
+                    update_progress(8, "🛠️ Generating launch scripts based on README.md...", None, progress_callback)
+                    
+                    # Use the new script generator that focuses on README
+                    try:
+                        from src.preview.handler.generate_start_scripts import generate_start_scripts
+                        generate_start_scripts(target_directory, api_key, selected_model)
+                        update_progress(8, "✅ Launch scripts created based on README.md.", 100, progress_callback)
+                        
+                        # Vérifier et améliorer le README si nécessaire
+                        try:
+                            from src.preview.steps.improve_readme import improve_readme_for_preview
+                            if improve_readme_for_preview(target_directory):
+                                update_progress(8, "✅ README.md has been enhanced with detailed instructions.", 100, progress_callback)
+                        except Exception as e:
+                            logging.error(f"Failed to enhance README: {e}")
+                    except Exception as e:
+                        logging.error(f"Failed to generate start scripts: {e}")
+                        update_progress(8, "⚠️ Failed to generate start scripts, using fallback method.", None, progress_callback)
+                        
+                        # Fallback to previous method
+                        from src.api.openrouter_api import call_openrouter_api
+                        config_files = {}
+                        for fname in ['requirements.txt','Pipfile','Pipfile.lock','package.json','.env']:
+                            p = Path(target_directory) / fname
+                            if p.exists():
+                                config_files[fname] = p.read_text(encoding='utf-8')
+                        
+                        # Include README.md content if it exists for better script generation
+                        readme_path = Path(target_directory) / 'README.md'
+                        if readme_path.exists():
+                            config_files['README.md'] = readme_path.read_text(encoding='utf-8')
+                        
+                        structure_block = '\n'.join(structure_lines)
+                        launch_prompt = f"""
+Generate two simple launch scripts at the project root:
 --- FILE: start.sh ---
- (bash script for macOS/Linux: create or activate environment, install dependencies, start the application)
+ (bash script for macOS/Linux: install dependencies, start the application on port passed as argument)
 --- FILE: start.bat ---
- (batch script for Windows: install dependencies, start the application)
+ (batch script for Windows: install dependencies, start the application on port passed as argument)
 
 ### Project structure ###
 {structure_block}
 
 ### Configuration files content ###
 """
-                    for name, content in config_files.items():
-                        launch_prompt += f"### {name}\n{content}\n"
-                    launch_prompt += """
+                        for name, content in config_files.items():
+                            launch_prompt += f"### {name}\n{content}\n"
+                        
+                        launch_prompt += """
 The scripts should:
- - Create or activate the environment if needed
- - Install dependencies (pip or npm)
- - Launch the application using the port passed as argument
+ - Be simple and focused on launching a server
+ - Install dependencies (pip or npm) if needed
+ - Launch the application using the port passed as argument (default to 8080)
+ - Focus primarily on instructions in README.md if available
+ - For most frameworks, use localhost:8080 as the default server address
+ - The scripts are complementary to the README, not a replacement. The README should contain complete manual instructions
+ - The scripts are complementary to the README, not a replacement. The README should contain complete manual instructions.
 Use exactly the FILE markers shown above.
 """
-                    response = call_openrouter_api(
-                        api_key, selected_model,
-                        [{"role":"user","content":launch_prompt}],
-                        temperature=0.3, max_retries=2
-                    )
-                    if response and response.get('choices'):
-                        content = response['choices'][0]['message']['content']
-                        parse_and_write_code(target_directory, content)
-                    update_progress(8, "✅ Launch scripts created.", 100, progress_callback)
+                        response = call_openrouter_api(
+                            api_key, selected_model,
+                            [{"role":"user","content":launch_prompt}],
+                            temperature=0.3, max_retries=2
+                        )
+                        if response and response.get('choices'):
+                            content = response['choices'][0]['message']['content']
+                            parse_and_write_code(target_directory, content)
+                        update_progress(8, "✅ Launch scripts created.", 100, progress_callback)
                     
                     # Save path for preview mode if in Flask context
                     if current_app:
