@@ -52,7 +52,8 @@ def start_preview(project_dir: str, session_id: str, running_processes=None, pro
         elif 'static' in types:
             project_type = 'static'
         else:
-            project_type = None        command, env = get_start_command(project_dir, project_type, session_id)
+            project_type = None        
+        command, env = get_start_command(project_dir, project_type, session_id)
         log_entry(session_id, "INFO", f"Commande de démarrage: {' '.join(command)}")
         
         try:
