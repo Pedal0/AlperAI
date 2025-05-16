@@ -58,52 +58,15 @@
               <div class="mb-4">
                 <label for="model" class="form-label">AI Model</label>
                 <select class="form-select mb-2" id="model" name="model">
-                  <option value="google/gemini-2.5-pro-preview">
-                    Gemini 2.5 Pro Preview
-                  </option>
-                  <option value="google/gemini-2.5-flash-preview">
-                    Gemini 2.5 Flash Preview
-                  </option>
-                  <option value="qwen/qwen3-235b-a22b">
-                    Qwen 3.5 235B A22B (No Tools)
-                  </option>
-                  <option value="anthropic/claude-3.7-sonnet">
-                    Claude 3.7 Sonnet
-                  </option>
-                  <option value="openai/gpt-4.1">GPT-4.1</option>
-                  <option value="openai/gpt-4.1-mini">GPT-4.1 Mini</option>
-                  <option value="openai/gpt-4.1-nano" selected>
-                    GPT-4.1 Nano
-                  </option>
-                  <option value="agentica-org/deepcoder-14b-preview:free">
-                    Agentica Deepcoder (Free)
-                  </option>
-                  <option value="meta-llama/llama-4-maverick:free">
-                    Llama 4 Maverick (Free No Tools)
-                  </option>
-                  <option value="meta-llama/llama-4-scout:free">
-                    Llama 4 Scout (Free No Tools)
-                  </option>
-                  <option value="deepseek/deepseek-chat-v3-0324:free">
-                    DeepSeek Chat v3 (Free)
-                  </option>
-                  <option value="custom">Other model (custom)...</option>
+                  <option value="..." selected>Select a model</option>
+                  {% for section in models %}
+                  <optgroup label="{{ section.label }}">
+                    {% for model in section.models %}
+                    <option value="{{ model.id }}">{{ model.name }}</option>
+                    {% endfor %}
+                  </optgroup>
+                  {% endfor %}
                 </select>
-                <div id="customModelContainer" class="d-none">
-                  <input
-                    type="text"
-                    class="form-control"
-                    id="customModel"
-                    name="customModel"
-                    placeholder="Enter the model identifier (e.g. organization/model:tag)"
-                  />
-                  <div class="form-text">
-                    Format: organization/model:tag - Check on
-                    <a href="https://openrouter.ai/models" target="_blank"
-                      >OpenRouter</a
-                    >
-                  </div>
-                </div>
               </div>
 
               <div id="mcpToolsContainer" class="mb-4">
