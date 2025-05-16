@@ -25,8 +25,10 @@ bp_ui = Blueprint('ui', __name__)
 @bp_ui.route('/')
 def index():
     from src.utils.env_utils import get_openrouter_api_key, is_vercel_environment
+    from src.api.list_openrouter_models import get_openrouter_models
     is_vercel = is_vercel_environment()
-    return render_template('index.html', api_key=get_openrouter_api_key(), is_vercel=is_vercel)
+    models = get_openrouter_models()
+    return render_template('index.html', api_key=get_openrouter_api_key(), is_vercel=is_vercel, models=models)
 
 @bp_ui.route('/about')
 def about():
