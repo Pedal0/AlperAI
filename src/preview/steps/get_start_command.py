@@ -25,7 +25,8 @@ def get_start_command(project_dir: str, project_type: str, session_id: str = Non
     if project_type == ProjectType.STATIC or (isinstance(project_type, str) and project_type.lower() == 'static'):
         port = find_free_port(start_port=8000)
     else:
-        port = find_free_port()    if port == 5000:
+        port = find_free_port()    
+    if port == 5000:
         port = find_free_port(start_port=5001)
     if session_id:
         from src.preview.preview_manager import session_ports
