@@ -339,6 +339,50 @@ def generate_code_with_openrouter(
     return {"error": "Toutes les tentatives d'appel à l'API ont échoué"}
 
 
+async def get_openrouter_completion(prompt: str, model_name: str, api_key: Optional[str] = None, temperature: float = 0.7, max_retries: int = 1) -> Optional[str]:
+    """
+    Simplified function to get a completion from OpenRouter.
+    This is an async wrapper for call_openrouter_api.
+    """
+    if api_key is None:
+        api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        logger.error("OpenRouter API key not provided or found in environment variables.")
+        return None
+
+    messages = [{"role": "user", "content": prompt}]
+    
+    # call_openrouter_api is synchronous, so we'd need to run it in an executor
+    # For now, let's assume we want to keep it simple and make it a direct call
+    # if this were a truly async application, we'd use httpx.AsyncClient
+    
+    # This is a placeholder for how you might call it.
+    # In a real async app, you'd use an async HTTP client or run sync in executor.
+    # For the purpose of this fix, we'll make call_openrouter_api directly,
+    # but be aware this will block if get_openrouter_completion is called from an async event loop.
+    # A better approach would be to make call_openrouter_api async or use asyncio.to_thread.
+
+    response_data = call_openrouter_api(
+        api_key=api_key,
+        model=model_name,
+        messages=messages,
+        temperature=temperature,
+        max_retries=max_retries
+    )
+
+    if response_data and "choices" in response_data and response_data["choices"]:
+        choice = response_data["choices"][0]
+        if "message" in choice and "content" in choice["message"]:
+            return choice["message"]["content"]
+        elif "text" in choice: # Some models might return text directly
+            return choice["text"]
+    elif response_data and "error" in response_data:
+        logger.error(f"OpenRouter API error: {response_data['error']}")
+        return None
+        
+    logger.error("Failed to get a valid completion from OpenRouter.")
+    return None
+
 def extract_files_from_response(response_data: Dict[str, Any]) -> Dict[str, str]:
     """
     Extrait les fichiers à partir de la réponse de l'API.

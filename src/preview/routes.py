@@ -16,7 +16,9 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, session, flash, current_app
 import uuid
 from pathlib import Path
-from src.preview.preview_manager import cleanup_unused_ports, start_preview, stop_preview, get_preview_status, restart_preview
+from src.preview.preview_manager import cleanup_unused_ports, stop_preview, get_preview_status, restart_preview
+from src.preview.handler.prepare_and_launch_project import prepare_and_launch_project_async
+import asyncio
 
 bp_preview = Blueprint('preview', __name__)
 
@@ -41,31 +43,37 @@ def start_preview_route():
     if 'generation_result' not in session:
         current_app.logger.error("Error: 'generation_result' not found in session")
         return jsonify({"status": "error", "message": "No generation result found"}), 400
+    
     target_dir = session['generation_result'].get('target_directory')
     if not target_dir or not Path(target_dir).is_dir():
         current_app.logger.error(f"Error: Target directory '{target_dir}' not found or invalid")
         return jsonify({"status": "error", "message": "Target directory not found"}), 400
+    
+    project_name = Path(target_dir).name
+
     preview_session_id = request.json.get('session_id') if request.json else session.get('preview_session_id')
     if not preview_session_id:
         preview_session_id = str(uuid.uuid4())
         session['preview_session_id'] = preview_session_id
+    
     ports_cleaned = cleanup_unused_ports()
     if ports_cleaned > 0:
         current_app.logger.info(f"{ports_cleaned} ports freed before starting")
-    success, message, info = start_preview(target_dir, preview_session_id)
-    if success:
+
+    # Lancer la coroutine asynchrone de façon synchrone
+    result = asyncio.run(prepare_and_launch_project_async(project_name, target_dir))
+
+    if result and result[0]:
+        # result = (success, message, port)
         return jsonify({
             "status": "success", 
-            "message": message,
-            "url": info.get("url"),
-            "project_type": info.get("project_type"),
-            "logs": info.get("logs", [])
+            "message": result[1] or "Preview started successfully.",
+            "url": result[2] if len(result) > 2 else None
         })
     else:
         return jsonify({
             "status": "error", 
-            "message": message,
-            "logs": info.get("logs", [])
+            "message": result[1] if result and len(result) > 1 else "Failed to start preview.",
         }), 500
 
 @bp_preview.route('/preview/status', methods=['GET'])

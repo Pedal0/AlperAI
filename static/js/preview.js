@@ -4,12 +4,6 @@ document.addEventListener("DOMContentLoaded", function () {
   const previewSessionId = document.getElementById("preview-session-id").value;
   const appStatusBadge = document.getElementById("app-status-badge");
   const appUrlEl = document.getElementById("app-url");
-  const logsContent = document.getElementById("logsContent");
-  const logLevelSelect = document.querySelector(".log-level");
-  const startAppBtn = document.getElementById("startAppBtn");
-  const stopAppBtn = document.getElementById("stopAppBtn");
-  const restartAppBtn = document.getElementById("restartAppBtn");
-  const openInNewTabBtn = document.getElementById("openInNewTab");
   const projectPath = document.getElementById("project-path").textContent;
   const refreshBtn = document.getElementById("refreshPreviewBtn");
   let logPollInterval = null;
@@ -19,6 +13,15 @@ document.addEventListener("DOMContentLoaded", function () {
   const appPortEl = document.getElementById("app-port");
   const appUrlConfigEl = document.getElementById("app-url-config");
   const mainFilesList = document.getElementById("main-files-list");
+
+  // Patch IA UI elements
+  const aiPatchAlert = document.getElementById("ai-patch-alert");
+  const aiPatchFile = document.getElementById("ai-patch-file");
+  const aiPatchExcerpt = document.getElementById("ai-patch-excerpt");
+  // URL correction UI
+  const manualUrlGroup = document.getElementById("manual-url-group");
+  const manualUrlInput = document.getElementById("manual-url-input");
+  const manualUrlApply = document.getElementById("manual-url-apply");
 
   function updateConfig(status) {
     projectTypeEl.textContent = status.project_type || "Unknown";
@@ -50,10 +53,38 @@ document.addEventListener("DOMContentLoaded", function () {
       });
   }
 
-  // Add updateLogs to render log entries
+  // Affichage du patch IA si détecté dans les logs
   function updateLogs(logs) {
-    logsContent.innerHTML = logs.map((entry) => `<div>${entry}</div>`).join("");
+    let aiPatch = null;
+    for (const log of logs) {
+      if (log.level === "AI_PATCH_APPLIED") {
+        try {
+          aiPatch = JSON.parse(log.message);
+        } catch {}
+      }
+    }
+    if (aiPatch) {
+      aiPatchAlert.classList.remove("d-none");
+      aiPatchFile.textContent = aiPatch.file;
+      aiPatchExcerpt.textContent = aiPatch.patch_excerpt;
+    } else {
+      aiPatchAlert.classList.add("d-none");
+    }
   }
+
+  // Correction manuelle d'URL si non détectée
+  function showManualUrlInput() {
+    manualUrlGroup.classList.remove("d-none");
+    manualUrlInput.value = "";
+    manualUrlInput.focus();
+  }
+  manualUrlApply.addEventListener("click", function () {
+    const url = manualUrlInput.value.trim();
+    if (url) {
+      appUrlEl.innerHTML = `<a href="${url}" target="_blank" class="text-primary">${url}</a> <small class="text-muted">(Manual URL)</small>`;
+      manualUrlGroup.classList.add("d-none");
+    }
+  });
 
   // Add beforeunload to stop preview
   window.addEventListener("beforeunload", function () {
@@ -96,11 +127,12 @@ document.addEventListener("DOMContentLoaded", function () {
         if (data.status === "success") {
           appStatusBadge.textContent = "Running";
           appStatusBadge.className = "badge bg-success me-2";
-          appUrlEl.textContent = data.url; // Always show the clickable URL first, then try to open window
-          document.getElementById(
-            "app-url"
-          ).innerHTML = `<a href="${data.url}" target="_blank" class="text-primary">${data.url}</a> 
-               <small class="text-muted">(Click to open in a new tab)</small>`;
+          if (data.url && data.url !== "null" && data.url !== "") {
+            appUrlEl.innerHTML = `<a href="${data.url}" target="_blank" class="text-primary">${data.url}</a> <small class="text-muted">(Click to open in a new tab)</small>`;
+          } else {
+            appUrlEl.textContent = "Address not available";
+            showManualUrlInput();
+          }
 
           // Try to open in a new tab as a second step, but handle if blocked
           try {
@@ -122,10 +154,6 @@ document.addEventListener("DOMContentLoaded", function () {
             console.error("Error opening new window:", e);
           }
 
-          startAppBtn.disabled = true;
-          stopAppBtn.disabled = false;
-          restartAppBtn.disabled = false;
-          openInNewTabBtn.disabled = false;
           logPollInterval = setInterval(() => {
             fetch(window.URL_PREVIEW_STATUS)
               .then((r) => r.json())
@@ -136,63 +164,6 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
           alert(data.message);
         }
-      })
-      .catch((e) => alert("Error: " + e));
-  }
-
-  function stopApp() {
-    fetch(window.URL_PREVIEW_STOP, { method: "POST" })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.status === "success") {
-          if (childWindow && !childWindow.closed) childWindow.close();
-          clearInterval(logPollInterval);
-          appStatusBadge.textContent = "Stopped";
-          appStatusBadge.className = "badge bg-secondary me-2";
-          startAppBtn.disabled = false;
-          stopAppBtn.disabled = true;
-          restartAppBtn.disabled = true;
-        } else alert(data.message);
-      })
-      .catch((e) => alert("Error: " + e));
-  }
-  function restartApp() {
-    fetch(window.URL_PREVIEW_RESTART, { method: "POST" })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.status === "success") {
-          // Close existing window if it exists
-          if (childWindow && !childWindow.closed) childWindow.close();
-
-          // Always show the clickable URL first, then try to open window
-          document.getElementById(
-            "app-url"
-          ).innerHTML = `<a href="${data.url}" target="_blank" class="text-primary">${data.url}</a> 
-               <small class="text-muted">(Click to open in a new tab)</small>`;
-
-          // Try to open in a new tab as a second step, but handle if blocked
-          try {
-            // Add a small delay before opening to ensure UI is updated
-            setTimeout(() => {
-              childWindow = window.open(data.url, "_blank");
-              if (
-                !childWindow ||
-                childWindow.closed ||
-                typeof childWindow.closed === "undefined"
-              ) {
-                // Popup was blocked
-                console.log(
-                  "Popup blocked on restart. URL already shown as clickable link."
-                );
-              }
-            }, 500);
-          } catch (e) {
-            console.error("Error opening new window:", e);
-          }
-
-          // update configuration after restart
-          updateConfig(data);
-        } else alert(data.message);
       })
       .catch((e) => alert("Error: " + e));
   }
@@ -257,16 +228,12 @@ document.addEventListener("DOMContentLoaded", function () {
   }
   iterateBtn.addEventListener("click", startIteration);
 
-  // Initialize logs polling on start
   // Event Listeners
-  startAppBtn.addEventListener("click", startApp);
-  stopAppBtn.addEventListener("click", stopApp);
-  restartAppBtn.addEventListener("click", restartApp);
-  openInNewTabBtn.addEventListener("click", () => {
-    if (childWindow) childWindow.focus();
-  });
   refreshBtn.addEventListener("click", () => fetch(window.URL_PREVIEW_REFRESH));
 
   // Auto-start application on preview load
   startApp();
+
+  // Désactive la gestion des boutons start/stop/restart car ils n'existent plus
+  // (Pas d'ajout d'eventListener sur startAppBtn, stopAppBtn, restartAppBtn, openInNewTabBtn)
 });
