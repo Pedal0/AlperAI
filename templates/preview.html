@@ -52,6 +52,22 @@ content %}
             </div>
             <!-- /Patch IA Alert -->
 
+            <!-- Launch Progress Bar -->
+            <div id="launch-progress-container" class="mt-3 mb-3" style="display: none;">
+              <p id="launch-progress-message" class="mb-1">Starting application...</p>
+              <div class="progress" style="height: 1rem;">
+                <div id="launch-progress-bar"
+                     class="progress-bar progress-bar-striped progress-bar-animated"
+                     role="progressbar"
+                     style="width: 0%;"
+                     aria-valuenow="0"
+                     aria-valuemin="0"
+                     aria-valuemax="100">
+                </div>
+              </div>
+            </div>
+            <!-- /Launch Progress Bar -->
+
             <div
               class="d-flex justify-content-between align-items-center p-3 preview-toolbar"
             >

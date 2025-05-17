@@ -23,6 +23,14 @@ document.addEventListener("DOMContentLoaded", function () {
   const manualUrlInput = document.getElementById("manual-url-input");
   const manualUrlApply = document.getElementById("manual-url-apply");
 
+  const launchProgressContainer = document.getElementById(
+    "launch-progress-container"
+  );
+  const launchProgressBar = document.getElementById("launch-progress-bar");
+  const launchProgressMessage = document.getElementById(
+    "launch-progress-message"
+  );
+
   function updateConfig(status) {
     projectTypeEl.textContent = status.project_type || "Unknown";
     // extract port from URL
@@ -53,6 +61,21 @@ document.addEventListener("DOMContentLoaded", function () {
       });
   }
 
+  function showLaunchProgress(message, percentage) {
+    if (launchProgressContainer && launchProgressBar && launchProgressMessage) {
+      launchProgressContainer.style.display = "block";
+      launchProgressMessage.textContent = message;
+      launchProgressBar.style.width = `${percentage}%`;
+      launchProgressBar.setAttribute("aria-valuenow", percentage);
+    }
+  }
+
+  function hideLaunchProgress() {
+    if (launchProgressContainer) {
+      launchProgressContainer.style.display = "none";
+    }
+  }
+
   // Affichage du patch IA si détecté dans les logs
   function updateLogs(logs) {
     let aiPatch = null;
@@ -69,6 +92,20 @@ document.addEventListener("DOMContentLoaded", function () {
       aiPatchExcerpt.textContent = aiPatch.patch_excerpt;
     } else {
       aiPatchAlert.classList.add("d-none");
+    }
+
+    // Check for launch messages in logs to update progress
+    const installLog = logs.find(
+      (log) => log.includes("npm install") || log.includes("Installing dependencies")
+    );
+    const startLog = logs.find(
+      (log) => log.includes("Starting development server") || log.includes("Application starting")
+    );
+
+    if (installLog && !startLog) {
+      showLaunchProgress("Installing dependencies (this may take a few minutes)...", 33);
+    } else if (startLog) {
+      showLaunchProgress("Starting application...", 66);
     }
   }
 
@@ -117,6 +154,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
   function startApp() {
+    showLaunchProgress("Initiating application launch...", 10);
     fetch(window.URL_PREVIEW_START, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -125,6 +163,7 @@ document.addEventListener("DOMContentLoaded", function () {
       .then((res) => res.json())
       .then((data) => {
         if (data.status === "success") {
+          showLaunchProgress("Application running.", 100);
           appStatusBadge.textContent = "Running";
           appStatusBadge.className = "badge bg-success me-2";
           if (data.url && data.url !== "null" && data.url !== "") {
@@ -161,11 +200,17 @@ document.addEventListener("DOMContentLoaded", function () {
           }, 3000);
           // update configuration
           updateConfig(data);
+          // Hide progress bar after a short delay if successful
+          setTimeout(hideLaunchProgress, 2000);
         } else {
           alert(data.message);
+          hideLaunchProgress(); // Hide on error
         }
       })
-      .catch((e) => alert("Error: " + e));
+      .catch((e) => {
+        alert("Error: " + e);
+        hideLaunchProgress(); // Hide on error
+      });
   }
 
   // Iteration button handler
@@ -232,7 +277,9 @@ document.addEventListener("DOMContentLoaded", function () {
   refreshBtn.addEventListener("click", () => fetch(window.URL_PREVIEW_REFRESH));
 
   // Auto-start application on preview load
-  startApp();
+  if (previewSessionId) {
+    startApp();
+  }
 
   // Désactive la gestion des boutons start/stop/restart car ils n'existent plus
   // (Pas d'ajout d'eventListener sur startAppBtn, stopAppBtn, restartAppBtn, openInNewTabBtn)
