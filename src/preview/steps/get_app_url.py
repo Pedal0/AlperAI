@@ -1,6 +1,7 @@
 import logging  # Import logging
 import socket
 
+
 """
 Retourne l'URL d'accès à l'application selon le type de projet et le port utilisé.
 Ne doit JAMAIS retourner le port 5000 (utilisé par l'app principale).
@@ -13,12 +14,15 @@ def get_app_url(project_type: str, session_id: str = None):
     port = default_port
     found = False
 
+
     if session_id:
         try:
             from src.preview.preview_manager import session_ports, running_processes
             if session_id in session_ports:
                 port = session_ports[session_id]
+
                 found = True
+
             elif session_id in running_processes:
                 # Try to extract port from the command args
                 cmd_args = running_processes[session_id].get('command', [])
@@ -46,6 +50,17 @@ def get_app_url(project_type: str, session_id: str = None):
     # Si toujours rien, fallback
     if not found:
         logging.warning(f"Aucun port détecté, fallback sur {default_port}")
+
+                else:
+                    port = default_port
+            else:
+                logging.warning(f"session_id '{session_id}' not found in session_ports or running_processes. Defaulting to port {default_port}.")
+                port = default_port
+        except Exception as e:
+            logging.error(f"Error accessing session data: {e}. Defaulting to port {default_port}.")
+            port = default_port
+    else:
+        logging.warning(f"No session_id provided. Defaulting to port {default_port}.")
         port = default_port
 
     # Construire l'URL avec le port déterminé (jamais 5000)

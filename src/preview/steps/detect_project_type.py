@@ -3,6 +3,8 @@ Détecte le type de projet à partir du dossier projet.
 """
 import json
 from pathlib import Path
+from src.preview.handler.detect_project_type import detect_project_type
+
 
 class ProjectType:
     FLASK = "flask"

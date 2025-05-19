@@ -7,12 +7,18 @@ import threading
 import os
 from src.preview.handler.detect_project_type import detect_project_type
 from src.preview.handler.prepare_and_launch_project import prepare_and_launch_project_async as prepare_and_launch_project
+from src.preview.handler.detect_project_type import detect_project_type
+from src.preview.handler.prepare_and_launch_project import prepare_and_launch_project
+
 from src.preview.steps.get_start_command import get_start_command
 from src.preview.steps.get_app_url import get_app_url
 from src.preview.steps.log_entry import log_entry
 from src.preview.steps.improve_readme import improve_readme_for_preview
 
+
 def start_preview(project_dir: str, session_id: str, running_processes=None, process_logs=None, session_ports=None, already_patched=False, ai_model=None, api_key=None):
+def start_preview(project_dir: str, session_id: str, running_processes=None, process_logs=None, session_ports=None):
+
     if running_processes is None or process_logs is None or session_ports is None:
         from src.preview.preview_manager import running_processes, process_logs, session_ports
     if session_id in running_processes:
@@ -122,6 +128,11 @@ A project failed to start due to an error. Here is the error message:
                             return False, "L'auto-correction IA a échoué. Impossible de démarrer l'application après correction automatique.", {"project_type": None}
             except Exception as e:
                 log_entry(session_id, "ERROR", f"AI patch suggestion failed: {e}")
+
+        success, message = prepare_and_launch_project(project_dir)
+        log_entry(session_id, "INFO" if success else "ERROR", message)
+        if not success:
+
             return False, message, {"project_type": None}
         # Détecter le type de projet (pour Flask, React, etc.)
         detected = detect_project_type(project_dir)

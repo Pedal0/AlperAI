@@ -19,6 +19,7 @@ from pathlib import Path
 from src.preview.preview_manager import cleanup_unused_ports, stop_preview, get_preview_status, restart_preview
 from src.preview.handler.prepare_and_launch_project import prepare_and_launch_project_async
 import asyncio
+from src.preview.preview_manager import cleanup_unused_ports, start_preview, stop_preview, get_preview_status, restart_preview
 
 bp_preview = Blueprint('preview', __name__)
 
@@ -43,7 +44,7 @@ def start_preview_route():
     if 'generation_result' not in session:
         current_app.logger.error("Error: 'generation_result' not found in session")
         return jsonify({"status": "error", "message": "No generation result found"}), 400
-    
+
     target_dir = session['generation_result'].get('target_directory')
     if not target_dir or not Path(target_dir).is_dir():
         current_app.logger.error(f"Error: Target directory '{target_dir}' not found or invalid")
@@ -76,11 +77,26 @@ def start_preview_route():
             "status": "success", 
             "message": result[1] or "Preview started successfully.",
             "url": result[2] if len(result) > 2 else None
+    ports_cleaned = cleanup_unused_ports()
+    if ports_cleaned > 0:
+        current_app.logger.info(f"{ports_cleaned} ports freed before starting")
+    success, message, info = start_preview(target_dir, preview_session_id)
+    if success:
+        return jsonify({
+            "status": "success", 
+            "message": message,
+            "url": info.get("url"),
+            "project_type": info.get("project_type"),
+            "logs": info.get("logs", [])
         })
     else:
         return jsonify({
             "status": "error", 
             "message": result[1] if result and len(result) > 1 else "Failed to start preview.",
+
+            "message": message,
+            "logs": info.get("logs", [])
+
         }), 500
 
 @bp_preview.route('/preview/status', methods=['GET'])

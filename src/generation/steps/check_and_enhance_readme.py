@@ -78,7 +78,13 @@ def _is_readme_detailed(readme_content):
     
     # Vérifier si le README mentionne uniquement les scripts de démarrage
     script_mentions = [
-        # Removed all references to start.bat and start.sh
+
+        "run the start.bat", 
+        "run start.bat", 
+        "run the start.sh",
+        "run start.sh",
+        "execute start.bat",
+        "execute start.sh",
         "launch the script",
         "launch script",
         "execute the scripts"

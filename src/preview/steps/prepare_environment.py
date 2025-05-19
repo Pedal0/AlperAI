@@ -7,6 +7,9 @@ from pathlib import Path
 from .detect_project_type import ProjectType
 from src.preview.handler.prepare_and_launch_project import prepare_and_launch_project_async as prepare_and_launch_project
 
+from src.preview.handler.prepare_and_launch_project import prepare_and_launch_project
+
+
 def prepare_environment(project_dir: str, project_type: str):
     """
     Nouvelle version : utilise l'orchestrateur universel pour préparer et lancer le projet.

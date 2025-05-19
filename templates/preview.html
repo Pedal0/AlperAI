@@ -35,10 +35,29 @@ content %}
             </a>
           </li>
           <li class="nav-item">
+
+            <a
+              class="nav-link"
+              id="config-tab"
+              data-bs-toggle="tab"
+              href="#config"
+            >
+              <i class="fas fa-cogs me-1"></i> Configuration
+            </a>
+          </li>
+          <li class="nav-item">
+
             <a class="nav-link" id="interaction-tab" data-bs-toggle="tab" href="#interaction">
               <i class="fas fa-comment-dots me-1"></i> Interaction
             </a>
           </li>
+
+          <li class="nav-item">
+            <a class="nav-link" id="logs-tab" data-bs-toggle="tab" href="#logs">
+              <i class="fas fa-terminal me-1"></i> Logs
+            </a>
+          </li>
+
         </ul>
       </div>
       <div class="card-body p-0">
@@ -68,6 +87,7 @@ content %}
             </div>
             <!-- /Launch Progress Bar -->
 
+
             <div
               class="d-flex justify-content-between align-items-center p-3 preview-toolbar"
             >
@@ -76,6 +96,7 @@ content %}
                   >Not Started</span
                 >
                 <span class="app-url" id="app-url">Address not available</span>
+
                 <!-- Champ de correction d'URL -->
                 <span id="manual-url-group" class="d-none ms-2">
                   <input
@@ -92,6 +113,7 @@ content %}
                     Apply
                   </button>
                 </span>
+
               </div>
               <div>
                 <button
@@ -121,6 +143,174 @@ content %}
             <button class="btn btn-primary mt-3" id="iteratePreviewBtn"><i class="fas fa-sync-alt me-1"></i> Iterate</button>
             <div id="iterationStatus" class="mt-2"></div>
           </div>
+
+          <!-- Configuration Tab -->
+          <div class="tab-pane fade p-4" id="config">
+            <h4 class="mb-4">Application Configuration</h4>
+
+            <div class="row">
+              <div class="col-md-6">
+                <div class="card mb-4">
+                  <div class="card-header">
+                    <h5 class="mb-0">
+                      <i class="fas fa-info-circle me-2"></i>General Information
+                    </h5>
+                  </div>
+                  <div class="card-body">
+                    <table class="table">
+                      <tbody>
+                        <tr>
+                          <th scope="row">Directory</th>
+                          <td>{{ target_dir }}</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">Application Type</th>
+                          <td id="project-type">Not detected</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">Port</th>
+                          <td id="app-port">-</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">URL</th>
+                          <td id="app-url-config">-</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <div class="card mb-4" id="files-card">
+                  <div class="card-header">
+                    <h5 class="mb-0">
+                      <i class="fas fa-file-code me-2"></i>Main Files
+                    </h5>
+                  </div>
+                  <div class="card-body">
+                    <div class="list-group" id="main-files-list">
+                      <div class="text-center py-3 text-muted">
+                        <i class="fas fa-spinner fa-spin me-2"></i> Loading
+                        files...
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h5 class="mb-0">
+                  <i class="fas fa-cogs me-2"></i>Management Commands
+                </h5>
+              </div>
+              <div class="card-body">
+                <div class="row">
+                  <div class="col-md-6">
+                    <h6>Start Command</h6>
+                    <div class="input-group mb-3">
+                      <input
+                        type="text"
+                        class="form-control"
+                        id="start-command"
+                        value="..."
+                        readonly
+                      />
+                      <button
+                        class="btn btn-outline-secondary copy-btn"
+                        type="button"
+                        data-target="start-command"
+                      >
+                        <i class="fas fa-copy"></i>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <h6>Install Dependencies</h6>
+                    <div class="input-group mb-3">
+                      <input
+                        type="text"
+                        class="form-control"
+                        id="deps-command"
+                        value="..."
+                        readonly
+                      />
+                      <button
+                        class="btn btn-outline-secondary copy-btn"
+                        type="button"
+                        data-target="deps-command"
+                      >
+                        <i class="fas fa-copy"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="d-flex mt-3">
+                  <button class="btn btn-success me-2" id="startAppBtn">
+                    <i class="fas fa-play me-1"></i> Start Application
+                  </button>
+                  <button class="btn btn-danger me-2" id="stopAppBtn" disabled>
+                    <i class="fas fa-stop me-1"></i> Stop Application
+                  </button>
+                  <button class="btn btn-warning" id="restartAppBtn" disabled>
+                    <i class="fas fa-sync-alt me-1"></i> Restart Application
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Logs Tab -->
+          <div class="tab-pane fade" id="logs">
+            <div
+              class="logs-toolbar d-flex justify-content-between align-items-center p-2 bg-light border-bottom"
+            >
+              <div class="d-flex align-items-center">
+                <span class="badge bg-secondary me-2" id="logs-status"
+                  >Logs inactive</span
+                >
+                <select
+                  class="form-select form-select-sm log-level"
+                  style="width: auto"
+                >
+                  <option value="all">All levels</option>
+                  <option value="INFO">Info</option>
+                  <option value="WARNING">Warning</option>
+                  <option value="ERROR">Error</option>
+                </select>
+              </div>
+              <div>
+                <button
+                  class="btn btn-sm btn-outline-secondary me-2"
+                  id="clearLogs"
+                >
+                  <i class="fas fa-trash-alt me-1"></i> Clear
+                </button>
+                <button
+                  class="btn btn-sm btn-outline-primary"
+                  id="downloadLogs"
+                >
+                  <i class="fas fa-download me-1"></i> Download
+                </button>
+              </div>
+            </div>
+
+            <div class="logs-container p-3">
+              <div
+                class="logs-content bg-dark text-light p-3 rounded"
+                id="logsContent"
+              >
+                <div class="text-center text-muted py-3">
+                  <i class="fas fa-terminal mb-2"></i>
+                  <p>Logs will appear here when the application is started.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
