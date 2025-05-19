@@ -283,6 +283,21 @@ document.addEventListener("DOMContentLoaded", function () {
       });
   }
 
+  // Ajout de la fonction restartApp pour corriger l'erreur lors de l'itération
+  function restartApp() {
+    // Arrête le polling des logs si actif
+    if (logPollInterval) {
+      clearInterval(logPollInterval);
+      logPollInterval = null;
+    }
+    // Réinitialise l'état de l'UI
+    appStatusBadge.textContent = "Restarting...";
+    appStatusBadge.className = "badge bg-warning me-2";
+    appUrlEl.textContent = "Restarting...";
+    // Relance l'application
+    startApp();
+  }
+
   // Iteration button handler
   const iterateBtn = document.getElementById("iteratePreviewBtn");
   const iterationStatus = document.getElementById("iterationStatus");
