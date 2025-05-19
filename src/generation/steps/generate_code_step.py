@@ -58,12 +58,6 @@ def generate_code_step(api_key, selected_model, reformulated_prompt, structure_l
     5. For `README.md`, provide DETAILED setup/run instructions. Include step-by-step manual instructions on how to install dependencies and run the application. Do NOT mention or rely on any start.bat/start.sh scripts. The README must contain explicit commands that a user can run directly.
     6. If the code exceeds token limits, end the *entire* response EXACTLY with: `GENERATION_INCOMPLETE` (no other text after).{animation_instruction}
     7. IMPORTANT: For web frameworks (e.g., Flask, Django, Express), ensure the application entrypoint configures its listening port via environment variable or CLI argument, never hardcoding port 5000.
-    5. For `README.md`, provide DETAILED setup/run instructions. Include step-by-step manual instructions on how to install dependencies and run the application without relying on start.bat/start.sh scripts. The README must contain explicit commands that a user can run directly.
-    6. If the code exceeds token limits, end the *entire* response EXACTLY with: `GENERATION_INCOMPLETE` (no other text after).{animation_instruction}
-    7. IMPORTANT: For web frameworks (e.g., Flask, Django, Express), ensure the application entrypoint configures its listening port via environment variable or CLI argument, never hardcoding port 5000.
-    8. Generate two launch scripts at project root:
-        - `start.sh` (for macOS/Linux) containing commands to install dependencies and start the application on macOS/Linux.
-        - `start.bat` (for Windows) containing commands to install dependencies and start the application on Windows.
     IMPORTANT: If a style, template, or documentation is provided in the URLs, use them as the primary reference.
     Generate the code now:
     """

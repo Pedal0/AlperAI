@@ -19,19 +19,12 @@ Vérifie et améliore le README pour la prévisualisation.
 import logging
 from pathlib import Path
 
-from src.preview.handler.generate_start_scripts import generate_start_scripts
-
-
 logger = logging.getLogger(__name__)
 
 def improve_readme_for_preview(project_dir):
     """
     Vérifie que le README contient des instructions détaillées et pas seulement une référence à des scripts de démarrage. N'utilise jamais start.bat/start.sh.
     Améliore les instructions si nécessaire.
-
-    Vérifie que le README contient des instructions détaillées et pas seulement une référence aux scripts start.bat/start.sh.
-    Améliore les scripts de démarrage si nécessaire.
-
     
     Args:
         project_dir (str): Chemin du projet
@@ -51,19 +44,13 @@ def improve_readme_for_preview(project_dir):
         with open(readme_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
-
+        # Vérifier si le README mentionne uniquement des scripts de démarrage
         inadequate_content = _check_readme_inadequacy(content)
         
         if not inadequate_content:
             logger.info(f"README.md in {project_dir} has adequate instructions")
             return True
         
-
-        # Si le README est inadéquat, essayons de générer de meilleurs scripts de démarrage
-        # basés sur le contenu du projet plutôt que sur le README
-        generate_start_scripts(project_dir)
-        
-
         # Ajouter des informations complémentaires au README
         _append_detailed_instructions(readme_path, project_dir)
         return True
@@ -73,7 +60,8 @@ def improve_readme_for_preview(project_dir):
 
 def _check_readme_inadequacy(content):
     """
-    Vérifie si le README est inadéquat (ne mentionne que des scripts de démarrage
+    Vérifie si le README est inadéquat (ne mentionne que des scripts de démarrage)
+    
     Args:
         content (str): Contenu du README
         
@@ -82,18 +70,12 @@ def _check_readme_inadequacy(content):
     """
     # Recherche de mentions de scripts sans instructions détaillées
     script_mentions = [
-
-        "run the start.bat", 
-        "run start.bat", 
-        "run the start.sh",
-        "run start.sh",
-        "execute start.bat",
-        "execute start.sh"
+        # Removed all references to start.bat and start.sh
     ]
     
     content_lower = content.lower()
     
-
+    # Si le README mentionne des scripts mais ne contient pas d'instructions détaillées
     if any(mention in content_lower for mention in script_mentions):
         # Vérifier s'il y a des instructions détaillées
         detailed_instructions = [
@@ -128,7 +110,6 @@ def _append_detailed_instructions(readme_path, project_dir):
         # Déterminer le type de projet et les commandes à exécuter
         additional_instructions = "\n\n## Instructions détaillées d'installation et d'exécution\n\n"
         
-
         # Extraire les commandes d'installation
         additional_instructions += "Installation des dépendances:\n```bash\n"
         if "pip install" in content:
@@ -164,91 +145,6 @@ def _append_detailed_instructions(readme_path, project_dir):
             additional_instructions += "# Consultez la documentation pour les commandes spécifiques\n"
         
         additional_instructions += "```\n\n"
-        # Vérifier les start scripts pour extraire les commandes
-        start_bat = project_dir / "start.bat"
-        start_sh = project_dir / "start.sh"
-        
-        if start_sh.exists():
-            with open(start_sh, 'r', encoding='utf-8') as f:
-                sh_content = f.read()
-                additional_instructions += "### Pour Linux/macOS:\n\n"
-                
-                # Extraire les commandes d'installation
-                additional_instructions += "Installation des dépendances:\n```bash\n"
-                if "pip install" in sh_content:
-                    additional_instructions += "pip install -r requirements.txt\n"
-                if "npm install" in sh_content:
-                    additional_instructions += "npm install\n"
-                additional_instructions += "```\n\n"
-                
-                # Extraire les commandes d'exécution
-                additional_instructions += "Lancement de l'application:\n```bash\n"
-                run_commands = []
-                
-                if "python " in sh_content:
-                    for line in sh_content.split('\n'):
-                        if "python " in line and not line.strip().startswith('#'):
-                            # Remplacer $PORT par 8080 dans la commande
-                            clean_cmd = line.strip().replace("$PORT", "8080")
-                            run_commands.append(clean_cmd)
-                elif "node " in sh_content:
-                    for line in sh_content.split('\n'):
-                        if "node " in line and not line.strip().startswith('#'):
-                            clean_cmd = line.strip().replace("PORT=$PORT", "PORT=8080")
-                            run_commands.append(clean_cmd)
-                elif "npm " in sh_content:
-                    for line in sh_content.split('\n'):
-                        if "npm start" in line and not line.strip().startswith('#'):
-                            clean_cmd = line.strip().replace("PORT=$PORT", "PORT=8080")
-                            run_commands.append(clean_cmd)
-                
-                if run_commands:
-                    additional_instructions += "\n".join(run_commands) + "\n"
-                else:
-                    additional_instructions += "# Consultez le script start.sh pour les commandes spécifiques\n"
-                
-                additional_instructions += "```\n\n"
-        
-        if start_bat.exists():
-            with open(start_bat, 'r', encoding='utf-8') as f:
-                bat_content = f.read()
-                additional_instructions += "### Pour Windows:\n\n"
-                
-                # Extraire les commandes d'installation
-                additional_instructions += "Installation des dépendances:\n```batch\n"
-                if "pip install" in bat_content:
-                    additional_instructions += "pip install -r requirements.txt\n"
-                if "npm install" in bat_content:
-                    additional_instructions += "npm install\n"
-                additional_instructions += "```\n\n"
-                
-                # Extraire les commandes d'exécution
-                additional_instructions += "Lancement de l'application:\n```batch\n"
-                run_commands = []
-                
-                if "python " in bat_content:
-                    for line in bat_content.split('\n'):
-                        if "python " in line and not line.strip().startswith('rem'):
-                            clean_cmd = line.strip().replace("%PORT%", "8080")
-                            run_commands.append(clean_cmd)
-                elif "node " in bat_content:
-                    for line in bat_content.split('\n'):
-                        if "node " in line and not line.strip().startswith('rem'):
-                            clean_cmd = line.strip().replace("set PORT=%PORT%", "set PORT=8080")
-                            run_commands.append(clean_cmd)
-                elif "npm " in bat_content:
-                    for line in bat_content.split('\n'):
-                        if "npm start" in line and not line.strip().startswith('rem'):
-                            clean_cmd = line.strip().replace("set PORT=%PORT%", "set PORT=8080")
-                            run_commands.append(clean_cmd)
-                
-                if run_commands:
-                    additional_instructions += "\n".join(run_commands) + "\n"
-                else:
-                    additional_instructions += "rem Consultez le script start.bat pour les commandes spécifiques\n"
-                
-                additional_instructions += "```\n\n"
-
         
         additional_instructions += "L'application sera accessible à l'adresse: http://localhost:8080\n"
         

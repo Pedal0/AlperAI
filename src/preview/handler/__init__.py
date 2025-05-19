@@ -18,8 +18,4 @@ Package pour les gestionnaires de prévisualisation des applications.
 """
 from .detect_project_type import detect_project_type
 from .generate_start_scripts import generate_start_scripts
-
 from .prepare_and_launch_project import prepare_and_launch_project_async as prepare_and_launch_project
-
-from .prepare_and_launch_project import prepare_and_launch_project
-

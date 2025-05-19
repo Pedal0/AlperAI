@@ -36,20 +36,6 @@ def get_start_command(project_dir: str, project_type: str, session_id: str = Non
     from ..handler.generate_start_scripts import generate_start_scripts
     generate_start_scripts(project_dir)
     
-
-    # Custom launch script detection: start.sh for macOS/Linux, start.bat for Windows
-    custom_sh = project_dir / 'start.sh'
-    custom_bat = project_dir / 'start.bat'
-    # On Windows prefer batch script, otherwise bash script
-    if is_windows and custom_bat.exists():
-        # Run batch file through cmd with port argument
-        return ['cmd', '/c', str(custom_bat), str(port)], env
-    if custom_sh.exists():
-        # Run bash script with port argument
-        return ['bash', str(custom_sh), str(port)], env
-    if custom_bat.exists():
-        return [str(custom_bat), str(port)], env
-
     if project_type == ProjectType.FLASK or (isinstance(project_type, str) and project_type.lower() == "flask"):
         # Run Flask via project venv Python on script (run.py or app.py)
         if session_id:

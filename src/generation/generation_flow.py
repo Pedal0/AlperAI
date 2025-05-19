@@ -325,23 +325,11 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                 if not errors:
                     update_progress(7, "🎉 Application generated successfully!", 100, progress_callback)
                     # == STEP 8: Generate launch scripts ==
-
                     update_progress(8, "🛠️ Generating launch instructions based on README.md...", None, progress_callback)
                     try:
                         from src.preview.handler.generate_start_scripts import generate_start_scripts
                         generate_start_scripts(target_directory, api_key, selected_model)
                         update_progress(8, "✅ Launch instructions created based on README.md.", 100, progress_callback)
-
-                    update_progress(8, "🛠️ Generating launch scripts based on README.md...", None, progress_callback)
-                    
-                    # Use the new script generator that focuses on README
-                    try:
-                        from src.preview.handler.generate_start_scripts import generate_start_scripts
-                        generate_start_scripts(target_directory, api_key, selected_model)
-                        update_progress(8, "✅ Launch scripts created based on README.md.", 100, progress_callback)
-                        
-                        # Vérifier et améliorer le README si nécessaire
-
                         try:
                             from src.preview.steps.improve_readme import improve_readme_for_preview
                             if improve_readme_for_preview(target_directory):
@@ -349,62 +337,8 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                         except Exception as e:
                             logging.error(f"Failed to enhance README: {e}")
                     except Exception as e:
-
                         logging.error(f"Failed to generate launch instructions: {e}")
                         update_progress(8, "⚠️ Failed to generate launch instructions.", None, progress_callback)
-
-                        logging.error(f"Failed to generate start scripts: {e}")
-                        update_progress(8, "⚠️ Failed to generate start scripts, using fallback method.", None, progress_callback)
-                        
-                        # Fallback to previous method
-                        from src.api.openrouter_api import call_openrouter_api
-                        config_files = {}
-                        for fname in ['requirements.txt','Pipfile','Pipfile.lock','package.json','.env']:
-                            p = Path(target_directory) / fname
-                            if p.exists():
-                                config_files[fname] = p.read_text(encoding='utf-8')
-                        
-                        # Include README.md content if it exists for better script generation
-                        readme_path = Path(target_directory) / 'README.md'
-                        if readme_path.exists():
-                            config_files['README.md'] = readme_path.read_text(encoding='utf-8')
-                        
-                        structure_block = '\n'.join(structure_lines)
-                        launch_prompt = f"""
-Generate two simple launch scripts at the project root:
---- FILE: start.sh ---
- (bash script for macOS/Linux: install dependencies, start the application on port passed as argument)
---- FILE: start.bat ---
- (batch script for Windows: install dependencies, start the application on port passed as argument)
-
-### Project structure ###
-{structure_block}
-
-### Configuration files content ###
-"""
-                        for name, content in config_files.items():
-                            launch_prompt += f"### {name}\n{content}\n"
-                        
-                        launch_prompt += """
-The scripts should:
- - Be simple and focused on launching a server
- - Install dependencies (pip or npm) if needed
- - Launch the application using the port passed as argument (default to 8080)
- - Focus primarily on instructions in README.md if available
- - For most frameworks, use localhost:8080 as the default server address
- - The scripts are complementary to the README, not a replacement. The README should contain complete manual instructions
- - The scripts are complementary to the README, not a replacement. The README should contain complete manual instructions.
-Use exactly the FILE markers shown above.
-"""
-                        response = call_openrouter_api(
-                            api_key, selected_model,
-                            [{"role":"user","content":launch_prompt}],
-                            temperature=0.3, max_retries=2
-                        )
-                        if response and response.get('choices'):
-                            content = response['choices'][0]['message']['content']
-                            parse_and_write_code(target_directory, content)
-                        update_progress(8, "✅ Launch scripts created.", 100, progress_callback)
                     
                     # Save path for preview mode if in Flask context
                     if current_app:

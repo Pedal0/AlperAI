@@ -21,7 +21,6 @@ import logging
 import datetime # Added import
 import subprocess # Added import
 
-
 # Configuration du logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -35,7 +34,6 @@ session_ports = {}
 from src.preview.steps.find_free_port import find_free_port
 from src.preview.handler.detect_project_type import detect_project_type
 from src.preview.steps.detect_project_type import ProjectType
-from src.preview.steps.detect_project_type import detect_project_type, ProjectType
 from src.preview.steps.prepare_environment import prepare_environment
 from src.preview.steps.get_start_command import get_start_command
 from src.preview.steps.log_entry import log_entry
@@ -141,4 +139,3 @@ def get_preview_manager():
 
 # Existing global variables and re-exported functions from 'steps/' remain for now.
 # Future refactoring could integrate them with the PreviewManager instance.
-from src.preview.steps.improve_readme import improve_readme_for_preview
