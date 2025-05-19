@@ -325,6 +325,13 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                 if not errors:
                     update_progress(7, "🎉 Application generated successfully!", 100, progress_callback)
                     # == STEP 8: Generate launch scripts ==
+
+                    update_progress(8, "🛠️ Generating launch instructions based on README.md...", None, progress_callback)
+                    try:
+                        from src.preview.handler.generate_start_scripts import generate_start_scripts
+                        generate_start_scripts(target_directory, api_key, selected_model)
+                        update_progress(8, "✅ Launch instructions created based on README.md.", 100, progress_callback)
+
                     update_progress(8, "🛠️ Generating launch scripts based on README.md...", None, progress_callback)
                     
                     # Use the new script generator that focuses on README
@@ -334,6 +341,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                         update_progress(8, "✅ Launch scripts created based on README.md.", 100, progress_callback)
                         
                         # Vérifier et améliorer le README si nécessaire
+
                         try:
                             from src.preview.steps.improve_readme import improve_readme_for_preview
                             if improve_readme_for_preview(target_directory):
@@ -341,6 +349,10 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                         except Exception as e:
                             logging.error(f"Failed to enhance README: {e}")
                     except Exception as e:
+
+                        logging.error(f"Failed to generate launch instructions: {e}")
+                        update_progress(8, "⚠️ Failed to generate launch instructions.", None, progress_callback)
+
                         logging.error(f"Failed to generate start scripts: {e}")
                         update_progress(8, "⚠️ Failed to generate start scripts, using fallback method.", None, progress_callback)
                         

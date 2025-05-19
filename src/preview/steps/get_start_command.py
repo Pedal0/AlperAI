@@ -36,6 +36,7 @@ def get_start_command(project_dir: str, project_type: str, session_id: str = Non
     from ..handler.generate_start_scripts import generate_start_scripts
     generate_start_scripts(project_dir)
     
+
     # Custom launch script detection: start.sh for macOS/Linux, start.bat for Windows
     custom_sh = project_dir / 'start.sh'
     custom_bat = project_dir / 'start.bat'

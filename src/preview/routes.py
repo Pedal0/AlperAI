@@ -16,6 +16,9 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, session, flash, current_app
 import uuid
 from pathlib import Path
+from src.preview.preview_manager import cleanup_unused_ports, stop_preview, get_preview_status, restart_preview
+from src.preview.handler.prepare_and_launch_project import prepare_and_launch_project_async
+import asyncio
 from src.preview.preview_manager import cleanup_unused_ports, start_preview, stop_preview, get_preview_status, restart_preview
 
 bp_preview = Blueprint('preview', __name__)
@@ -41,14 +44,39 @@ def start_preview_route():
     if 'generation_result' not in session:
         current_app.logger.error("Error: 'generation_result' not found in session")
         return jsonify({"status": "error", "message": "No generation result found"}), 400
+
     target_dir = session['generation_result'].get('target_directory')
     if not target_dir or not Path(target_dir).is_dir():
         current_app.logger.error(f"Error: Target directory '{target_dir}' not found or invalid")
         return jsonify({"status": "error", "message": "Target directory not found"}), 400
+    
+    project_name = Path(target_dir).name
+
     preview_session_id = request.json.get('session_id') if request.json else session.get('preview_session_id')
     if not preview_session_id:
         preview_session_id = str(uuid.uuid4())
         session['preview_session_id'] = preview_session_id
+    
+    # Extract AI model from session or request
+    ai_model = None
+    if request.json and 'model' in request.json:
+        ai_model = request.json['model']
+    elif 'model' in session:
+        ai_model = session['model']
+    
+    ports_cleaned = cleanup_unused_ports()
+    if ports_cleaned > 0:
+        current_app.logger.info(f"{ports_cleaned} ports freed before starting")
+
+    # Pass ai_model to prepare_and_launch_project_async
+    result = asyncio.run(prepare_and_launch_project_async(project_name, target_dir, ai_model=ai_model))
+
+    if result and result[0]:
+        # result = (success, message, url/port)
+        return jsonify({
+            "status": "success", 
+            "message": result[1] or "Preview started successfully.",
+            "url": result[2] if len(result) > 2 else None
     ports_cleaned = cleanup_unused_ports()
     if ports_cleaned > 0:
         current_app.logger.info(f"{ports_cleaned} ports freed before starting")
@@ -64,8 +92,11 @@ def start_preview_route():
     else:
         return jsonify({
             "status": "error", 
+            "message": result[1] if result and len(result) > 1 else "Failed to start preview.",
+
             "message": message,
             "logs": info.get("logs", [])
+
         }), 500
 
 @bp_preview.route('/preview/status', methods=['GET'])

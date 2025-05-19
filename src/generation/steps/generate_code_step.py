@@ -55,6 +55,9 @@ def generate_code_step(api_key, selected_model, reformulated_prompt, structure_l
     1. Provide the full code for *all* files listed in the structure.
     2. Use the EXACT format `--- FILE: path/to/filename ---` on a line by itself before each file's code block. Start your response *immediately* with the first marker. No introduction text.    3. Ensure the code is functional, includes necessary imports, basic error handling, and comments.
     4. For `requirements.txt` or similar, list the dependencies.
+    5. For `README.md`, provide DETAILED setup/run instructions. Include step-by-step manual instructions on how to install dependencies and run the application. Do NOT mention or rely on any start.bat/start.sh scripts. The README must contain explicit commands that a user can run directly.
+    6. If the code exceeds token limits, end the *entire* response EXACTLY with: `GENERATION_INCOMPLETE` (no other text after).{animation_instruction}
+    7. IMPORTANT: For web frameworks (e.g., Flask, Django, Express), ensure the application entrypoint configures its listening port via environment variable or CLI argument, never hardcoding port 5000.
     5. For `README.md`, provide DETAILED setup/run instructions. Include step-by-step manual instructions on how to install dependencies and run the application without relying on start.bat/start.sh scripts. The README must contain explicit commands that a user can run directly.
     6. If the code exceeds token limits, end the *entire* response EXACTLY with: `GENERATION_INCOMPLETE` (no other text after).{animation_instruction}
     7. IMPORTANT: For web frameworks (e.g., Flask, Django, Express), ensure the application entrypoint configures its listening port via environment variable or CLI argument, never hardcoding port 5000.
