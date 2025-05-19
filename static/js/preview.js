@@ -32,14 +32,14 @@ document.addEventListener("DOMContentLoaded", function () {
   );
 
   function updateConfig(status) {
-    projectTypeEl.textContent = status.project_type || "Unknown";
+    if (projectTypeEl) projectTypeEl.textContent = status.project_type || "Unknown";
     // extract port from URL
     const url = status.url || "";
     const port = url.split(":").pop();
-    appPortEl.textContent = port;
-    appUrlConfigEl.textContent = url;
+    if (appPortEl) appPortEl.textContent = port;
+    if (appUrlConfigEl) appUrlConfigEl.textContent = url;
     // list main files
-    mainFilesList.innerHTML = "";
+    if (mainFilesList) mainFilesList.innerHTML = "";
     fetch(`/list_files?directory=${encodeURIComponent(projectPath)}`)
       .then((res) => res.json())
       .then((data) => {
@@ -48,15 +48,15 @@ document.addEventListener("DOMContentLoaded", function () {
             const a = document.createElement("a");
             a.className = "list-group-item list-group-item-action";
             a.textContent = file;
-            mainFilesList.appendChild(a);
+            if (mainFilesList) mainFilesList.appendChild(a);
           });
         } else {
-          mainFilesList.innerHTML =
+          if (mainFilesList) mainFilesList.innerHTML =
             '<div class="text-center py-3 text-muted">Unable to list files</div>';
         }
       })
       .catch(() => {
-        mainFilesList.innerHTML =
+        if (mainFilesList) mainFilesList.innerHTML =
           '<div class="text-center py-3 text-muted">Error retrieving files</div>';
       });
   }
@@ -158,41 +158,66 @@ document.addEventListener("DOMContentLoaded", function () {
     fetch(window.URL_PREVIEW_START, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: previewSessionId }),
+      body: JSON.stringify({ session_id: previewSessionId, model: window.MODEL }),
     })
       .then((res) => res.json())
       .then((data) => {
         if (data.status === "success") {
-          showLaunchProgress("Application running.", 100);
-          appStatusBadge.textContent = "Running";
-          appStatusBadge.className = "badge bg-success me-2";
-          if (data.url && data.url !== "null" && data.url !== "") {
-            appUrlEl.innerHTML = `<a href="${data.url}" target="_blank" class="text-primary">${data.url}</a> <small class="text-muted">(Click to open in a new tab)</small>`;
-          } else {
-            appUrlEl.textContent = "Address not available";
-            showManualUrlInput();
-          }
-
-          // Try to open in a new tab as a second step, but handle if blocked
-          try {
-            // Add a small delay before opening to ensure UI is updated
-            setTimeout(() => {
-              childWindow = window.open(data.url, "_blank");
-              if (
-                !childWindow ||
-                childWindow.closed ||
-                typeof childWindow.closed === "undefined"
-              ) {
-                // Popup was blocked
-                console.log(
-                  "Popup blocked. URL already shown as clickable link."
-                );
+          function handleUrlOrWait(url) {
+            if (url && url !== "null" && url !== "") {
+              showLaunchProgress("Application running.", 100);
+              appStatusBadge.textContent = "Running";
+              appStatusBadge.className = "badge bg-success me-2";
+              appUrlEl.innerHTML = `<a href="${url}" target="_blank" class="text-primary">${url}</a> <small class="text-muted">(Click to open in a new tab)</small>`;
+              setTimeout(hideLaunchProgress, 2000);
+              // Try to open in a new tab as a second step, but handle if blocked
+              try {
+                setTimeout(() => {
+                  childWindow = window.open(url, "_blank");
+                  if (!childWindow || childWindow.closed || typeof childWindow.closed === "undefined") {
+                    // Popup was blocked
+                    console.log("Popup blocked. URL already shown as clickable link.");
+                  }
+                }, 500);
+              } catch (e) {
+                console.error("Error opening new window:", e);
               }
-            }, 500);
-          } catch (e) {
-            console.error("Error opening new window:", e);
+            } else {
+              // No URL yet, poll status every 2s until available
+              showLaunchProgress("Waiting for application URL...", 90);
+              let pollCount = 0;
+              const maxPolls = 15; // Wait up to 30s
+              const pollStatus = () => {
+                fetch(window.URL_PREVIEW_STATUS)
+                  .then((r) => r.json())
+                  .then((s) => {
+                    if (s.status === "success" && s.url && s.url !== "null" && s.url !== "") {
+                      handleUrlOrWait(s.url);
+                    } else if (s.status === "error") {
+                      alert(s.message || "Preview failed to start.");
+                      hideLaunchProgress();
+                    } else if (++pollCount < maxPolls) {
+                      setTimeout(pollStatus, 2000);
+                    } else {
+                      appUrlEl.textContent = "Address not available";
+                      showManualUrlInput();
+                      hideLaunchProgress();
+                    }
+                  })
+                  .catch(() => {
+                    if (++pollCount < maxPolls) setTimeout(pollStatus, 2000);
+                    else {
+                      appUrlEl.textContent = "Address not available";
+                      showManualUrlInput();
+                      hideLaunchProgress();
+                    }
+                  });
+              };
+              pollStatus();
+            }
           }
-
+          handleUrlOrWait(data.url);
+          // Start log polling
           logPollInterval = setInterval(() => {
             fetch(window.URL_PREVIEW_STATUS)
               .then((r) => r.json())
@@ -200,11 +225,56 @@ document.addEventListener("DOMContentLoaded", function () {
           }, 3000);
           // update configuration
           updateConfig(data);
-          // Hide progress bar after a short delay if successful
-          setTimeout(hideLaunchProgress, 2000);
         } else {
-          alert(data.message);
-          hideLaunchProgress(); // Hide on error
+          // If the backend returns an error but the preview is actually running, try to check status after a short delay
+          setTimeout(() => {
+            fetch(window.URL_PREVIEW_STATUS)
+              .then((r) => r.json())
+              .then((s) => {
+                if (s.status === "success" && s.url && s.url !== "null" && s.url !== "") {
+                  // The app is running, so continue as if success
+                  function handleUrlOrWait(url) {
+                    if (url && url !== "null" && url !== "") {
+                      showLaunchProgress("Application running.", 100);
+                      appStatusBadge.textContent = "Running";
+                      appStatusBadge.className = "badge bg-success me-2";
+                      appUrlEl.innerHTML = `<a href="${url}" target="_blank" class="text-primary">${url}</a> <small class="text-muted">(Click to open in a new tab)</small>`;
+                      setTimeout(hideLaunchProgress, 2000);
+                      try {
+                        setTimeout(() => {
+                          childWindow = window.open(url, "_blank");
+                          if (!childWindow || childWindow.closed || typeof childWindow.closed === "undefined") {
+                            // Popup was blocked
+                            console.log("Popup blocked. URL already shown as clickable link.");
+                          }
+                        }, 500);
+                      } catch (e) {
+                        console.error("Error opening new window:", e);
+                      }
+                    } else {
+                      appUrlEl.textContent = "Address not available";
+                      showManualUrlInput();
+                      hideLaunchProgress();
+                    }
+                  }
+                  handleUrlOrWait(s.url);
+                  // Start log polling
+                  logPollInterval = setInterval(() => {
+                    fetch(window.URL_PREVIEW_STATUS)
+                      .then((r) => r.json())
+                      .then((s) => updateLogs(s.logs || []));
+                  }, 3000);
+                  updateConfig(s);
+                } else {
+                  alert(data.message);
+                  hideLaunchProgress();
+                }
+              })
+              .catch(() => {
+                alert(data.message);
+                hideLaunchProgress();
+              });
+          }, 2000);
         }
       })
       .catch((e) => {

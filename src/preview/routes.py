@@ -56,15 +56,22 @@ def start_preview_route():
         preview_session_id = str(uuid.uuid4())
         session['preview_session_id'] = preview_session_id
     
+    # Extract AI model from session or request
+    ai_model = None
+    if request.json and 'model' in request.json:
+        ai_model = request.json['model']
+    elif 'model' in session:
+        ai_model = session['model']
+    
     ports_cleaned = cleanup_unused_ports()
     if ports_cleaned > 0:
         current_app.logger.info(f"{ports_cleaned} ports freed before starting")
 
-    # Lancer la coroutine asynchrone de façon synchrone
-    result = asyncio.run(prepare_and_launch_project_async(project_name, target_dir))
+    # Pass ai_model to prepare_and_launch_project_async
+    result = asyncio.run(prepare_and_launch_project_async(project_name, target_dir, ai_model=ai_model))
 
     if result and result[0]:
-        # result = (success, message, port)
+        # result = (success, message, url/port)
         return jsonify({
             "status": "success", 
             "message": result[1] or "Preview started successfully.",

@@ -14,21 +14,18 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>
 
 """
-Génère des scripts de démarrage (start.bat, start.sh) à partir du contenu du README.md
+Génère les instructions de démarrage à partir du contenu du README.md sous forme de commandes shell dans un objet JSON. Ne jamais créer, mentionner ou utiliser de scripts start.bat ou start.sh.
 """
 import os
 import json
 import logging
 from pathlib import Path
-# Removed: from ..preview_utils import parse_readme_instructions
-# Removed: from ..handler.detect_project_type import detect_project_type
-# Add necessary import for your AI API call, e.g.:
-from src.api.openrouter_api import get_openrouter_completion # Uncommented
-import asyncio # For async AI calls
+from src.api.openrouter_api import get_openrouter_completion
+import asyncio
 
 logger = logging.getLogger(__name__)
 
-async def get_launch_commands_from_ai(project_dir: Path, readme_content: str, project_structure: str, project_types: list, log_callback=print, api_key: str = None, model_name: str = "openrouter/anthropic/claude-3-haiku"): # Added api_key and model_name
+async def get_launch_commands_from_ai(project_dir: Path, readme_content: str, project_structure: str, project_types: list, log_callback=print, api_key: str = None, model_name: str = "openrouter/anthropic/claude-3-haiku"):
     """
     Asks AI for a structured list of setup and run commands for the project.
     Returns: {"commands": ["cmd1", ...], "env": {"VAR": "val"}} or None if failed.
@@ -50,12 +47,12 @@ Project Structure:
 {project_structure}
 ---
 
-Please respond with a single JSON object containing two keys:
-1.  "commands": A list of strings, where each string is a shell command to be executed in sequence.
-    These commands should cover all necessary steps like installing dependencies and then starting the application.
-    Assume the commands will be run from the root of the project directory.
-    If the project runs a server, the last command should be the one that starts the server and keeps running.
-2.  "env": An optional dictionary of environment variables (string key-value pairs) that might be needed for the commands. Example: {{"PORT": "8080", "NODE_ENV": "development"}}. If no specific environment variables are needed, this can be an empty dictionary or omitted.
+IMPORTANT: Your response MUST be a single valid JSON object, WITHOUT any code block markers (no triple backticks, no markdown, no explanations, just the JSON object itself).
+
+STRICT REQUIREMENTS:
+- The JSON object must contain two keys:
+  1. "commands": A list of strings, where each string is a shell command to be executed in sequence. These commands should cover all necessary steps like installing dependencies and then starting the application. Assume the commands will be run from the root of the project directory. If the project runs a server, the last command should be the one that starts the server and keeps running. For static HTML/CSS/JS projects, ALWAYS provide a real command to launch a local server (for example: 'python -m http.server 8000' or 'npx serve' or 'npx http-server'), NEVER just an echo or instruction to open index.html manually. DO NOT create, write, or mention any batch (.bat), shell (.sh), or script files. DO NOT output any file content, only the JSON object as described. DO NOT output any command that creates or writes to a file (e.g., do not use 'echo ... > start.sh'). DO NOT include any 'cd ...' command, as the working directory is already set correctly. If you suggest a Python server, prefer 'python -m http.server 8000 --bind 127.0.0.1' to ensure local accessibility.
+  2. "env": An optional dictionary of environment variables (string key-value pairs) that might be needed for the commands. Example: {{"PORT": "8080", "NODE_ENV": "development"}}. If no specific environment variables are needed, this can be an empty dictionary or omitted.
 
 Example of a valid JSON response:
 {{
@@ -74,23 +71,20 @@ If you cannot determine the commands, respond with:
   "commands": [],
   "error": "Could not determine launch commands."
 }}
-Ensure the response is a single, valid JSON object.
 """
 
     log_callback(f"Attempting to get launch commands from AI model: {model_name}")
     ai_response_str = None
     try:
-        # Actual AI call
         ai_response_str = await get_openrouter_completion(
             prompt,
-            model_name=model_name, # Use the provided model_name
-            api_key=api_key # Pass the api_key
+            model_name=model_name,
+            api_key=api_key
         )
         if ai_response_str:
             log_callback(f"AI response received: {ai_response_str[:500]}{'...' if len(ai_response_str) > 500 else ''}") # Log snippet
         else:
             log_callback("AI call did not return a response.")
-            # Fallback to an error structure if AI returns None/empty
             ai_response_str = json.dumps({
                 "commands": [],
                 "error": "AI service failed to provide a response."
@@ -105,6 +99,12 @@ Ensure the response is a single, valid JSON object.
     
     # log_callback(f"AI response: {ai_response_str}") # Full response might be too verbose
 
+    # --- PATCH: Remove code block markers if present in AI response ---
+    if ai_response_str and ai_response_str.strip().startswith('```'):
+        import re as _re
+        ai_response_str = _re.sub(r'^```[a-zA-Z0-9]*\n', '', ai_response_str.strip())
+        ai_response_str = _re.sub(r'```$', '', ai_response_str.strip())
+    # --- END PATCH ---
     try:
         parsed_response = json.loads(ai_response_str)
         if not isinstance(parsed_response, dict) or "commands" not in parsed_response:
@@ -152,7 +152,7 @@ def get_project_structure(project_dir: Path, max_depth=2, max_files_per_dir=10):
             
     return "\\n".join(structure)
 
-async def generate_launch_config_from_ai(project_dir_str: str, log_callback=print, api_key: str = None, model_name: str = "openrouter/anthropic/claude-3-haiku"): # Added api_key and model_name
+async def generate_launch_config_from_ai(project_dir_str: str, log_callback=print, api_key: str = None, model_name: str = None):
     """
     Generates a launch configuration (list of commands and env vars) for a project
     by querying an AI based on README.md and project structure.

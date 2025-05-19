@@ -21,21 +21,38 @@ from src.api.openrouter_api import get_openrouter_completion # Added import
 logger = logging.getLogger(__name__)
 
 # Regex for port detection
+SERVE_OUTPUT_REGEX = re.compile(r"https?://[a-zA-Z0-9.-]+:(\\d{4,5})") # New regex for common server outputs
+
 PORT_REGEX_1 = re.compile(
-    r"""\\b(?:port|address|listening on|host|server at|endpoint)\\b\\s*[:=]?\\s*(?:(?:[a-zA-Z0-9.-]+|\\[[^\\]]+]):)?(\\d{4,5})\\b""",  # Corrected bracketed host pattern
+    r"""\\b(?:port|address|listening on|host|server at|endpoint)\\b\\s*[:=]?\\s*(?:(?:[a-zA-Z0-9.-]+|\\[[^]]+\\]):)?(\\d{4,5})\\b""",  # Corrected word boundaries and bracket matching
     re.IGNORECASE
 )
 PORT_REGEX_2 = re.compile(
-    r"""(?:https?://)?(?:[a-zA-Z0-9.-]+|\\[[^\\]]+]):(\\d{4,5})\\b""",  # Corrected bracketed host pattern
+    r"""(?:https?://)?(?:[a-zA-Z0-9.-]+|\\[[^]]+\\]):(\\d{4,5})\\b""",  # Corrected word boundaries and bracket matching
     re.IGNORECASE
 )
 
 def extract_port_from_line(line: str) -> int | None:
     """Extracts a port number from a log line using predefined regexes."""
-    match = PORT_REGEX_1.search(line)
+    # Attempt to match common "serve" like output first
+    # e.g., "INFO  Accepting connections at http://localhost:3000"
+    # or "   Local: http://localhost:3000"
+    match_serve = SERVE_OUTPUT_REGEX.search(line)
+    if match_serve:
+        port_str = match_serve.group(1)
+        try:
+            port = int(port_str)
+            if 1024 <= port <= 65535:
+                logger.info(f"Port {port} detected by SERVE_OUTPUT_REGEX from line: {line}")
+                return port
+        except ValueError:
+            pass # Fall through if parsing fails
+
+    # Then try existing regexes
+    match1 = PORT_REGEX_1.search(line)
     port_str = None
-    if match:
-        port_str = match.group(1)
+    if match1:
+        port_str = match1.group(1)
     else:
         match = PORT_REGEX_2.search(line)
         if match:
@@ -51,6 +68,56 @@ def extract_port_from_line(line: str) -> int | None:
         except ValueError:
             pass
     return None
+
+def extract_url_and_port_from_line(line: str):
+    """
+    Extracts a (url, port) tuple from a log line using regexes.
+    Returns (url, port) if found, else (None, None).
+    """
+    # Try to match a URL with port, including IPv6 brackets
+    match_serve = re.search(r"(https?://(?:[a-zA-Z0-9.-]+|\[[^\]]+\]):(\d{4,5}))", line)
+    if match_serve:
+        url = match_serve.group(1)
+        port_str = match_serve.group(2)
+        try:
+            port = int(port_str)
+            if 1024 <= port <= 65535:
+                logger.info(f"URL {url} and port {port} detected from line: {line}")
+                return url, port
+        except ValueError:
+            pass
+    # Fallback: try to extract just the port from 'port XXXX' or similar
+    match_port = re.search(r"port[\s:=]+(\d{4,5})", line, re.IGNORECASE)
+    if match_port:
+        port_str = match_port.group(1)
+        try:
+            port = int(port_str)
+            if 1024 <= port <= 65535:
+                # Construct a default URL if possible
+                url = f"http://localhost:{port}"
+                logger.info(f"Port {port} detected from 'port' pattern in line: {line}")
+                return url, port
+        except ValueError:
+            pass
+    # Fallback: try to extract just the port with existing regexes
+    match1 = PORT_REGEX_1.search(line)
+    port_str = None
+    if match1:
+        port_str = match1.group(1)
+    else:
+        match = PORT_REGEX_2.search(line)
+        if match:
+            port_str = match.group(1)
+        else:
+            return None, None
+    if port_str:
+        try:
+            port = int(port_str)
+            if 1024 <= port <= 65535:
+                return None, port
+        except ValueError:
+            pass
+    return None, None
 
 async def _read_stream_and_find_port(stream_reader: asyncio.StreamReader, log_callback, port_found_event: asyncio.Event, found_port_ref: list):
     """Helper to read a stream, log, and extract port."""
@@ -75,6 +142,30 @@ async def _read_stream_and_find_port(stream_reader: asyncio.StreamReader, log_ca
         except Exception as e:
             logger.error(f"Error reading stream: {e}")
             break # Stop on error
+
+async def _read_stream_and_find_url_and_port(stream_reader: asyncio.StreamReader, log_callback, url_found_event: asyncio.Event, found_url_ref: list):
+    """Helper to read a stream, log, and extract url/port."""
+    while not stream_reader.at_eof():
+        try:
+            line_bytes = await stream_reader.readline()
+            if not line_bytes:
+                break
+            line = line_bytes.decode(errors='ignore').strip()
+            if line:
+                log_callback(line)
+                if not url_found_event.is_set():
+                    url, port = extract_url_and_port_from_line(line)
+                    if url or port:
+                        logger.info(f"Detected in logs: url={url}, port={port}, line={line}")
+                        if not found_url_ref:
+                            found_url_ref.append((url, port))
+                        url_found_event.set()
+        except asyncio.CancelledError:
+            logger.debug("Stream reading task cancelled.")
+            break
+        except Exception as e:
+            logger.error(f"Error reading stream: {e}")
+            break
 
 async def monitor_process_output_for_port(
     process: asyncio.subprocess.Process, # MODIFIED: Takes asyncio.subprocess.Process
@@ -117,7 +208,42 @@ async def monitor_process_output_for_port(
         return found_port_ref[0]
     return None
 
-async def get_ai_fix_for_launch_failure(project_dir: str, commands_data: dict, failed_command_index: int, stdout: str, stderr: str, log_callback=print, ai_model: str = "openai/gpt-4.1-nano", api_key: str = None):
+async def monitor_process_output_for_url_and_port(
+    process: asyncio.subprocess.Process,
+    duration: int,
+    log_callback
+) -> tuple[str|None, int|None]:
+    """
+    Monitors the process's stdout and stderr for a specified duration,
+    logs the output, and tries to extract a url and/or port number.
+    Returns (url, port) tuple.
+    """
+    if process.stdout is None or process.stderr is None:
+        logger.warning("Process stdout or stderr is None, cannot monitor for url/port.")
+        return None, None
+    url_found_event = asyncio.Event()
+    found_url_ref = []
+    stdout_task = asyncio.create_task(_read_stream_and_find_url_and_port(process.stdout, log_callback, url_found_event, found_url_ref))
+    stderr_task = asyncio.create_task(_read_stream_and_find_url_and_port(process.stderr, log_callback, url_found_event, found_url_ref))
+    try:
+        await asyncio.wait_for(url_found_event.wait(), timeout=duration)
+        logger.info(f"URL/Port detection: Event triggered within {duration}s.")
+    except asyncio.TimeoutError:
+        logger.info(f"URL/Port detection: Timed out after {duration}s waiting for event. Checking collected data.")
+    except Exception as e:
+        logger.error(f"URL/Port detection: Error during wait: {e}")
+    finally:
+        if not stdout_task.done():
+            stdout_task.cancel()
+        if not stderr_task.done():
+            stderr_task.cancel()
+        await asyncio.gather(stdout_task, stderr_task, return_exceptions=True)
+        logger.debug("URL/Port monitoring tasks finished.")
+    if found_url_ref:
+        return found_url_ref[0]
+    return None, None
+
+async def get_ai_fix_for_launch_failure(project_dir: str, commands_data: dict, failed_command_index: int, stdout: str, stderr: str, log_callback=print, ai_model: str = None, api_key: str = None):
     """
     Asks AI for help with a failed launch command.
     Returns: {"fixed": bool, "new_commands_data": dict_or_none, "message_to_user": str, "file_patch": {"filename": ..., "content": ...} or None}
@@ -174,7 +300,9 @@ async def get_ai_fix_for_launch_failure(project_dir: str, commands_data: dict, f
     ai_response_str = None
     try:
         log_callback("Attempting to call AI for a fix...")
-        ai_response_str = await get_openrouter_completion(prompt, model_name=ai_model, api_key=api_key)
+        # Use the provided ai_model, fallback to a default if None
+        model_to_use = ai_model if ai_model else "openai/gpt-4.1-nano"
+        ai_response_str = await get_openrouter_completion(prompt, model_name=model_to_use, api_key=api_key)
         log_callback("AI call completed.")
     except Exception as e:
         log_callback(f"Error calling AI API: {e}")
@@ -242,7 +370,7 @@ async def run_application_commands_internal_async(
     venv_path_str: str = None, 
     log_callback=print, 
     attempt_ai_fix=False,
-    ai_model: str = "openai/gpt-4.1-nano", # Added for AI fix
+    ai_model: str = None, # Default is now None, not hardcoded
     api_key: str = None # Added for AI fix
 ):
     """
@@ -332,6 +460,25 @@ async def run_application_commands_internal_async(
         
         process = None # Define process here for broader scope in try/except
         try:
+            # Add detection for static project launchers (e.g., 'start', 'open', 'explorer', etc.)
+            static_launchers = [
+                'start ',  # Windows
+                'explorer ',  # Windows
+                'open ',  # macOS
+                'xdg-open ',  # Linux
+            ]
+            if is_last_command and any(command_str.lower().startswith(launcher) for launcher in static_launchers):
+                log_callback("Le projet est statique. Aucun serveur n'a été lancé, mais le fichier HTML a été ouvert dans le navigateur.")
+                return {
+                    "success": True,
+                    "message": "Projet statique : aucun serveur n'a été lancé, mais le fichier HTML a été ouvert dans le navigateur. Pour la prévisualisation intégrée, lancez un serveur local (ex: 'python -m http.server').",
+                    "process": None,
+                    "stdout": "",
+                    "stderr": "",
+                    "original_commands_data": commands_data,
+                    "url": None,
+                    "port": None
+                }
             process = await _execute_single_command_async(command_str, project_dir, current_env, log_callback)
 
             if not is_last_command: # Setup command, wait for it
@@ -500,15 +647,13 @@ async def run_application_async_wrapper(
     venv_path_str: str = None, 
     log_callback=print, 
     attempt_ai_fix=True,
-    # Add ai_model and api_key or retrieve them from a config service/module
-    ai_model: str = "openai/gpt-4.1-nano", 
+    ai_model: str = None, # Default is now None, not hardcoded
     api_key: str = None 
 ):
     """
     Asynchronous wrapper to handle AI fix attempts for run_application_commands_internal_async.
-    Also monitors for port in logs if the application starts successfully.
+    Also monitors for url/port in logs if the application starts successfully.
     """
-    # Ensure logger.info is used if default print is passed for log_callback
     effective_log_callback = log_callback if log_callback != print else logger.info
 
     try:
@@ -517,28 +662,15 @@ async def run_application_async_wrapper(
             raise ValueError("Commands data must be a dict with a 'commands' key.")
     except json.JSONDecodeError as e:
         effective_log_callback(f"Error: Invalid JSON format for commands_data: {e}")
-        return {"success": False, "message": f"Invalid JSON for commands: {e}", "process": None, "original_commands_data": None, "port": None }
-    except ValueError as e: # Catches the custom ValueError
+        return {"success": False, "message": f"Invalid JSON for commands: {e}", "process": None, "original_commands_data": None, "url": None, "port": None }
+    except ValueError as e:
         effective_log_callback(f"Error: Invalid structure for commands_data: {e}")
-        return {"success": False, "message": f"Invalid data structure for commands: {e}", "process": None, "original_commands_data": None, "port": None}
+        return {"success": False, "message": f"Invalid data structure for commands: {e}", "process": None, "original_commands_data": None, "url": None, "port": None}
 
     effective_log_callback(f"run_application_async_wrapper called for {project_dir_str}, AI fix: {attempt_ai_fix}")
 
     current_commands_data = initial_commands_data.copy()
-    max_ai_attempts = 3 # Max attempts for the entire command sequence
-    ai_attempt_count = 0 # Counts how many times AI fix has been applied to the command list
-    
     final_result = {} # To store the final outcome
-
-    # This loop is for retrying the *entire command sequence* if AI provides a new one.
-    # The inner loop in run_application_commands_internal_async handles retries for a single command.
-    # This outer loop might be redundant if the inner loop's `i = 0; continue` is sufficient.
-    # For now, let's assume the inner loop handles command list modification and restart.
-    # The `attempt_ai_fix` flag passed to internal function controls if it tries.
-
-    # The structure of AI fix attempts is primarily handled inside run_application_commands_internal_async
-    # by resetting `i=0` and `ai_fix_attempted_for_command = -1` when new commands are provided.
-    # This wrapper mainly orchestrates the initial call and port monitoring.
 
     result = await run_application_commands_internal_async(
         project_dir_str,
@@ -553,50 +685,51 @@ async def run_application_async_wrapper(
     final_result = result.copy() # Store the latest result
 
     app_process = result.get("process") # asyncio.subprocess.Process or None
+    url_to_return = None
     port_to_return = None
 
     if result.get("success") and app_process:
-        effective_log_callback(f"[{Path(project_dir_str).name}] Main application process started. Monitoring output for port for up to 10 seconds...")
+        effective_log_callback(f"[{Path(project_dir_str).name}] Main application process started. Monitoring output for url/port for up to 10 seconds...")
         try:
-            # Pass the asyncio.subprocess.Process object
-            port = await monitor_process_output_for_port(app_process, 10, effective_log_callback)
+            url, port = await monitor_process_output_for_url_and_port(app_process, 10, effective_log_callback)
+            if url:
+                effective_log_callback(f"[{Path(project_dir_str).name}] URL {url} detected from application logs.")
+                url_to_return = url
             if port:
                 effective_log_callback(f"[{Path(project_dir_str).name}] Port {port} detected from application logs.")
                 port_to_return = port
-            else:
-                effective_log_callback(f"[{Path(project_dir_str).name}] No specific port detected from application logs within monitoring period.")
-            
-            # Update final_result with port, keep process
+            if not url and not port:
+                effective_log_callback(f"[{Path(project_dir_str).name}] No specific url/port detected from application logs within monitoring period.")
+            final_result["url"] = url_to_return
             final_result["port"] = port_to_return
-            # The process is already in final_result if it was successful
-
         except Exception as e_monitor:
-            effective_log_callback(f"Error during port monitoring: {e_monitor}")
+            effective_log_callback(f"Error during url/port monitoring: {e_monitor}")
             final_result["success"] = False
-            final_result["message"] = f"{final_result.get('message', '')} Error during port monitoring: {e_monitor}"
+            final_result["message"] = f"{final_result.get('message', '')} Error during url/port monitoring: {e_monitor}"
+            final_result["url"] = None
             final_result["port"] = None
             if app_process and app_process.returncode is None:
-                app_process.kill() # Kill if monitoring failed badly
+                app_process.kill()
                 await app_process.wait()
-            final_result["process"] = None # Nullify process if monitoring failed
+            final_result["process"] = None
     elif not result.get("success"):
         effective_log_callback(f"[{Path(project_dir_str).name}] Application command execution failed: {result.get('message')}")
-        # Ensure process is None if not successful
         final_result["process"] = None
+        final_result["url"] = None
         final_result["port"] = None
-    else: # Success but no process (e.g., all setup commands, no server)
+    else:
         effective_log_callback(f"[{Path(project_dir_str).name}] Application commands completed, but no running server process returned.")
         final_result["process"] = None
+        final_result["url"] = None
         final_result["port"] = None
 
-
-    # Ensure all fields are present in the return
     return {
         "success": final_result.get("success", False),
         "message": final_result.get("message", "An unknown error occurred."),
-        "process": final_result.get("process"), # This is an asyncio.subprocess.Process or None
-        "stdout": final_result.get("stdout", ""), # From the last command if error
-        "stderr": final_result.get("stderr", ""), # From the last command if error
-        "original_commands_data": initial_commands_data, # Always return the initial for reference
-        "port": final_result.get("port") 
+        "process": final_result.get("process"),
+        "stdout": final_result.get("stdout", ""),
+        "stderr": final_result.get("stderr", ""),
+        "original_commands_data": initial_commands_data,
+        "url": final_result.get("url"),
+        "port": final_result.get("port")
     }

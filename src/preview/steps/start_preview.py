@@ -12,7 +12,7 @@ from src.preview.steps.get_app_url import get_app_url
 from src.preview.steps.log_entry import log_entry
 from src.preview.steps.improve_readme import improve_readme_for_preview
 
-def start_preview(project_dir: str, session_id: str, running_processes=None, process_logs=None, session_ports=None, already_patched=False):
+def start_preview(project_dir: str, session_id: str, running_processes=None, process_logs=None, session_ports=None, already_patched=False, ai_model=None, api_key=None):
     if running_processes is None or process_logs is None or session_ports is None:
         from src.preview.preview_manager import running_processes, process_logs, session_ports
     if session_id in running_processes:
@@ -26,7 +26,8 @@ def start_preview(project_dir: str, session_id: str, running_processes=None, pro
         from src.preview.steps.improve_readme import improve_readme_for_preview
         improve_readme_for_preview(project_dir)
         
-        success, message = prepare_and_launch_project(project_dir)
+        # When calling prepare_and_launch_project, pass ai_model and api_key
+        success, message = prepare_and_launch_project(project_dir, ai_model=ai_model, api_key=api_key)
         log_entry(session_id, "INFO" if success else "ERROR", message)
         if not success:
             if already_patched:
@@ -65,7 +66,7 @@ def start_preview(project_dir: str, session_id: str, running_processes=None, pro
                 return "\n".join(structure)
             structure_str = get_project_structure(project_dir)
             # Try to get the model used for generation from launch_commands.json
-            model_name = "openai/gpt-4.1-nano"
+            model_name = None
             launch_config_path = Path(project_dir) / "launch_commands.json"
             if launch_config_path.exists():
                 try:
@@ -113,7 +114,7 @@ A project failed to start due to an error. Here is the error message:
                             log_entry(session_id, "ERROR", f"Failed to apply AI patch to {file_path.name}: {e}")
                     if patched:
                         # Relancer la preview automatiquement après patch (mais une seule fois)
-                        retry_result = start_preview(project_dir, session_id, running_processes, process_logs, session_ports, already_patched=True)
+                        retry_result = start_preview(project_dir, session_id, running_processes, process_logs, session_ports, already_patched=True, ai_model=ai_model, api_key=api_key)
                         if retry_result and retry_result[0]:
                             return retry_result
                         else:

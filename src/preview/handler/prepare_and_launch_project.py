@@ -28,7 +28,7 @@ from src.preview.steps.run_application import run_application_async_wrapper
 
 logger = logging.getLogger(__name__)
 
-async def prepare_and_launch_project_async(project_name: str, project_dir_str: str, ai_model: str = "openai/gpt-4.1-nano", api_key: str = None):
+async def prepare_and_launch_project_async(project_name: str, project_dir_str: str, ai_model: str = None, api_key: str = None):
     """
     Prépare et lance un projet en utilisant la configuration de lancement générée par l'IA.
     Args:
@@ -104,30 +104,37 @@ async def prepare_and_launch_project_async(project_name: str, project_dir_str: s
         commands_data_json=commands_data_json,
         venv_path_str=venv_path_str, # Passé ici, mais run_application gère son utilisation
         log_callback=log_callback,
-        attempt_ai_fix=True # Activer la boucle de correction par IA
+        attempt_ai_fix=True, # Activer la boucle de correction par IA
+        ai_model=ai_model,
+        api_key=api_key
     )
 
     if run_result["success"]:
         process_info = run_result.get("process") # Objet Popen du processus principal (serveur)
         message = f"Application '{project_name}' seems to have started successfully."
         log_callback(message)
-        
-        # Essayer de déterminer le port à partir de la configuration de l'IA ou d'autres moyens
-        port = launch_config.get("env", {}).get("PORT")
-        app_url = None
-        if port:
-            try:
-                port = int(port) # S'assurer que le port est un entier
-                app_url = f"http://localhost:{port}" # Ou 127.0.0.1
-                log_callback(f"Application expected to be available at: {app_url}")
-            except ValueError:
-                log_callback(f"Warning: Port '{port}' from config is not a valid integer. URL cannot be determined.")
-                port = None # Invalider le port si non numérique
-        else:
-            log_callback("Port not specified in config. Manual URL check might be needed.")
+
+        # Prefer detected url/port from run_result
+        app_url = run_result.get("url")
+        port = run_result.get("port")
+        if not app_url and port:
+            app_url = f"http://localhost:{port}"
+        if not port:
+            # Try to get from config as fallback
+            port = launch_config.get("env", {}).get("PORT")
+            if port:
+                try:
+                    port = int(port)
+                    if not app_url:
+                        app_url = f"http://localhost:{port}"
+                except ValueError:
+                    log_callback(f"Warning: Port '{port}' from config is not a valid integer. URL cannot be determined.")
+                    port = None
+        if not app_url:
+            log_callback("Port/URL not specified in config or detected. Manual URL check might be needed.")
 
         preview_manager.update_project_status(project_name, "running", message, process_info=process_info, app_url=app_url, port=port)
-        return True, message, port
+        return True, message, app_url
     else:
         error_detail = run_result['message']
         message = f"Failed to start application '{project_name}': {error_detail}"
