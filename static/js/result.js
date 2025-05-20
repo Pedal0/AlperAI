@@ -160,8 +160,118 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Download button functionality
     document.getElementById("downloadBtn").addEventListener("click", function () {
-      window.location.href = window.URL_DOWNLOAD_ZIP;
+      const url = "/download_zip";
+      console.log("Download button clicked. Preparing to fetch from URL:", url);
+
+      // Check if running in pywebview context first
+      if (
+        window.pywebview &&
+        window.pywebview.api &&
+        typeof window.pywebview.api.save_file_via_dialog === "function"
+      ) {
+        // Pywebview environment: Fetch blob, convert to base64, then use pywebview API
+        fetch(url)
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const disposition = response.headers.get("Content-Disposition");
+            let filename = "downloaded_project.zip";
+            if (disposition && disposition.indexOf("attachment") !== -1) {
+              const filenameRegex = /filename[^;=\\n]*=((['\\"])(.*?)\\2|[^;\\n]*)/;
+              const matches = filenameRegex.exec(disposition);
+              if (matches != null && matches[3]) {
+                filename = matches[3];
+              }
+            }
+            console.log("Suggested filename from header (pywebview path):", filename);
+            return response.blob().then((blob) => ({ blob, filename }));
+          })
+          .then(({ blob, filename }) => {
+            const reader = new FileReader();
+            reader.onloadend = function () {
+              const base64data = reader.result.split(",")[1];
+              console.log(
+                "Calling window.pywebview.api.save_file_via_dialog with filename:",
+                filename
+              );
+              window.pywebview.api
+                .save_file_via_dialog(filename, base64data)
+                .then((result) => {
+                  if (result && result.success) {
+                    console.log("File saved successfully via Python:", result.path);
+                  } else {
+                    console.error(
+                      "Error saving file via Python:",
+                      result ? result.error : "Unknown error"
+                    );
+                    // Fallback to browser download if pywebview save fails but API was detected
+                    alert("Pywebview save failed. Attempting browser download.");
+                    triggerBrowserDownload(url, filename); 
+                  }
+                })
+                .catch((error) => {
+                  console.error("Error calling save_file_via_dialog:", error);
+                  alert("Error during pywebview save. Attempting browser download.");
+                  triggerBrowserDownload(url, filename); // Fallback
+                });
+            };
+            reader.onerror = function (error) {
+              console.error("FileReader error (pywebview path):", error);
+              alert("Error preparing file for pywebview download. Attempting browser download.");
+              triggerBrowserDownload(url, filename); // Fallback
+            };
+            reader.readAsDataURL(blob);
+          })
+          .catch((error) => {
+            console.error("Error fetching or processing blob for pywebview download:", error);
+            alert("Failed to retrieve the file for pywebview download: " + error.message + ". Attempting browser download.");
+            // Attempt to get filename from error or use default for fallback
+            const defaultFilename = "downloaded_project.zip";
+            triggerBrowserDownload(url, defaultFilename); // Fallback
+          });
+      } else {
+        // Standard web browser environment (dev server or no pywebview API)
+        console.log("Pywebview API not detected or save_file_via_dialog is not a function. Using standard browser download.");
+        // We need to get the filename first if possible, then trigger download
+        fetch(url, { method: 'GET' }) // Ensure it's a GET if not specified by default
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const disposition = response.headers.get("Content-Disposition");
+                let filename = "downloaded_project.zip"; // Default filename
+                if (disposition && disposition.indexOf("attachment") !== -1) {
+                    const filenameRegex = /filename[^;=\\n]*=((['\\"])(.*?)\\2|[^;\\n]*)/;
+                    const matches = filenameRegex.exec(disposition);
+                    if (matches != null && matches[3]) {
+                        filename = matches[3];
+                    }
+                }
+                console.log("Suggested filename from header (browser path):", filename);
+                // Now that we have the filename (or default), trigger the actual download
+                // The browser will handle the blob from the same URL
+                triggerBrowserDownload(url, filename);
+            })
+            .catch(error => {
+                console.error("Error fetching filename for browser download:", error);
+                alert("Failed to prepare download: " + error.message);
+                // Fallback with default name if filename fetch failed
+                triggerBrowserDownload(url, "downloaded_project.zip");
+            });
+      }
     });
+
+    // Helper function for standard browser download
+    function triggerBrowserDownload(fileUrl, fileName) {
+        const a = document.createElement("a");
+        a.href = fileUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        console.log("Browser download triggered for:", fileName);
+    }
 
     // Open folder button (this would require backend support in a real implementation)
     document.querySelectorAll(".open-folder-btn").forEach((button) => {

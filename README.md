@@ -130,3 +130,45 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 - More complex applications may require additional dependencies to be installed manually.
 - Static website generation produces pure HTML/CSS/JS files that can be hosted on any web server.
 - MCP tools enhance generation but may require internet access to function properly.
+
+## Compiling the Application (for Desktop Use)
+
+If you want to create a standalone desktop executable (.exe on Windows) from this project, you can use PyInstaller. This project includes a `launcher.py` script and a `launcher.spec` file configured to help package the application with `pywebview` for a native window experience.
+
+**Prerequisites for Compiling:**
+
+*   Ensure all development dependencies are installed:
+    ```powershell
+    pipenv install
+    ```
+    (PyInstaller should ideally be listed as a dev dependency in your `Pipfile` if you compile frequently. If not, you can install it in your pipenv environment: `pipenv install pyinstaller`)
+*   You will need an icon file in `.ico` format if you want to set a custom icon for the executable (e.g., `static/images/favicon.ico`).
+
+**Compilation Steps:**
+
+1.  **Activate the Pipenv Environment**:
+    Open your terminal in the project root directory and run:
+    ```powershell
+    pipenv shell
+    ```
+
+2.  **Clean Previous Builds (Recommended)**:
+    Before each compilation, it's good practice to remove any previous build artifacts:
+    ```powershell
+    Remove-Item -Recurse -Force ./build
+    Remove-Item -Recurse -Force ./dist
+    ```
+
+3.  **Compile using `launcher.spec`**:
+    The `launcher.spec` file contains the configuration for PyInstaller.
+
+    *   **To create a bundled application in a folder** (output in `dist/YourAppName/`):
+        ```powershell
+        pyinstaller launcher.spec
+        ```
+
+4.  **Running the Compiled Application**:
+    After a successful compilation, navigate to the `dist/` folder. 
+    *   You can run `dist/BotProjectCreator.exe` directly.
+
+A `launcher_debug.log` file will be created in the same directory as the executable, which can be helpful for troubleshooting if the application doesn't start as expected.

@@ -4,3 +4,6 @@ check_api.py
 venv/
 __pycache__/
 test.txt
+build/
+dist/
+logs/

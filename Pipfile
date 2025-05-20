@@ -21,6 +21,8 @@ werkzeug = "*"
 itsdangerous = "*"
 click = "*"
 dotenv = "*"
+cefpython3 = "*"  # Added for pywebview with CEF backend
+pywebview = "*"    # Added for pywebview
 
 [dev-packages]
 
