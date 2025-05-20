@@ -139,9 +139,9 @@ If you want to create a standalone desktop executable (.exe on Windows) from thi
 
 *   Ensure all development dependencies are installed:
     ```powershell
-    pipenv install --dev
+    pipenv install
     ```
-    (PyInstaller should ideally be listed as a dev dependency in your `Pipfile` if you compile frequently. If not, you can install it in your pipenv environment: `pipenv install --dev pyinstaller`)
+    (PyInstaller should ideally be listed as a dev dependency in your `Pipfile` if you compile frequently. If not, you can install it in your pipenv environment: `pipenv install pyinstaller`)
 *   You will need an icon file in `.ico` format if you want to set a custom icon for the executable (e.g., `static/images/favicon.ico`).
 
 **Compilation Steps:**

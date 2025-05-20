@@ -22,32 +22,81 @@ Initialise les variables d'environnement et lance le serveur
 import os
 import sys
 from pathlib import Path
+import datetime
+import traceback
+
+# Determine base_path for logs and potentially other runtime data
+if getattr(sys, 'frozen', False):
+    # Running in a PyInstaller bundle
+    base_path_for_logs = Path(sys.executable).parent
+else:
+    # Running in a normal Python environment
+    base_path_for_logs = Path(__file__).resolve().parent
 
 # Importation des utilitaires et configuration
 # from src.utils.env_utils import load_env_vars # Sera importé dans start_flask_server
 
 def start_flask_server(port=5000, host='127.0.0.1'):
     """Démarre le serveur Flask et gère le contexte d'exécution."""
-    project_root = Path(__file__).resolve().parent
     
-    # S'assurer que le CWD est la racine du projet si ce n'est pas déjà le cas
-    if str(project_root) != os.getcwd():
-        os.chdir(project_root)
+    if not getattr(sys, 'frozen', False):
+        os.chdir(Path(__file__).resolve().parent)
 
-    # S'assurer que 'src' et la racine du projet sont dans sys.path pour les importations
-    # Cela est important si launcher.py et run.py sont à la racine du projet.
-    src_dir_path = project_root / "src"
-    if str(src_dir_path) not in sys.path:
-        sys.path.insert(0, str(src_dir_path))
-    if str(project_root) not in sys.path: # Pour 'from app import app'
-        sys.path.insert(0, str(project_root))
+    if not getattr(sys, 'frozen', False):
+        project_root_dev = Path(__file__).resolve().parent
+        src_dir_path_dev = project_root_dev / "src"
+        if str(src_dir_path_dev) not in sys.path:
+            sys.path.insert(0, str(src_dir_path_dev))
+        if str(project_root_dev) not in sys.path:
+            sys.path.insert(0, str(project_root_dev))
 
     from src.utils.env_utils import load_env_vars
     from app import app # app.py est supposé être à la racine du projet
 
     # Charger les variables d'environnement
     load_env_vars()
-    
+
+    # Configure logging
+    if not app.debug: # Or consider using: if getattr(sys, 'frozen', False):
+        import logging
+        from logging.handlers import RotatingFileHandler
+        
+        log_dir = base_path_for_logs / 'logs'
+        try:
+            log_dir.mkdir(exist_ok=True)
+            log_file = log_dir / 'app_flask.log'
+            # Use a formatter that includes more details for debugging
+            formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(lineno)d - %(message)s'
+            )
+            handler = RotatingFileHandler(log_file, maxBytes=2*1024*1024, backupCount=3) # 2MB per file
+            handler.setFormatter(formatter)
+            handler.setLevel(logging.DEBUG) # Capture more details
+
+            if not app.logger.handlers: # Avoid adding handler multiple times
+                app.logger.addHandler(handler)
+            app.logger.setLevel(logging.DEBUG) # Capture more details
+            
+            app.logger.info("-" * 50)
+            app.logger.info(f"Flask logger initialized. Frozen: {getattr(sys, 'frozen', False)}")
+            app.logger.info(f"Base path for logs: {base_path_for_logs}")
+            app.logger.info(f"Log file: {log_file}")
+            app.logger.info(f"CWD at logger setup: {os.getcwd()}")
+            app.logger.info(f"sys.executable: {sys.executable}")
+            if getattr(sys, 'frozen', False):
+                app.logger.info(f"sys._MEIPASS: {sys._MEIPASS}")
+
+        except Exception as e:
+            print(f"Critical error setting up Flask logging: {e}")
+            try:
+                fallback_log_path = base_path_for_logs / "flask_logging_setup_error.log"
+                with open(fallback_log_path, "a") as f_err:
+                    f_err.write(f"Timestamp: {datetime.datetime.now()}\\n") # Corrected datetime
+                    f_err.write(f"Critical error setting up Flask logging: {e}\\n")
+                    f_err.write(f"Traceback: {traceback.format_exc()}\\n\\n")
+            except Exception:
+                pass 
+
     # Démarrer l'application
     print(f"Démarrage de l'application Flask sur http://{host}:{port}")
     try:

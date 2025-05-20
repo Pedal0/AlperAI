@@ -21,6 +21,7 @@ import zipfile
 import io
 from pathlib import Path
 from datetime import datetime
+import traceback # Ensure traceback is imported
 from src.generation.generation_flow import generate_application
 from src.utils.model_utils import is_free_model
 from src.api.openrouter_api import extract_files_from_response, generate_code_with_openrouter
@@ -477,58 +478,86 @@ def continue_iteration():
 
 @bp_generation.route('/download_zip', methods=['GET'])
 def download_zip():
-    from src.utils.env_utils import is_vercel_environment
-    from src.utils.file_utils import cleanup_vercel_project
-    
-    if 'generation_result' not in session:
-        flash("No generation result found. Please generate an application first.", "warning")
-        return redirect(url_for('ui.index'))
-    
-    target_dir = session['generation_result'].get('target_directory')
-    if not target_dir or not Path(target_dir).is_dir():
-        flash("Target directory not found", "danger")
-        return redirect(url_for('generation.result'))
-    
-    # Vérifier si c'est un projet Vercel temporaire
-    is_vercel = is_vercel_environment()
-    is_vercel_project = current_app.config.get('is_vercel_project', False)
+    # Log entry point of the function
+    current_app.logger.debug("Entered download_zip route.")
     
     try:
+        # Log session content at the beginning to check its state
+        current_app.logger.debug(f"Session data at download_zip start: {{key: type(value) for key, value in session.items()}}")
+        # Log specific session keys expected
+        current_app.logger.debug(f"session.get('generation_result') type: {type(session.get('generation_result'))}")
+        current_app.logger.debug(f"session.get('target_dir') from generation_result: {session.get('generation_result', {}).get('target_directory')}")
+
+
+        from src.utils.env_utils import is_vercel_environment
+        from src.utils.file_utils import cleanup_vercel_project
+        current_app.logger.debug("Successfully imported env_utils and file_utils in download_zip.")
+
+        if 'generation_result' not in session:
+            current_app.logger.error("'generation_result' not found in session for download_zip.")
+            flash("No generation result found. Please generate an application first.", "warning")
+            return redirect(url_for('ui.index'))
+        
+        generation_result_data = session['generation_result']
+        target_dir = generation_result_data.get('target_directory')
+        current_app.logger.info(f"Target directory for ZIP: {target_dir}")
+
+        if not target_dir or not Path(target_dir).is_dir():
+            current_app.logger.error(f"Target directory '{target_dir}' not found or is not a directory.")
+            flash("Target directory not found", "danger")
+            return redirect(url_for('generation.result'))
+        
+        is_vercel = is_vercel_environment()
+        # Make sure 'is_vercel_project' is accessed safely if it might not exist
+        is_vercel_project = current_app.config.get('is_vercel_project', False)
+        current_app.logger.debug(f"Vercel check: is_vercel={is_vercel}, is_vercel_project={is_vercel_project}")
+        
+        current_app.logger.info(f"Attempting to create ZIP for directory: {target_dir}")
         memory_file = io.BytesIO()
         with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for root, dirs, files in os.walk(target_dir):
+                # Exclude hidden files/dirs and __pycache__
+                dirs[:] = [d for d in dirs if not d.startswith('.') and d != '__pycache__']
+                files[:] = [f for f in files if not f.startswith('.')] # Corrected this line
+                
                 for file in files:
-                    if file.startswith('.') or '__pycache__' in root:
-                        continue
                     file_path = os.path.join(root, file)
                     rel_path = os.path.relpath(file_path, target_dir)
+                    current_app.logger.debug(f"Adding to ZIP: {file_path} as {rel_path}")
                     zipf.write(file_path, rel_path)
         memory_file.seek(0)
-        dir_name = os.path.basename(os.path.normpath(target_dir))
-          # Si on est sur Vercel et c'est un projet temporaire, nettoyer le dossier après téléchargement
-        def cleanup_after_send():
-            if is_vercel and is_vercel_project:
-                cleanup_vercel_project(Path(target_dir))
-                current_app.logger.info(f"Projet temporaire nettoyé: {target_dir}")
-                
-        # Nom du fichier zip avec horodatage
-        zip_filename = f"{dir_name}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.zip"
         
-        # Utilisation d'une fonction de rappel après l'envoi du fichier
+        dir_name = os.path.basename(os.path.normpath(target_dir))
+        zip_filename = f"{dir_name}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.zip"
+        current_app.logger.info(f"ZIP file '{zip_filename}' created in memory. Size: {memory_file.getbuffer().nbytes} bytes.")
+
+        def cleanup_after_send():
+            try: # Added try-except for cleanup
+                if is_vercel and is_vercel_project:
+                    current_app.logger.info(f"Vercel cleanup: Attempting to remove {target_dir}")
+                    cleanup_vercel_project(Path(target_dir))
+                    current_app.logger.info(f"Vercel cleanup: Project directory {target_dir} cleaned up.")
+            except Exception as e_cleanup:
+                 current_app.logger.error(f"Exception in Vercel cleanup: {str(e_cleanup)}\\nTraceback:\\n{traceback.format_exc()}")
+
+        
         response = send_file(
             memory_file,
             as_attachment=True, 
             download_name=zip_filename,
             mimetype='application/zip'
         )
+        current_app.logger.info(f"Prepared send_file response for {zip_filename}.")
         
-        # Déclenchement du nettoyage si c'est un projet Vercel
         if is_vercel and is_vercel_project:
-            # Nous devons planifier le nettoyage pour qu'il se produise après l'envoi
-            threading.Timer(2.0, cleanup_after_send).start()
+            current_app.logger.info("Scheduling Vercel cleanup after send.")
+            threading.Timer(5.0, cleanup_after_send).start() 
         
+        current_app.logger.debug("download_zip route processing complete, returning response.")
         return response
+        
     except Exception as e:
-        current_app.logger.error(f"Error creating ZIP: {str(e)}")
+        tb_str = traceback.format_exc()
+        current_app.logger.error(f"Exception in download_zip: {str(e)}\\nTraceback:\\n{tb_str}")
         flash(f"Error creating ZIP file: {str(e)}", "danger")
         return redirect(url_for('generation.result'))

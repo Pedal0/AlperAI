@@ -9,6 +9,8 @@ import multiprocessing # Ajouté pour freeze_support
 import threading # Ajouté pour lancer Flask dans un thread
 import requests # Déplacé ici pour une meilleure organisation
 import traceback # Pour le logging d\'exception détaillé
+import webview
+import base64 # Ajouté pour le décodage des données du fichier
 
 # --- Début du bloc de débogage ---
 if getattr(sys, 'frozen', False): # Si l\'application est compilée par PyInstaller
@@ -34,6 +36,61 @@ debug_log(f"sys.argv: {sys.argv}")
 debug_log(f"BASE_DIR: {BASE_DIR}")
 debug_log(f"LOG_FILE_PATH: {LOG_FILE_PATH}")
 
+
+# Fonction pour sauvegarder les données reçues de JavaScript
+def save_file_via_dialog(filename_suggestion, data_base64):
+    debug_log(f"Entrée dans save_file_via_dialog. Suggestion de nom: {filename_suggestion}")
+    try:
+        if not webview.windows:
+            debug_log("Erreur critique dans save_file_via_dialog: Aucune fenêtre webview active (webview.windows est vide).")
+            return {"success": False, "error": "No active webview window found to open save dialog."}
+
+        current_window = webview.windows[0] # Accéder à la fenêtre active
+
+        # Ouvrir la boîte de dialogue "Enregistrer sous"
+        # Utiliser un répertoire par défaut comme le dossier Téléchargements de l'utilisateur
+        default_dir = str(Path.home() / "Downloads")
+        if not os.path.exists(default_dir):
+            default_dir = str(Path.home()) # Fallback au dossier home si Downloads n\'existe pas
+
+        # Corrected: Call create_file_dialog on the window instance
+        if not webview.windows:
+            debug_log("Erreur: Aucune fenêtre webview active trouvée pour create_file_dialog.")
+            return {"success": False, "error": "No active webview window."}
+        
+        active_window = webview.windows[0]
+        # For SAVE_DIALOG, create_file_dialog returns a string path or None
+        file_path_str = active_window.create_file_dialog(
+            webview.SAVE_DIALOG,
+            directory=default_dir,
+            save_filename=filename_suggestion
+        )
+
+        # Check if a valid file path string was returned
+        if file_path_str and isinstance(file_path_str, str):
+            try:
+                debug_log(f"Tentative d'écriture dans le fichier : {file_path_str}")
+                # Decode the base64 data
+                file_data = base64.b64decode(data_base64)
+                
+                # Write the data to the selected file
+                with open(file_path_str, 'wb') as f:
+                    f.write(file_data)
+                
+                debug_log(f"Fichier sauvegardé avec succès : {file_path_str}")
+                return {"success": True, "path": file_path_str}
+            except Exception as e:
+                error_message = f"Erreur lors de la sauvegarde du fichier : {e}"
+                debug_log(error_message)
+                return {"success": False, "error": error_message}
+        else:
+            debug_log("Boîte de dialogue de sauvegarde annulée ou fermée, ou chemin invalide.")
+            return {"success": False, "error": "Save dialog cancelled or closed, or invalid path."}
+
+    except Exception as e:
+        error_msg = f"Erreur dans save_file_via_dialog: {str(e)}"
+        debug_log(f"{error_msg}\\n{traceback.format_exc()}")
+        return {"success": False, "error": error_msg}
 
 try:
     import webview
@@ -200,45 +257,69 @@ def open_app():
     ping_url = 'http://127.0.0.1:5000/ping'
     debug_log(f"URL de ping: {ping_url}")
 
-    for i in range(30):
+    for i in range(30): # Tenter pendant 30 secondes max
         debug_log(f"Tentative de ping {i+1}/30...")
-        server_potentially_running = (flask_server_thread and flask_server_thread.is_alive()) or is_port_in_use(5000, '127.0.0.1')
-        if not server_potentially_running:
-            debug_log("Serveur Flask (thread ou externe) ne semble plus actif. Arrêt des tentatives.")
-            print("Le serveur Flask (thread ou externe) ne semble plus actif. Arrêt des tentatives de connexion.")
-            return False
         try:
-            r = requests.get(ping_url, timeout=1)
-            if r.status_code == 200:
-                debug_log(f"Ping réussi: {r.status_code} - {r.text}")
-                print("Serveur Flask prêt.")
+            response = requests.get(ping_url, timeout=1)
+            if response.status_code == 200:
+                debug_log(f"Ping réussi: {response.status_code} - {response.text.strip()}")
                 server_ready = True
                 break
             else:
-                debug_log(f"Ping échoué avec statut {r.status_code}.")
-        except requests.exceptions.ConnectionError:
-            debug_log("Ping échoué (ConnectionError).")
-        except requests.exceptions.RequestException as e:
-            debug_log(f"Ping échoué (RequestException): {e}")
+                debug_log(f"Ping échoué (status {response.status_code}). Réessai dans 1s...")
+        except requests.ConnectionError:
+            debug_log("Ping échoué (ConnectionError). Réessai dans 1s...")
+        except requests.Timeout:
+            debug_log("Ping échoué (Timeout). Réessai dans 1s...")
+        except Exception as e:
+            debug_log(f"Ping échoué (Exception: {e}). Réessai dans 1s...")
         time.sleep(1)
-            
+
     if not server_ready:
-        debug_log("Serveur Flask non prêt après 30 tentatives.")
-        print(f"Erreur : le serveur Flask n\'a pas démarré correctement ou n\'est pas joignable à {ping_url}. Arrêt du launcher.")
-        return False
-        
+        debug_log("Serveur Flask non prêt après 30s. Impossible d'ouvrir la fenêtre webview.")
+        print("Le serveur Flask n'a pas pu démarrer correctement. Impossible d'ouvrir l'application.")
+        return False # Indicate failure
+
     debug_log("Ouverture de la fenêtre webview...")
-    print("Ouverture de l\'application dans une fenêtre native...")
     try:
-        webview.create_window('Bot Project Creator', ping_url.replace("/ping",""), width=1200, height=800, resizable=True) # Pointer vers la racine
+        window = webview.create_window(
+            'Bot Project Creator',
+            'http://127.0.0.1:5000',
+            width=1200, 
+            height=800,
+            resizable=True
+            # confirm_close=True # Removed to prevent quit confirmation
+        )
         debug_log("Fenêtre webview créée.")
-        webview.start(debug=False) # Mettre debug=True pour le développement si nécessaire
+
+        # Exposer la fonction Python à JavaScript
+        try:
+            window.expose(save_file_via_dialog)
+            debug_log("Fonction 'save_file_via_dialog' exposée à JavaScript.")
+        except Exception as e_expose:
+            debug_log(f"Erreur lors de l'exposition de la fonction à JavaScript: {e_expose}\\n{traceback.format_exc()}")
+            # Continuer même si l'exposition échoue, bien que le téléchargement ne fonctionnera pas
+
+        # Supprimer les anciens gestionnaires d'événements de téléchargement car ils ne fonctionnent pas
+        # if hasattr(window, 'events') and hasattr(window.events, 'download'):
+        # debug_log("Tentative de suppression du gestionnaire window.events.download (s'il existe).")
+        # try:
+        # window.events.download -= on_download_requested # Assurez-vous que on_download_requested est défini ou supprimez cette ligne
+        # except Exception as e_remove_event:
+        # debug_log(f"Erreur lors de la suppression de l'ancien gestionnaire d'événements: {e_remove_event}")
+        # else:
+        # debug_log("Aucun gestionnaire d'événements de téléchargement standard trouvé sur l'objet window.")
+
+
+        # Try to explicitly use Edge WebView2 (mswebview2)
+        # CEF is causing Python version compatibility issues.
+        webview.start(gui='mswebview2') # Removed debug=True
         debug_log("webview.start() terminé (fenêtre fermée).")
+        return True # Indicate success
     except Exception as e:
-        debug_log(f"Erreur lors de la création/démarrage de webview: {e}\\n{traceback.format_exc()}")
-        print(f"Erreur lors de la création ou du démarrage de la fenêtre webview: {e}")
-        return False
-    return True
+        debug_log(f"Erreur lors de la création ou du démarrage de la fenêtre webview: {e}\\\\n{traceback.format_exc()}")
+        print(f"Erreur lors de l'ouverture de l'application: {e}")
+        return False # Indicate failure
 
 def check_already_running():
     debug_log("Entrée dans check_already_running().")
@@ -322,30 +403,40 @@ def main():
     check_already_running()
     
     update_successful = update_code()
+    # update_code() retourne False si git n'est pas là ou si une erreur survient.
+    # On continue même si la mise à jour échoue, mais on logue.
     if not update_successful:
-        debug_log("Mise à jour du code échouée. Lancement avec la version actuelle.")
-        print("La mise à jour du code a échoué. Lancement avec la version actuelle si possible.")
+        debug_log("Mise à jour du code non effectuée ou échouée. Lancement avec la version actuelle.")
+        # print("La mise à jour du code a échoué ou n'a pas été effectuée. Lancement avec la version actuelle si possible.")
 
     server_started_by_us = start_server_in_thread()
 
     if not server_started_by_us and not is_port_in_use(5000, '127.0.0.1'):
         debug_log("Serveur Flask n'a pas pu être démarré. Arrêt du launcher.")
-        print("Le serveur Flask n\'a pas pu être démarré. Arrêt du launcher.")
-        sys.exit(1)
+        print("Le serveur Flask n\\\'a pas pu être démarré. Arrêt du launcher.")
+        sys.exit(1) # Quitter si le serveur ne peut pas démarrer
     
     debug_log("Serveur démarré ou déjà en cours. Tentative d'ouverture de l'application.")
-    app_opened_successfully = open_app()
+    app_opened_successfully = open_app() # Stocker le résultat de open_app()
 
-    if not app_opened_successfully:
-        debug_log("L'application n'a pas pu s'ouvrir correctement. Arrêt.")
-        print("L\'application n\'a pas pu s\'ouvrir correctement.")
-        sys.exit(1)
+    if not app_opened_successfully: # Vérifier le booléen retourné
+        debug_log("L'application n'a pas pu s'ouvrir correctement (open_app a retourné False). Arrêt.")
+        print("L\\\'application n\\\'a pas pu s\\\'ouvrir correctement.")
+        # Ne pas appeler sys.exit(1) ici si open_app gère déjà la sortie en cas d'erreur critique
+        # ou si on veut que le finally s'exécute proprement.
+        # Si open_app retourne False à cause d'une exception pendant webview.start, le programme va continuer ici.
+        # Si l'utilisateur ferme la fenêtre, open_app retourne True.
+        # Si une exception survient avant webview.start, open_app retourne False.
+        # Le sys.exit(1) est déplacé dans le bloc except de main pour les erreurs non gérées.
+    else:
+        debug_log("Fenêtre de l'application fermée par l'utilisateur ou webview.start() terminé normalement.")
+        print("Fenêtre de l\\\'application fermée.")
 
-    debug_log("Fenêtre de l'application fermée par l'utilisateur (ou webview.start() terminé).")
-    print("Fenêtre de l\'application fermée.")
+    # Le reste du code de main s'exécute après la fermeture de la fenêtre ou si open_app a échoué avant webview.start()
+    # Si flask_server_thread est un daemon, il s'arrêtera avec le thread principal.
     if flask_server_thread is not None and flask_server_thread.is_alive():
-        debug_log("Thread serveur Flask actif à la fin de main (après fermeture webview). S'arrêtera car daemon.")
-        print("Le thread du serveur Flask est toujours actif et s\'arrêtera avec le programme principal (car daemon).")
+        debug_log("Thread serveur Flask actif à la fin de main (après fermeture webview ou échec open_app). S'arrêtera car daemon.")
+        # print("Le thread du serveur Flask est toujours actif et s\\\'arrêtera avec le programme principal (car daemon).")
     
     debug_log(f"Sortie de main() - PID: {os.getpid()}.")
 

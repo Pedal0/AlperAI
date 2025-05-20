@@ -160,7 +160,75 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Download button functionality
     document.getElementById("downloadBtn").addEventListener("click", function () {
-      window.location.href = window.URL_DOWNLOAD_ZIP;
+      const url = "/download_zip";
+      console.log("Download button clicked. Preparing to fetch from URL:", url);
+
+      fetch(url)
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const disposition = response.headers.get("Content-Disposition");
+          let filename = "downloaded_project.zip";
+          if (disposition && disposition.indexOf("attachment") !== -1) {
+            const filenameRegex = /filename[^;=\n]*=((['"])(.*?)\2|[^;\n]*)/;
+            const matches = filenameRegex.exec(disposition);
+            if (matches != null && matches[3]) {
+              filename = matches[3];
+            }
+          }
+          console.log("Suggested filename from header:", filename);
+          return response.blob().then((blob) => ({ blob, filename }));
+        })
+        .then(({ blob, filename }) => {
+          const reader = new FileReader();
+          reader.onloadend = function () {
+            const base64data = reader.result.split(",")[1];
+            if (
+              window.pywebview &&
+              window.pywebview.api &&
+              typeof window.pywebview.api.save_file_via_dialog === "function"
+            ) {
+              console.log(
+                "Calling window.pywebview.api.save_file_via_dialog with filename:",
+                filename
+              );
+              // Appeler la fonction Python exposée pour sauvegarder le fichier
+              // et gérer la promesse retournée par la fonction Python
+              window.pywebview.api
+                .save_file_via_dialog(filename, base64data)
+                .then((result) => {
+                  if (result && result.success) {
+                    console.log("File saved successfully via Python:", result.path);
+                  } else {
+                    console.error(
+                      "Error saving file via Python:",
+                      result ? result.error : "Unknown error"
+                    );
+                  }
+                })
+                .catch((error) => {
+                  console.error("Error calling save_file_via_dialog:", error);
+                });
+            } else {
+              console.error(
+                "The function save_file_via_dialog is not available on window.pywebview.api or is not a function."
+              );
+              alert(
+                "Download functionality not initialized correctly. Ensure pywebview API is available."
+              );
+            }
+          };
+          reader.onerror = function (error) {
+            console.error("FileReader error:", error);
+            alert("Error preparing file for download.");
+          };
+          reader.readAsDataURL(blob);
+        })
+        .catch((error) => {
+          console.error("Error fetching or processing blob for download:", error);
+          alert("Failed to retrieve the file for download: " + error.message);
+        });
     });
 
     // Open folder button (this would require backend support in a real implementation)
