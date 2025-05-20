@@ -167,34 +167,8 @@ If you want to create a standalone desktop executable (.exe on Windows) from thi
         pyinstaller launcher.spec
         ```
 
-    *   **To create a single executable file** (output in `dist/YourAppName.exe`):
-        PyInstaller typically determines the output type (one-file or one-dir) from the `.spec` file itself. If `launcher.spec` is set up for a one-dir build (which is common), and you want a one-file build, you would typically modify the `.spec` file or regenerate it with the `--onefile` option initially. 
-        However, if you want to try and force a one-file build with an existing spec, ensure the spec is compatible. The command would be:
-        ```powershell
-        pyinstaller --onefile launcher.spec 
-        ```
-        *Note: The `--onefile` option directly with a `.spec` file can sometimes cause issues if the spec isn't structured for it. The most reliable way is to have the spec define the one-file nature, or to generate the spec initially with `pyinstaller --onefile launcher.py` and then customize that spec.* 
-
-4.  **Customizing the Executable Name and Icon**:
-    You can change the name of the output `.exe` and its icon by editing the `launcher.spec` file.
-    Look for the `exe = EXE(...)` section:
-    ```python
-    exe = EXE(
-        pyz,
-        a.scripts,
-        a.binaries,
-        a.datas,
-        [],
-        name='BotProjectCreator',  # Change this to your desired .exe name
-        # ... other options ...
-        icon='static/images/favicon.ico'  # Change this to the path of your .ico file
-    )
-    ```
-    After modifying `launcher.spec`, save it and re-run the `pyinstaller launcher.spec` command.
-
-5.  **Running the Compiled Application**:
+4.  **Running the Compiled Application**:
     After a successful compilation, navigate to the `dist/` folder. 
-    *   If you created a bundled application, go into the subfolder (e.g., `dist/BotProjectCreator/`) and run `YourAppName.exe`.
-    *   If you created a single executable, you can run `dist/YourAppName.exe` directly.
+    *   You can run `dist/BotProjectCreator.exe` directly.
 
 A `launcher_debug.log` file will be created in the same directory as the executable, which can be helpful for troubleshooting if the application doesn't start as expected.
