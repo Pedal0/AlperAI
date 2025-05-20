@@ -22,8 +22,8 @@ Initialise les variables d'environnement et lance le serveur
 import os
 import sys
 from pathlib import Path
-import datetime
-import traceback
+import logging
+from logging.handlers import RotatingFileHandler
 
 # Determine base_path for logs and potentially other runtime data
 if getattr(sys, 'frozen', False):
@@ -38,17 +38,6 @@ else:
 
 def start_flask_server(port=5000, host='127.0.0.1'):
     """Démarre le serveur Flask et gère le contexte d'exécution."""
-    
-    if not getattr(sys, 'frozen', False):
-        os.chdir(Path(__file__).resolve().parent)
-
-    if not getattr(sys, 'frozen', False):
-        project_root_dev = Path(__file__).resolve().parent
-        src_dir_path_dev = project_root_dev / "src"
-        if str(src_dir_path_dev) not in sys.path:
-            sys.path.insert(0, str(src_dir_path_dev))
-        if str(project_root_dev) not in sys.path:
-            sys.path.insert(0, str(project_root_dev))
 
     from src.utils.env_utils import load_env_vars
     from app import app # app.py est supposé être à la racine du projet
@@ -56,72 +45,86 @@ def start_flask_server(port=5000, host='127.0.0.1'):
     # Charger les variables d'environnement
     load_env_vars()
 
-    # Configure logging
-    if not app.debug: # Or consider using: if getattr(sys, 'frozen', False):
-        import logging
-        from logging.handlers import RotatingFileHandler
-        
-        log_dir = base_path_for_logs / 'logs'
-        try:
-            log_dir.mkdir(exist_ok=True)
-            log_file = log_dir / 'app_flask.log'
-            # Use a formatter that includes more details for debugging
-            formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(lineno)d - %(message)s'
-            )
-            handler = RotatingFileHandler(log_file, maxBytes=2*1024*1024, backupCount=3) # 2MB per file
-            handler.setFormatter(formatter)
-            handler.setLevel(logging.DEBUG) # Capture more details
-
-            if not app.logger.handlers: # Avoid adding handler multiple times
-                app.logger.addHandler(handler)
-            app.logger.setLevel(logging.DEBUG) # Capture more details
-            
-            app.logger.info("-" * 50)
-            app.logger.info(f"Flask logger initialized. Frozen: {getattr(sys, 'frozen', False)}")
-            app.logger.info(f"Base path for logs: {base_path_for_logs}")
-            app.logger.info(f"Log file: {log_file}")
-            app.logger.info(f"CWD at logger setup: {os.getcwd()}")
-            app.logger.info(f"sys.executable: {sys.executable}")
-            if getattr(sys, 'frozen', False):
-                app.logger.info(f"sys._MEIPASS: {sys._MEIPASS}")
-
-        except Exception as e:
-            print(f"Critical error setting up Flask logging: {e}")
+    # Configure basic logging for UTF-8 console output
+    # This might help with Werkzeug and other root logger outputs
+    # Ensure this is called before Flask/Werkzeug initializes its own logging too much
+    # Remove existing root handlers if any, to avoid duplicate console logs if re-running this
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+    
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                        handlers=[
+                            logging.StreamHandler(sys.stdout) # Explicitly use sys.stdout
+                        ])
+    
+    # Ensure all stream handlers for the root logger use UTF-8
+    # This is a bit more forceful for console.
+    for handler in logging.root.handlers:
+        if isinstance(handler, logging.StreamHandler):
+            handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
             try:
-                fallback_log_path = base_path_for_logs / "flask_logging_setup_error.log"
-                with open(fallback_log_path, "a") as f_err:
-                    f_err.write(f"Timestamp: {datetime.datetime.now()}\\n") # Corrected datetime
-                    f_err.write(f"Critical error setting up Flask logging: {e}\\n")
-                    f_err.write(f"Traceback: {traceback.format_exc()}\\n\\n")
-            except Exception:
-                pass 
+                handler.stream.reconfigure(encoding='utf-8') # Python 3.7+
+            except AttributeError:
+                # For older versions or if reconfigure is not available on this stream
+                # Fallback or accept potential issues if this stream is the console
+                # and PYTHONIOENCODING is not set.
+                pass
+
+
+    # Configure logging for the Flask app (file handler)
+    log_dir = base_path_for_logs / 'logs'
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file_path = log_dir / 'app_flask.log'
+
+    # Remove any pre-existing handlers from app.logger to avoid conflicts/duplicates
+    for handler in list(app.logger.handlers):
+        app.logger.removeHandler(handler)
+
+    # Create a new file handler with UTF-8 encoding
+    file_handler = RotatingFileHandler(
+        log_file_path,
+        maxBytes=1024 * 1024 * 5,  # 5 MB
+        backupCount=5,
+        encoding='utf-8'  # Explicitly set UTF-8
+    )
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s [in %(pathname)s:%(lineno)d]'
+    )
+    file_handler.setFormatter(formatter)
+
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(logging.INFO) # Ensure app logger level is set
+    app.logger.propagate = False # Prevent app logs from going to root logger's console handler
+
+    app.logger.info(f"Flask logger (re)initialized. Log file: {log_file_path} (UTF-8)")
+    app.logger.info(f"Base path for logs: {base_path_for_logs}")
 
     # Démarrer l'application
     print(f"Démarrage de l'application Flask sur http://{host}:{port}")
     try:
-        # Utiliser 127.0.0.1 pour le serveur Flask lorsqu'il est utilisé avec pywebview
-        # pour des raisons de sécurité et de simplicité.
-        app.run(host=host, port=port, debug=False, use_reloader=False)
+        # Use app.debug setting from Flask app instance if configured, or pass explicitly.
+        # Logs indicate debug mode is off, so matching that.
+        app.run(host=host, port=port, debug=app.debug)
     except SystemExit:
-        # Werkzeug peut lever SystemExit lors d'un signal d'arrêt (ex: Ctrl+C dans le terminal direct)
-        print("Le serveur Flask a été arrêté.")
+        app.logger.info("Flask application exited via SystemExit.")
     except Exception as e:
-        print(f"Erreur lors de l'exécution du serveur Flask: {e}")
-        # Gérer d'autres erreurs potentielles ici
+        app.logger.exception("An error occurred during Flask app execution:")
+    finally:
+        app.logger.info("Flask application shutdown.")
 
 def main():
     """Fonction principale pour démarrer l'application (quand run.py est exécuté directement)"""
     port_arg = 5000
     # Pour une exécution directe, 0.0.0.0 peut être utilisé pour rendre accessible sur le réseau local.
     # Cependant, pour l'utilisation avec le launcher, 127.0.0.1 est préférable.
-    host_arg = '127.0.0.1' 
+    host_arg = '127.0.0.1'
     if len(sys.argv) > 1:
         try:
             port_arg = int(sys.argv[1])
         except ValueError:
             print(f"Le port spécifié '{sys.argv[1]}' n'est pas valide. Utilisation du port par défaut {port_arg}.")
-    
+
     start_flask_server(port=port_arg, host=host_arg)
 
 if __name__ == "__main__":

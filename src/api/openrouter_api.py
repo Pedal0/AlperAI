@@ -52,80 +52,61 @@ def call_openrouter_api(api_key, model, messages, temperature=0.7, stream=False,
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "User-Agent": "CodeGenApp/1.0" # Good practice to identify your app
+        "HTTP-Referer": "https://bot-project-creator.com", # Added for OpenRouter tracking
+        "X-Title": "Bot Project Creator" # Added for OpenRouter tracking
     }
-    data = {
+    payload: Dict[str, Any] = {
         "model": model,
         "messages": messages,
         "temperature": temperature,
-        "stream": stream
+        "stream": stream,
     }
-    
-    # Add tools if provided
     if tools:
-        data["tools"] = tools
-    
-    # Add response_format if provided (for structured output)
+        payload["tools"] = tools
     if response_format:
-        data["response_format"] = response_format
-    
-    response = None # Initialize response to None
-    
-    for retry_attempt in range(max_retries + 1):  # +1 to include initial attempt
+        payload["response_format"] = response_format
+
+    attempt = 0
+    while attempt <= max_retries:
         try:
-            # Indicate attempt number if not the first one
-            if retry_attempt > 0:
-                logger.info(f"Attempt #{retry_attempt+1}/{max_retries+1} calling API...")
-                
-            response = requests.post(OPENROUTER_API_URL, headers=headers, json=data, timeout=300) # Long timeout
-            
-            # If no HTTP error, return JSON response
-            if response.status_code == 200:
-                if retry_attempt > 0:
-                    logger.info(f"Success after {retry_attempt+1} attempts!")
-                return response.json()
-            
-            # If error 429 (Rate Limit), try to extract retryDelay
-            elif response.status_code == 429:
-                # Show error and response for debug
-                logger.error(f"Error 429 (Rate Limit) on attempt #{retry_attempt+1}")
-                
-                retry_delay = extract_retry_delay(response, model) 
-                
-                if retry_delay and retry_attempt < max_retries:
-                    logger.warning(f"Rate Limit hit. Waiting {retry_delay} seconds before retrying...")
-                    time.sleep(retry_delay)
-                    continue  # Try again after delay
-                else:
-                    if retry_attempt >= max_retries:
-                        logger.error(f"Maximum number of attempts reached ({max_retries+1})")
-                    else:
-                        logger.error("No retry delay found in response")
-                    # No retryDelay found or no more attempts possible
-                    response.raise_for_status()  # Will trigger HTTPError exception
-            else:
-                # Other HTTP error codes
-                response.raise_for_status()
-                
-        except requests.exceptions.Timeout:
-            logger.error("Error: API request timeout exceeded (300 seconds). Generation might be too long.")
-            return None
-        except requests.exceptions.RequestException as e:
+            response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload)
+            response.raise_for_status()  # Raise HTTPError for bad responses (4XX or 5XX)
+            return response.json()
+        except requests.exceptions.HTTPError as e:
             logger.error(f"Error during OpenRouter API call: {e}")
-            if response is not None:
-                try:
-                    logger.error(f"API response (status {response.status_code}): {response.text}")
-                except Exception: # In case response.text isn't readable
-                     logger.error(f"API response (status {response.status_code}) not decodable.")
-            return None
-        except json.JSONDecodeError:
-            logger.error(f"Error: Unable to decode JSON response from API.")
-            if response is not None:
-               logger.error(f"Raw response received: {response.text}")
-            return None
-    
-    # If we get here, all attempts failed
-    return None
+            error_response_text = e.response.text if e.response else "No response text"
+            # Ensure we log the status code if available
+            status_code_log = f"status {e.response.status_code}" if e.response is not None else "status N/A"
+            logger.error(f"API response ({status_code_log}): {error_response_text}")
+            
+            error_detail = {"message": str(e), "raw_response": error_response_text}
+            try:
+                # Try to parse JSON for more structured error info
+                error_json = e.response.json()
+                error_detail = error_json.get("error", error_detail) # Prefer OpenAI's error structure
+            except ValueError: # Not a JSON response
+                pass
+
+            if e.response is not None and e.response.status_code == 429: # Rate limit or quota exceeded
+                retry_delay = extract_retry_delay(e.response, model)
+                logger.warning(f"Rate limit hit for model {model}. Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                attempt += 1
+            elif attempt < max_retries:
+                logger.warning(f"API call failed (attempt {attempt + 1}/{max_retries + 1}). Retrying in {5 * (attempt + 1)} seconds...")
+                time.sleep(5 * (attempt + 1))
+                attempt += 1
+            else:
+                return {"error": error_detail, "status_code": e.response.status_code if e.response else 500}
+        except requests.exceptions.RequestException as e: # Other network errors
+            logger.error(f"Request failed: {e}")
+            if attempt < max_retries:
+                logger.warning(f"Request failed (attempt {attempt + 1}/{max_retries + 1}). Retrying in {5 * (attempt + 1)} seconds...")
+                time.sleep(5 * (attempt + 1))
+                attempt += 1
+            else:
+                return {"error": {"message": str(e), "code": "REQUEST_EXCEPTION"}, "status_code": None}
+    return {"error": {"message": "Max retries exceeded after all attempts."}, "status_code": None}
 
 def extract_retry_delay(response, model):
     """
@@ -273,7 +254,8 @@ def generate_code_with_openrouter(
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://bot-project-creator.com"  # Pour le tracking OpenRouter
+        "HTTP-Referer": "https://bot-project-creator.com",  # Pour le tracking OpenRouter
+        "X-Title": "Bot Project Creator" # Added for OpenRouter tracking
     }
     
     # Tenter l'appel API avec des réessais
