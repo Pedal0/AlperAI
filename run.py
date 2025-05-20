@@ -66,7 +66,7 @@ def main():
     port_arg = 5000
     # Pour une exécution directe, 0.0.0.0 peut être utilisé pour rendre accessible sur le réseau local.
     # Cependant, pour l'utilisation avec le launcher, 127.0.0.1 est préférable.
-    host_arg = '0.0.0.0' 
+    host_arg = '127.0.0.1' 
     if len(sys.argv) > 1:
         try:
             port_arg = int(sys.argv[1])
