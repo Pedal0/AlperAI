@@ -10,7 +10,14 @@ def stop_preview(session_id: str, running_processes=None, process_logs=None, ses
     if running_processes is None or process_logs is None or session_ports is None or logger is None:
         from src.preview.preview_manager import running_processes, process_logs, session_ports, logger
     if session_id not in running_processes:
-        return False, "Aucun processus en cours d'exécution pour cette session"
+        # Appel du nettoyage global si aucun process n'est trouvé (force le même comportement que lors de l'arrêt du serveur Flask)
+        try:
+            from src.preview.steps.cleanup_all_processes import cleanup_all_processes
+            cleanup_all_processes()
+        except Exception as e:
+            if logger is not None:
+                logger.error(f"Erreur lors du cleanup_all_processes: {str(e)}")
+        return False, "Aucun processus en cours d'exécution pour cette session (nettoyage global forcé)"
     
     try:
         process_info = running_processes[session_id]

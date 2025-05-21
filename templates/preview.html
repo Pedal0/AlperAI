@@ -1,4 +1,4 @@
-{% extends "layout.html" %} {% block title %}Preview{% endblock %} {% block
+{% extends "layout.html" %} {% block title %}MorphAIus - Preview{% endblock %} {% block
 content %}
 <div class="row justify-content-center">
   <div class="col-lg-11">
@@ -165,6 +165,12 @@ content %}
 
 <!-- Preview Session ID (hidden) -->
 <input type="hidden" id="preview-session-id" value="{{ preview_session_id }}" />
+<script>
+  // Sauvegarde l'ID de session de preview dans sessionStorage pour la page result
+  if (window.sessionStorage) {
+    sessionStorage.setItem('preview_session_id', '{{ preview_session_id }}');
+  }
+</script>
 {% endblock %} {% block extra_js %}
 <script>
   window.URL_PREVIEW_START = "{{ url_for('preview.start_preview_route') }}";

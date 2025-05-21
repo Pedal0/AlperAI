@@ -283,7 +283,7 @@ def open_app():
     debug_log("Ouverture de la fenêtre webview...")
     try:
         window = webview.create_window(
-            'Bot Project Creator',
+            'MorphAIus',
             'http://127.0.0.1:5000',
             width=1200, 
             height=800,

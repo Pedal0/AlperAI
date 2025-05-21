@@ -190,3 +190,14 @@ def list_files_route():
             rel = os.path.relpath(os.path.join(root, fname), dir_path)
             file_list.append(rel.replace('\\', '/'))
     return jsonify(status="success", files=file_list)
+
+@bp_preview.route('/preview/stop_all', methods=['POST'])
+def stop_all_previews():
+    try:
+        from src.preview.steps.cleanup_all_processes import cleanup_all_processes
+        cleanup_all_processes()
+        current_app.logger.info("All preview processes cleaned up via /preview/stop_all")
+        return '', 204
+    except Exception as e:
+        current_app.logger.error(f"Error during stop_all_previews: {str(e)}")
+        return '', 204
