@@ -13,8 +13,8 @@ This project uses AI to generate complete, functional applications based on user
 1. Clone the repository:
 
    ```
-   git clone https://github.com/Pedal0/bot-project-creator
-   cd bot-project-creator
+   git clone https://github.com/Pedal0/MorhpAIus
+   cd MorhpAIus
    ```
 
 2. Install dependencies using Pipenv:
@@ -109,14 +109,6 @@ For best results, try to be specific in your descriptions. Here are some example
   pipenv install flask openai python-dotenv asyncio
   ```
 
-## API Configuration
-
-The application uses AI models for code generation through OpenRouter's API, with the default model being `google/gemini-2.5-pro-exp-03-25:free`.
-
-You can configure these settings in `src/config/constants.py`:
-
-- Change model names in `DEFAULT_MODEL` variable
-- Adjust temperature settings for different generation tasks to control creativity vs precision
 
 ## License
 
@@ -142,7 +134,6 @@ If you want to create a standalone desktop executable (.exe on Windows) from thi
     pipenv install
     ```
     (PyInstaller should ideally be listed as a dev dependency in your `Pipfile` if you compile frequently. If not, you can install it in your pipenv environment: `pipenv install pyinstaller`)
-*   You will need an icon file in `.ico` format if you want to set a custom icon for the executable (e.g., `static/images/favicon.ico`).
 
 **Compilation Steps:**
 
@@ -162,13 +153,13 @@ If you want to create a standalone desktop executable (.exe on Windows) from thi
 3.  **Compile using `launcher.spec`**:
     The `launcher.spec` file contains the configuration for PyInstaller.
 
-    *   **To create a bundled application in a folder** (output in `dist/YourAppName/`):
+    *   **To create a bundled application in a folder** (output in `dist/`):
         ```powershell
         pyinstaller launcher.spec
         ```
 
 4.  **Running the Compiled Application**:
     After a successful compilation, navigate to the `dist/` folder. 
-    *   You can run `dist/BotProjectCreator.exe` directly.
+    *   You can run `dist/MorphAius.exe` directly.
 
 A `launcher_debug.log` file will be created in the same directory as the executable, which can be helpful for troubleshooting if the application doesn't start as expected.
