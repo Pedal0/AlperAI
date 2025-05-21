@@ -49,17 +49,3 @@ def get_openrouter_api_key():
     
     # Return the API key if it exists
     return os.environ.get(OPENROUTER_API_KEY_ENV, "")
-
-def is_vercel_environment():
-    """
-    Détecte si l'application est déployée sur Vercel.
-    
-    Returns:
-        bool: True si l'application est sur Vercel, False sinon
-    """
-    # Vercel définit ces variables d'environnement
-    vercel_env = os.environ.get('VERCEL', '')
-    vercel_region = os.environ.get('VERCEL_REGION', '')
-    
-    # Si au moins une de ces variables existe, nous sommes sur Vercel
-    return bool(vercel_env or vercel_region)

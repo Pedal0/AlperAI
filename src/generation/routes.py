@@ -222,9 +222,6 @@ Followed by the complete content of the file after modifications. Do not truncat
 @bp_generation.route('/generate', methods=['POST'])
 def generate():
     try:
-        from src.utils.env_utils import is_vercel_environment
-        from src.utils.file_utils import generate_vercel_project_path
-        
         data = request.form
         api_key = data.get('api_key', '')
         model = data.get('model', 'google/gemini-2.5-pro-exp-03-25:free')
@@ -235,16 +232,6 @@ def generate():
         include_animations = data.get('include_animations', 'on') == 'on'
         empty_files_check = data.get('empty_files_check', 'on') == 'on'
         errors = []
-        
-        # Vérifier si on est dans l'environnement Vercel
-        is_vercel = is_vercel_environment()
-        
-        if is_vercel and target_dir == 'vercel_generated':
-            # Sur Vercel, utilisez un chemin temporaire avec un ID unique
-            project_path = generate_vercel_project_path()
-            target_dir = str(project_path)
-            current_app.config['is_vercel_project'] = True
-        
         if not api_key:
             errors.append("API key is required")
         if not prompt:
@@ -276,7 +263,6 @@ def generate():
             'error': None,
             'result': None
         }
-        # Fix: pass the app object to the thread and use app.app_context()
         app = current_app._get_current_object()
         thread = threading.Thread(
             target=generate_application_thread,
@@ -339,24 +325,16 @@ def generation_progress():
 
 @bp_generation.route('/result')
 def result():
-    from src.utils.env_utils import is_vercel_environment
-    
     if 'generation_result' not in session:
         flash("No generation result found. Please generate an application first.", "warning")
         return redirect(url_for('ui.index'))
-    
-    is_vercel = is_vercel_environment()
-    is_vercel_project = current_app.config.get('is_vercel_project', False)
     generation_result = session['generation_result']
     used_tools = generation_result.get('used_tools', [])
-    
     return render_template('result.html',
                           result=generation_result,
                           prompt=session.get('prompt', ''),
                           target_dir=session.get('target_dir', ''),
-                          used_tools=used_tools,
-                          is_vercel=is_vercel,
-                          is_vercel_project=is_vercel_project)
+                          used_tools=used_tools)
 
 @bp_generation.route('/iterate', methods=['POST'])
 def iterate_generation():

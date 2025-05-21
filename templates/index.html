@@ -133,11 +133,9 @@
                   required
                 ></textarea>
               </div>
-              {% if not is_vercel %}
+
               <div class="mb-4">
-                <label for="target_directory" class="form-label"
-                  >Target Directory</label
-                >
+                <label for="target_directory" class="form-label">Target Directory</label>
                 <div class="input-group">
                   <input
                     type="text"
@@ -159,23 +157,6 @@
                   The folder must exist and you must have write permissions.
                 </div>
               </div>
-              {% else %}
-              <input
-                type="hidden"
-                id="target_directory"
-                name="target_directory"
-                value="vercel_generated"
-              />
-              <div class="mb-4">
-                <div class="alert alert-info">
-                  <i class="fas fa-cloud me-2"></i>
-                  <strong>Online version:</strong> The project will be generated
-                  in a temporary folder and made available for download. This
-                  folder will be automatically deleted after download to
-                  preserve server space.
-                </div>
-              </div>
-              {% endif %}
 
               <div class="examples-section mt-4">
                 <h5>
