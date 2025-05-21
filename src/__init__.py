@@ -1,5 +1,5 @@
 """
-Bot Project Creator application source code.
+MorphAIus application source code.
 Module structure:
 - src/api: API integration modules
 - src/config: Configuration and constants

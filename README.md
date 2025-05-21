@@ -1,4 +1,4 @@
-# AI Application Generator
+# MorphAIus
 
 This project uses AI to generate complete, functional applications based on user descriptions. It leverages the OpenRouter API to design, generate, and validate application code. The Flask interface provides an intuitive and modern way to create applications without writing code.
 

@@ -84,6 +84,13 @@ body {
 
 .input-panel {
     background: var(--surface);
+    display: flex; /* Added */
+    flex-direction: column; /* Added */
+}
+
+/* Added to make the content area of input-panel grow */
+.input-panel > .p-4:first-child {
+    flex-grow: 1;
 }
 
 /* Form elements */
