@@ -281,4 +281,15 @@ document.addEventListener("DOMContentLoaded", function () {
         );
       });
     });
+
+  // Arrêt du serveur preview si on arrive sur la page result et qu'une session preview existe
+  if (window.sessionStorage && window.sessionStorage.getItem('preview_session_id')) {
+    fetch('/preview/stop_on_exit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: window.sessionStorage.getItem('preview_session_id') })
+    }).then(() => {
+      window.sessionStorage.removeItem('preview_session_id');
+    });
+  }
   });

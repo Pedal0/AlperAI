@@ -125,12 +125,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Add beforeunload to stop preview
   window.addEventListener("beforeunload", function () {
-    if (childWindow && !childWindow.closed) {
+    // Toujours envoyer la requête d'arrêt, même si aucun childWindow
+    if (previewSessionId) {
       navigator.sendBeacon(
         window.URL_PREVIEW_STOP_ON_EXIT,
         JSON.stringify({ session_id: previewSessionId })
       );
     }
+    // Nettoyage global (arrête tous les serveurs preview, comme à l'arrêt du serveur Flask)
+    fetch('/preview/stop_all', { method: 'POST' });
   });
 
   // Navigation hooks to stop preview on link click
@@ -139,10 +142,14 @@ document.addEventListener("DOMContentLoaded", function () {
     .forEach((link) => {
       link.addEventListener("click", function (e) {
         if (this.getAttribute("data-bs-toggle") === "tab") return;
-
-        if (childWindow && !childWindow.closed) {
+        // Toujours arrêter la preview avant de naviguer
+        if (previewSessionId) {
           e.preventDefault();
-          fetch(window.URL_PREVIEW_STOP, { method: "POST" })
+          fetch(window.URL_PREVIEW_STOP_ON_EXIT, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ session_id: previewSessionId })
+          })
             .then(() => {
               window.location.href = this.href;
             })
@@ -366,6 +373,12 @@ document.addEventListener("DOMContentLoaded", function () {
     startApp();
   }
 
+  // Fonction utilitaire pour forcer le nettoyage global (stop_all)
+  function stopAllPreviews() {
+    fetch('/preview/stop_all', { method: 'POST' });
+  }
+  // Appel automatique lors du beforeunload (optionnel, ou à placer sur un bouton admin)
+  // window.addEventListener('beforeunload', stopAllPreviews);
   // Désactive la gestion des boutons start/stop/restart car ils n'existent plus
   // (Pas d'ajout d'eventListener sur startAppBtn, stopAppBtn, restartAppBtn, openInNewTabBtn)
 });
