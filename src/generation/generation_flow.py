@@ -14,8 +14,8 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>
 
 """
-Module de gestion du processus de génération d'applications.
-Contient les étapes et la logique de génération d'applications.
+Module for managing the application generation process.
+Contains the steps and logic for generating applications.
 """
 import time
 import asyncio
@@ -53,20 +53,20 @@ from src.generation.steps.analyze_user_needs import analyze_user_needs
 
 def generate_application(api_key, selected_model, user_prompt, target_directory, use_mcp_tools=True, frontend_framework="Auto-detect", include_animations=True, progress_callback=None):
     """
-    Génère une application complète basée sur la description de l'utilisateur.
+    Generate a complete application based on the user's description.
     
     Args:
-        api_key (str): Clé API OpenRouter
-        selected_model (str): Modèle d'IA sélectionné
-        user_prompt (str): Description de l'application souhaitée
-        target_directory (str): Répertoire de destination
-        use_mcp_tools (bool, optional): Utiliser les outils MCP pour améliorer la génération
-        frontend_framework (str, optional): Framework frontend préféré
-        include_animations (bool, optional): Inclure des animations CSS
-        progress_callback (function, optional): Fonction pour mettre à jour la progression
+        api_key (str): OpenRouter API key
+        selected_model (str): Selected AI model
+        user_prompt (str): Application description
+        target_directory (str): Destination directory
+        use_mcp_tools (bool, optional): Use MCP tools to improve generation
+        frontend_framework (str, optional): Preferred frontend framework
+        include_animations (bool, optional): Include CSS animations
+        progress_callback (function, optional): Progress update callback
         
     Returns:
-        bool: True si la génération a réussi, False sinon
+        bool: True if generation succeeded, False otherwise
     """
     from flask import current_app
 
@@ -400,6 +400,23 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                     except Exception as e:
                         logging.error(f"Failed to generate launch instructions: {e}")
                         update_progress(8, "⚠️ Failed to generate launch instructions.", None, progress_callback)
+                    
+                    # == STEP 9: Automatic validation and self-correction via MCP ==
+                    from src.generation.steps.validate_with_mcp_step import validate_with_mcp_step
+                    mcp_validation_enabled = True  # TODO: make configurable
+                    if mcp_validation_enabled:
+                        update_progress(9, "🧪 Starting automatic MCP validation and self-correction...", 100, progress_callback)
+                        valid, mcp_message = validate_with_mcp_step(
+                            target_directory,
+                            api_key=api_key,
+                            model=selected_model,
+                            user_prompt=user_prompt,
+                            progress_callback=progress_callback
+                        )
+                        if valid:
+                            update_progress(10, f"✅ MCP validation/correction: {mcp_message}", 100, progress_callback)
+                        else:
+                            update_progress(10, f"⚠️ MCP validation failed: {mcp_message}", 100, progress_callback)
                     
                     # Save path for preview mode if in Flask context
                     if current_app:
