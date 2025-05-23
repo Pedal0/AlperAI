@@ -144,18 +144,85 @@ def iterate_application_thread(task_id, api_key, model, reformulated_prompt, fee
                     detailed_context += f"FILE: {path}\n```\n{preview}\n```\n\n"
             if detailed_context:
                 code_summary += "\nDetailed file previews for style context:\n" + detailed_context
-            system_prompt = """You are a software engineering expert. Your task is to improve the existing application code according to the user's instructions.
-Keep existing code as much as possible and modify only what is explicitly requested by the user to preserve overall application coherence.
+            # Nouveau prompt système renforcé pour l'itération IA
+            system_prompt = '''You are a senior software engineer AI assistant. Your task is to improve the existing application code according to the user's instructions.
 
-Generate only the files that need to be modified or added.
+STRICT RULES:
+- DO NOT modify any file, code, style, or structure unless it is EXPLICITLY requested by the user feedback.
+- PRESERVE all existing styles, layouts, and logic unless the user asks for a change.
+- If the user asks for a change, ONLY modify the minimal code required to achieve the request.
+- DO NOT refactor, optimize, or reformat code unless the user asks for it.
+- DO NOT change the structure, class names, CSS selectors, or HTML tags unless the user asks for it.
+- If you need to add code, do it in a way that does not break or alter the existing design and logic.
+- If the user feedback is ambiguous, DO NOT make assumptions: do the minimal change or ask for clarification.
+- If you detect a risk of breaking the style or structure, warn in a comment at the top of the file.
 
+EXAMPLES:
+Good:
+- User: "Add a button to the navbar" → Only add the button in the navbar, do not touch other parts.
+- User: "Change the background color to black" → Only change the background property, do not touch other CSS or HTML.
+Bad:
+- Changing unrelated styles, deleting or renaming classes, or reformatting the whole file.
+
+OUTPUT FORMAT:
 For each file to modify or add, clearly indicate:
 ```
 FILE: <file/path>
 ```
-
 Followed by the complete content of the file after modifications. Do not truncate code and provide full implementations. Ensure accuracy in file paths.
-"""
+
+FINAL CHECK:
+- Double check that you did NOT change anything except what the user requested.
+- If you made any change not strictly required, revert it.
+'''
+            # --- Détection automatique des fichiers concernés par l'itération ---
+            import re
+            feedback_lower = feedback.lower()
+            # Heuristique simple : cherche des mots-clés de fichiers ou d'éléments
+            file_keywords = []
+            if 'navbar' in feedback_lower or 'menu' in feedback_lower:
+                file_keywords += ['navbar', 'menu', 'header']
+            if 'footer' in feedback_lower:
+                file_keywords += ['footer']
+            if 'button' in feedback_lower or 'bouton' in feedback_lower:
+                file_keywords += ['button', 'btn']
+            if 'background' in feedback_lower or 'fond' in feedback_lower:
+                file_keywords += ['style', 'background', 'css']
+            if 'color' in feedback_lower or 'couleur' in feedback_lower:
+                file_keywords += ['style', 'color', 'css']
+            if 'page' in feedback_lower:
+                file_keywords += ['index', 'page', 'main']
+            # Ajoute d'autres heuristiques selon besoin...
+
+            # Recherche les fichiers concernés
+            targeted_files = []
+            for path in file_list:
+                for kw in file_keywords:
+                    if kw in path.lower():
+                        targeted_files.append(path)
+                        break
+            # Si rien trouvé, fallback sur tous les fichiers HTML/CSS
+            if not targeted_files:
+                targeted_files = [p for p in file_list if p.lower().endswith(('.html', '.css'))]
+            # Extraction des extraits pertinents
+            detailed_context = ""
+            for path in targeted_files:
+                content = existing_files.get(path, '')
+                preview = content[:2000] + ('...' if len(content) > 2000 else '')
+                detailed_context += f"FILE: {path}\n```\n{preview}\n```\n\n"
+            # Résumé du style global (extraction des variables CSS principales)
+            style_summary = ""
+            for path in file_list:
+                if path.lower().endswith('.css'):
+                    css_content = existing_files.get(path, '')
+                    # Extrait les variables CSS et couleurs principales
+                    vars_found = re.findall(r'--[\w-]+:\s*[^;]+;', css_content)
+                    colors_found = re.findall(r'#[0-9a-fA-F]{3,6}|rgb\([^\)]+\)', css_content)
+                    if vars_found or colors_found:
+                        style_summary += f"\nDans {path}:\nVariables CSS: {', '.join(vars_found[:10])}\nCouleurs: {', '.join(colors_found[:10])}\n"
+            if style_summary:
+                detailed_context += f"\nRésumé du style global :\n{style_summary}\n"
+            code_summary = "Liste des fichiers concernés :\n" + "\n".join(targeted_files) + "\n\nExtraits pertinents :\n" + detailed_context
             user_prompt = f"""Here is the original project description:\n\n{reformulated_prompt}\n\nHere is an overview of the existing code:\n\n{code_summary}\n\nUser requested iteration with the following feedback:\n\n{feedback}\n\nPlease improve the existing code according to these instructions. Provide only the files that need to be modified or added."""
             generation_tasks[task_id]['progress'] = 50
             generation_tasks[task_id]['current_step'] = "Generating improvements..."
