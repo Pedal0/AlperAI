@@ -336,14 +336,23 @@ document.addEventListener("DOMContentLoaded", function () {
               // Update current step
               if (data.current_step) {
                 currentStep.textContent = data.current_step;
-                // Ajout : détecter le message MCP
+                // Only show MCP message if it's not the generic tools enabled message
                 if (
-                  data.current_step.includes("Outils MCP activés") ||
-                  data.current_step.includes("MCP tools enabled")
+                  (data.current_step.includes("Outils MCP activés") ||
+                  data.current_step.includes("MCP tools enabled")) &&
+                  !data.current_step.startsWith("Define project structure") &&
+                  !data.current_step.startsWith("Generating documentation") &&
+                  !data.current_step.startsWith("Generating frontend") &&
+                  !data.current_step.startsWith("Generating backend")
                 ) {
                   mcpMessage = data.current_step;
                   mcpBox.textContent = mcpMessage;
                   mcpBox.classList.remove("d-none");
+                } else if (
+                  data.current_step.includes("MCP tools enabled")
+                ) {
+                  // Hide the green box for the generic tools enabled message
+                  mcpBox.classList.add("d-none");
                 }
               }
               // Afficher le message MCP si déjà détecté

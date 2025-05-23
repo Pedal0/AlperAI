@@ -89,7 +89,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         update_progress(0, "Using MCP tools to gather context and documentation...", 2, progress_callback)
         from src.mcp.clients import SimpleMCPClient
         mcp_client = SimpleMCPClient(api_key, selected_model)
-        update_progress(0, "🔌 MCP tools enabled: Web search, documentation, and frontend components available.", progress_callback)
+        update_progress(0, "🔌 MCP tools enabled: Web search, documentation, and frontend components available.", 4, progress_callback)
 
         import asyncio
         from src.generation.steps.run_mcp_query import run_mcp_query
@@ -97,17 +97,17 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         web_result = asyncio.run(run_mcp_query(mcp_client, web_query))
         if web_result and web_result.get("text"):
             mcp_context += "\n# Web Search Results\n" + web_result["text"]
-            update_progress(0, "Web search results integrated into context.", progress_callback)
+            update_progress(0, "Web search results integrated into context.", 5, progress_callback)
 
         if frontend_framework and frontend_framework.lower() not in ["auto-detect", "none", ""]:
             doc_query = f"Find the official documentation and best practices for using the frontend framework: {frontend_framework}"
             doc_result = asyncio.run(run_mcp_query(mcp_client, doc_query))
             if doc_result and doc_result.get("text"):
                 mcp_context += f"\n# Documentation for {frontend_framework}\n" + doc_result["text"]
-                update_progress(0, f"Documentation for {frontend_framework} integrated into context.", progress_callback)
+                update_progress(0, f"Documentation for {frontend_framework} integrated into context.", 7, progress_callback)
 
     # == STEP 0: Extract and process URLs from prompt ==
-    update_progress(0, "Extracting URLs from prompt...", 5, progress_callback)
+    update_progress(0, "Extracting URLs from prompt...", 8, progress_callback)
     urls = extract_urls_from_prompt(user_prompt)
     url_context = ""
     
@@ -123,9 +123,9 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                 truncated_content = content[:5000] + "..." if len(content) > 5000 else content
                 url_context += f"\nURL: {url}\n```\n{truncated_content}\n```\n"
             
-            update_progress(0, f"✅ Content retrieved for {len(url_contents)} URL(s)", 15, progress_callback)
+            update_progress(0, f"✅ Content retrieved for {len(url_contents)} URL(s)", 12, progress_callback)
         except Exception as e:
-            update_progress(0, f"❌ Error while retrieving URLs: {e}", 15, progress_callback)
+            update_progress(0, f"❌ Error while retrieving URLs: {e}", 12, progress_callback)
             # Continue even if error
 
     # Ajoute le contexte MCP à la reformulation du prompt si présent
@@ -136,7 +136,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
             process_state['reformulated_prompt'] = mcp_context
 
     # == STEP 1: Reformulate prompt ==
-    update_progress(1, "Reformulating prompt...", 20, progress_callback)
+    update_progress(1, "Reformulating prompt...", 15, progress_callback)
     additional_context = ""
     tool_results_text = ""
     url_reference = ""
@@ -156,13 +156,13 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         return False
 
     # == NOUVELLE ÉTAPE : Analyse des besoins utilisateur ==
-    update_progress(1, "Analyzing user needs to determine required steps...", 25, progress_callback)
+    update_progress(1, "Analyzing user needs to determine required steps...", 18, progress_callback)
     steps_to_run = analyze_user_needs(user_prompt)
     process_state['steps_to_run'] = steps_to_run
     logging.info(f"[GENERATION] Steps to run: {steps_to_run}")
 
     # == STEP 2: Define project structure ==
-    update_progress(2, "Defining project structure...", 45, progress_callback)
+    update_progress(2, "Defining project structure...", 25, progress_callback)
     structure_lines = define_project_structure(
         api_key,
         selected_model,
@@ -175,11 +175,11 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         return False
 
     # == STEP 3: Create file/folder structure ==
-    update_progress(3, f"Creating folders and files in '{target_directory}'...", 60, progress_callback)
+    update_progress(3, f"Creating folders and files in '{target_directory}'...", 35, progress_callback)
     created_paths = create_project_structure(target_directory, structure_lines)
 
     if created_paths is not None:
-        update_progress(3, f"✅ Structure created in '{target_directory}'.", 65, progress_callback)
+        update_progress(3, f"✅ Structure created in '{target_directory}'.", 40, progress_callback)
 
         # == STEP 4: Code generation ==
         steps_to_run = process_state.get('steps_to_run', [])
@@ -195,7 +195,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         from src.generation.steps.generate_documentation_step import generate_documentation_step
         
         if "frontend" in steps_to_run:
-            update_progress(4, "Generating frontend...", 70, progress_callback)
+            update_progress(4, "Generating frontend...", 45, progress_callback)
             code_responses["frontend"] = generate_frontend_step(
                 api_key,
                 selected_model,
@@ -213,7 +213,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
             )
         
         if "backend" in steps_to_run:
-            update_progress(4, "Generating backend...", 72, progress_callback)
+            update_progress(4, "Generating backend...", 50, progress_callback)
             code_responses["backend"] = generate_backend_step(
                 api_key,
                 selected_model,
@@ -230,7 +230,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                 process_state=process_state
             )
         if "tests" in steps_to_run:
-            update_progress(4, "Generating tests...", 74, progress_callback)
+            update_progress(4, "Generating tests...", 53, progress_callback)
             code_responses["tests"] = generate_tests_step(
                 api_key,
                 selected_model,
@@ -247,7 +247,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                 process_state=process_state
             )
         if "documentation" in steps_to_run or "readme" in steps_to_run:
-            update_progress(4, "Generating documentation...", 76, progress_callback)
+            update_progress(4, "Generating documentation...", 55, progress_callback)
             code_responses["documentation"] = generate_documentation_step(
                 api_key,
                 selected_model,
@@ -274,7 +274,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
             
             # Tool calls
             if use_mcp_tools and response_code_gen["choices"][0]["message"].get("tool_calls") and mcp_client:
-                update_progress(4, "🔍 AI is using tools to improve code generation...", 80, progress_callback)
+                update_progress(4, "🔍 AI is using tools to improve code generation...", 60, progress_callback)
                 
                 tool_calls = response_code_gen["choices"][0]["message"]["tool_calls"]
                 for tool_call in tool_calls:
@@ -321,10 +321,10 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                         add_used_tool(process_state, tool_name, {'error': str(e)})  # Record the tool even in case of error
 
             process_state['last_code_generation_response'] = code_response_text
-            update_progress(4, "✅ Code generation response received.", 90, progress_callback)
+            update_progress(4, "✅ Code generation response received.", 65, progress_callback)
 
             # == STEP 5: Write code to files ==
-            update_progress(5, "Writing code to files...", 90, progress_callback)
+            update_progress(5, "Writing code to files...", 70, progress_callback)
             files_written = []
             errors = []
             generation_incomplete = False
@@ -332,7 +332,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
             files_written, errors, generation_incomplete = parse_and_write_code(target_directory, code_response_text)
 
             if files_written or errors:
-                update_progress(5, "✅ Response processing complete.", 95, progress_callback)
+                update_progress(5, "✅ Response processing complete.", 75, progress_callback)
                 
                 # Log results
                 for f in files_written:
@@ -342,12 +342,12 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
 
                 # == STEP 6: Check empty files and generate missing code ==
                 if not errors and (files_written or generation_incomplete):
-                    update_progress(6, "Checking for empty files...", 95, progress_callback)
+                    update_progress(6, "Checking for empty files...", 77, progress_callback)
                     
                     empty_files = identify_empty_files(target_directory, structure_lines)
                     
                     if empty_files:
-                        update_progress(6, f"Found {len(empty_files)} empty files that need code generation.", 95, progress_callback)
+                        update_progress(6, f"Found {len(empty_files)} empty files that need code generation.", 78, progress_callback)
                         
                         # Check rate limit before calling the API again
                         if is_free_model(selected_model):
@@ -355,10 +355,10 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                             time_since_last_call = time.time() - process_state.get('last_api_call_time', 0)
                             if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
                                 wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
-                                update_progress(6, f"⏳ Free model detected. Waiting {wait_time:.1f} seconds before generating missing code...", 95, progress_callback)
+                                update_progress(6, f"⏳ Free model detected. Waiting {wait_time:.1f} seconds before generating missing code...", 80, progress_callback)
                                 time.sleep(wait_time)
                         
-                        update_progress(6, "Generating code for empty files...", 97, progress_callback)
+                        update_progress(6, "Generating code for empty files...", 82, progress_callback)
                         additional_files, additional_errors = generate_missing_code(
                             api_key, 
                             selected_model, 
@@ -371,7 +371,7 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                         process_state['last_api_call_time'] = time.time()
                         
                         if additional_files:
-                            update_progress(6, f"✅ Successfully generated code for {len(additional_files)} empty files.", 98, progress_callback)
+                            update_progress(6, f"✅ Successfully generated code for {len(additional_files)} empty files.", 85, progress_callback)
                             # Add to main file list
                             files_written.extend(additional_files)
                         
@@ -381,36 +381,38 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                             # Add to main error list
                             errors.extend(additional_errors)
                     else:
-                        update_progress(6, "✅ No empty files found - all files contain code.", 98, progress_callback)
+                        update_progress(6, "✅ No empty files found - all files contain code.", 85, progress_callback)
                   # Final success message
                 if not errors:
-                    update_progress(7, "🎉 Application generated successfully!", 100, progress_callback)
+                    update_progress(7, "🎉 Application generated successfully!", 90, progress_callback)
                     # == STEP 8: Generate launch scripts ==
-                    update_progress(8, "🛠️ Generating launch instructions based on README.md...", None, progress_callback)
+                    update_progress(8, "🛠️ Generating launch instructions based on README.md...", 92, progress_callback)
                     try:
                         from src.preview.handler.generate_start_scripts import generate_start_scripts
                         generate_start_scripts(target_directory, api_key, selected_model)
-                        update_progress(8, "✅ Launch instructions created based on README.md.", 100, progress_callback)
+                        update_progress(8, "✅ Launch instructions created based on README.md.", 94, progress_callback)
                         try:
                             from src.preview.steps.improve_readme import improve_readme_for_preview
                             if improve_readme_for_preview(target_directory):
-                                update_progress(8, "✅ README.md has been enhanced with detailed instructions.", 100, progress_callback)
+                                update_progress(8, "✅ README.md has been enhanced with detailed instructions.", 95, progress_callback)
                         except Exception as e:
                             logging.error(f"Failed to enhance README: {e}")
                     except Exception as e:
                         logging.error(f"Failed to generate launch instructions: {e}")
-                        update_progress(8, "⚠️ Failed to generate launch instructions.", None, progress_callback)
-                    
-                    # == STEP 9: Automatic validation and self-correction via MCP ==
+                        update_progress(8, "⚠️ Failed to generate launch instructions.", 95, progress_callback)
+                      # == STEP 9: Automatic validation and self-correction via MCP ==
                     from src.generation.steps.validate_with_mcp_step import validate_with_mcp_step
                     mcp_validation_enabled = True  # TODO: make configurable
                     if mcp_validation_enabled:
-                        update_progress(9, "🧪 Starting automatic MCP validation and self-correction...", 100, progress_callback)
+                        update_progress(9, "🧪 Starting automatic MCP validation and self-correction...", 97, progress_callback)
+                        # Use reformulated prompt for better validation context
+                        reformulated_for_validation = process_state.get('reformulated_prompt', reformulated_prompt)
                         valid, mcp_message = validate_with_mcp_step(
                             target_directory,
                             api_key=api_key,
                             model=selected_model,
                             user_prompt=user_prompt,
+                            reformulated_prompt=reformulated_for_validation,
                             progress_callback=progress_callback
                         )
                         if valid:
