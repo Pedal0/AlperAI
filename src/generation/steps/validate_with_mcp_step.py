@@ -24,11 +24,14 @@ def validate_with_mcp_step(target_directory, api_key=None, model=None, user_prom
         # 2. Ask the AI to check for errors and fix them
         import asyncio
         validation_prompt = (
-            "You are an expert code reviewer. "
-            "Check all files in this project for errors, bad imports, missing files, or incorrect calls. "
-            "If you find any issues, fix them directly in the files. "
-            "Summarize the corrections you made. "
-            "If everything is correct, just reply 'All good'."
+            "You are an expert full-stack code reviewer and auto-fixer. "
+            "1. Check all files for syntax errors, missing or incorrect imports, and unused dependencies in package files (like package.json, requirements.txt, etc). "
+            "2. For each API call or frontend-backend interaction, verify that the backend route exists and receives the correct parameters. "
+            "3. If you find any mismatch (e.g., frontend sends data that backend does not expect, or vice versa), fix both sides so they match. "
+            "4. Ensure all dependencies are declared and used correctly. "
+            "5. Fix any small issues (naming, typos, missing files, etc). "
+            "6. Summarize all corrections you made. If everything is correct, just reply 'All good'. "
+            "You are allowed to directly edit the files to fix any detected issues."
         )
         if user_prompt:
             validation_prompt += f"\nUser request: {user_prompt}"
