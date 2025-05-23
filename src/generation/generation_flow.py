@@ -49,6 +49,7 @@ from src.generation.steps.add_used_tool import add_used_tool
 from src.generation.steps.update_progress import update_progress
 from src.generation.steps.run_mcp_query import run_mcp_query
 from src.generation.steps.check_and_enhance_readme import check_and_enhance_readme
+from src.generation.steps.analyze_user_needs import analyze_user_needs
 
 def generate_application(api_key, selected_model, user_prompt, target_directory, use_mcp_tools=True, frontend_framework="Auto-detect", include_animations=True, progress_callback=None):
     """
@@ -154,6 +155,12 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         update_progress(1, "❌ Failed to reformulate prompt.", 40, progress_callback)
         return False
 
+    # == NOUVELLE ÉTAPE : Analyse des besoins utilisateur ==
+    update_progress(1, "Analyzing user needs to determine required steps...", 25, progress_callback)
+    steps_to_run = analyze_user_needs(user_prompt)
+    process_state['steps_to_run'] = steps_to_run
+    logging.info(f"[GENERATION] Steps to run: {steps_to_run}")
+
     # == STEP 2: Define project structure ==
     update_progress(2, "Defining project structure...", 45, progress_callback)
     structure_lines = define_project_structure(
@@ -175,37 +182,91 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         update_progress(3, f"✅ Structure created in '{target_directory}'.", 65, progress_callback)
 
         # == STEP 4: Code generation ==
-        if include_animations and not prompt_mentions_design(user_prompt):
-            animation_instruction = (
-                "\n7. **Animation & Fluidity:** Since no specific design was requested, "
-                "please incorporate subtle CSS animations and transitions (e.g., hover effects, smooth section transitions, subtle button feedback) "
-                "to make the UI modern, smooth, and attractive. Prioritize usability and avoid overly distracting animations."
+        steps_to_run = process_state.get('steps_to_run', [])
+        if not steps_to_run:
+            update_progress(4, "❌ No generation steps detected. Aborting.", 100, progress_callback)
+            return False
+
+        # Génération par bloc selon les étapes demandées
+        code_responses = {}
+        from src.generation.steps.generate_frontend_step import generate_frontend_step
+        from src.generation.steps.generate_backend_step import generate_backend_step
+        from src.generation.steps.generate_tests_step import generate_tests_step
+        from src.generation.steps.generate_documentation_step import generate_documentation_step
+        
+        if "frontend" in steps_to_run:
+            update_progress(4, "Generating frontend...", 70, progress_callback)
+            code_responses["frontend"] = generate_frontend_step(
+                api_key,
+                selected_model,
+                reformulated_prompt,
+                structure_lines,
+                url_context,
+                tool_results_text,
+                url_reference,
+                animation_instruction,
+                use_mcp_tools,
+                mcp_client,
+                user_prompt,
+                progress_callback=progress_callback,
+                process_state=process_state
             )
-            update_progress(4, "ℹ️ No design instructions detected, adding a request for smooth animations.", 75, progress_callback)
-        if use_mcp_tools and process_state.get('tool_results'):
-            tool_results_text = "\n**Tool Results:** The following information was gathered to assist development:\n"
-            for tool_name, tool_info in process_state['tool_results'].items():
-                tool_results_text += f"\n- **{tool_name}**: {json.dumps(tool_info.get('args', {}))}\n"
-                if 'result' in tool_info:
-                    tool_results_text += f"Result: {tool_info['result'][:500]}...\n"
-        if process_state.get('url_contents'):
-            url_reference = "\n**Provided URLs:** Please refer to the URLs provided by the user as inspiration or documentation. Follow examples or documentation from these URLs as much as possible."
-        update_progress(4, "Generating full code...", 70, progress_callback)
-        response_code_gen = generate_code_step(
-            api_key,
-            selected_model,
-            reformulated_prompt,
-            structure_lines,
-            url_context,
-            tool_results_text,
-            url_reference,
-            animation_instruction,
-            use_mcp_tools,
-            mcp_client,
-            user_prompt,
-            progress_callback=progress_callback,
-            process_state=process_state
-        )
+        
+        if "backend" in steps_to_run:
+            update_progress(4, "Generating backend...", 72, progress_callback)
+            code_responses["backend"] = generate_backend_step(
+                api_key,
+                selected_model,
+                reformulated_prompt,
+                structure_lines,
+                url_context,
+                tool_results_text,
+                url_reference,
+                animation_instruction,
+                use_mcp_tools,
+                mcp_client,
+                user_prompt,
+                progress_callback=progress_callback,
+                process_state=process_state
+            )
+        if "tests" in steps_to_run:
+            update_progress(4, "Generating tests...", 74, progress_callback)
+            code_responses["tests"] = generate_tests_step(
+                api_key,
+                selected_model,
+                reformulated_prompt,
+                structure_lines,
+                url_context,
+                tool_results_text,
+                url_reference,
+                animation_instruction,
+                use_mcp_tools,
+                mcp_client,
+                user_prompt,
+                progress_callback=progress_callback,
+                process_state=process_state
+            )
+        if "documentation" in steps_to_run or "readme" in steps_to_run:
+            update_progress(4, "Generating documentation...", 76, progress_callback)
+            code_responses["documentation"] = generate_documentation_step(
+                api_key,
+                selected_model,
+                reformulated_prompt,
+                structure_lines,
+                url_context,
+                tool_results_text,
+                url_reference,
+                animation_instruction,
+                use_mcp_tools,
+                mcp_client,
+                user_prompt,
+                progress_callback=progress_callback,
+                process_state=process_state
+            )
+        # Fusionner les réponses pour la suite du flow (écriture des fichiers, etc.)
+        # Pour l'instant, on ne traite que le frontend comme code principal si présent, sinon backend, sinon tests, sinon doc
+        main_code_response = code_responses.get("frontend") or code_responses.get("backend") or code_responses.get("tests") or code_responses.get("documentation")
+        response_code_gen = main_code_response
         process_state['last_api_call_time'] = time.time()
 
         if response_code_gen and response_code_gen.get("choices"):
