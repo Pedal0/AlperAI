@@ -174,19 +174,32 @@ def create_project_structure(target_directory, structure_lines):
 
 def clean_code_block(code_block):
     """
-    Remove markdown code block markers and end markers from the beginning and end of code blocks.
+    Remove markdown code block markers universally from any language.
+    Detects and removes ```language markers at start and ``` at end.
     """
-    # Pattern for beginning: ```language or ```
-    start_pattern = r'^```(?:\w+)?\n'
-    # Pattern for end: ```
-    end_pattern = r'\n```$'
-    # Remove both patterns
-    code_block = re.sub(start_pattern, '', code_block)
-    code_block = re.sub(end_pattern, '', code_block)
-    # Remove custom end-of-file markers often inserted by AI
+    import re
+    
+    # Pattern ultra-robuste pour début: ```[n'importe quel langage]
+    # Supporte: ```javascript, ```python, ```html, ```css, ```typescript, ```jsx, etc.
+    start_pattern = r'^```[a-zA-Z0-9_+-]*\n?'
+    
+    # Pattern pour fin: ``` (potentiellement avec espaces)
+    end_pattern = r'\n?```\s*$'
+    
+    # Supprimer les patterns de début et fin
+    code_block = re.sub(start_pattern, '', code_block, flags=re.MULTILINE)
+    code_block = re.sub(end_pattern, '', code_block, flags=re.MULTILINE)
+    
+    # Supprimer aussi les marqueurs isolés (cas rares mais possibles)
+    code_block = re.sub(r'^```[a-zA-Z0-9_+-]*$', '', code_block, flags=re.MULTILINE)
+    code_block = re.sub(r'^```$', '', code_block, flags=re.MULTILINE)
+    
+    # Supprimer les marqueurs de fin de fichier personnalisés de l'IA
     code_block = re.sub(r'^\s*--END FILE--.*$', '', code_block, flags=re.MULTILINE)
     code_block = re.sub(r'^\s*--END--.*$', '', code_block, flags=re.MULTILINE)
-    return code_block
+    code_block = re.sub(r'^\s*### END.*$', '', code_block, flags=re.MULTILINE)
+    
+    return code_block.strip()
 
 
 def parse_and_write_code(base_path, code_response_text):
@@ -409,9 +422,8 @@ def generate_missing_code(api_key, model, empty_files, reformulated_prompt, stru
     {reformulated_prompt}
     
     **Complete Project Structure:**
-    ```
+    
     {chr(10).join(structure_lines)}
-    ```
     
     **Existing Project Files (summary):**
     {existing_summary}

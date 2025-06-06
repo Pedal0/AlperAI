@@ -43,14 +43,11 @@ def process_animation_results(animation_results, animation_type):
         processed_info.append("\n### Hover.css Example ###")
         processed_info.append("""
 HTML:
-```html
 <link href="https://cdnjs.cloudflare.com/ajax/libs/hover.css/2.3.1/css/hover-min.css" rel="stylesheet">
 <button class="hvr-grow">Hover to Grow</button>
 <div class="hvr-float">Hover to Float</div>
-```
 
 CSS:
-```css
 /* Add to existing CSS if not using the CDN */
 .hvr-grow {
   display: inline-block;
@@ -67,23 +64,19 @@ CSS:
 .hvr-grow:active {
   transform: scale(1.1);
 }
-```
         """)
     elif animation_type.lower() in ['scroll', 'scrolling']:
         processed_info.append("\n### AOS (Animate On Scroll) Example ###")
         processed_info.append("""
 HTML:
-```html
 <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
 <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
 
 <div data-aos="fade-up">Fade up on scroll</div>
 <div data-aos="fade-down">Fade down on scroll</div>
 <div data-aos="zoom-in" data-aos-delay="100">Zoom in with delay</div>
-```
 
 JavaScript:
-```javascript
 // Initialize AOS
 document.addEventListener('DOMContentLoaded', function() {
   AOS.init({
@@ -92,7 +85,6 @@ document.addEventListener('DOMContentLoaded', function() {
     once: true
   });
 });
-```
         """)
     
     return "\n".join(processed_info)

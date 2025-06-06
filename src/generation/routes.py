@@ -166,9 +166,7 @@ Bad:
 
 OUTPUT FORMAT:
 For each file to modify or add, clearly indicate:
-```
 FILE: <file/path>
-```
 Followed by the complete content of the file after modifications. Do not truncate code and provide full implementations. Ensure accuracy in file paths.
 
 FINAL CHECK:

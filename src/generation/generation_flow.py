@@ -399,15 +399,14 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                             logging.error(f"Failed to enhance README: {e}")
                     except Exception as e:
                         logging.error(f"Failed to generate launch instructions: {e}")
-                        update_progress(8, "⚠️ Failed to generate launch instructions.", 95, progress_callback)
-                      # == STEP 9: Automatic validation and self-correction via MCP ==
-                    from src.generation.steps.validate_with_mcp_step import validate_with_mcp_step
-                    mcp_validation_enabled = True  # TODO: make configurable
-                    if mcp_validation_enabled:
-                        update_progress(9, "🧪 Starting automatic MCP validation and self-correction...", 97, progress_callback)
+                        update_progress(8, "⚠️ Failed to generate launch instructions.", 95, progress_callback)                    # == STEP 9: Simple RepoMix-based validation and auto-correction ==
+                    from src.mcp.simple_validation_system import validate_and_fix_with_repomix
+                    repomix_validation_enabled = True  # Simple et fiable
+                    if repomix_validation_enabled:
+                        update_progress(9, "🔍 RepoMix codebase analysis and validation...", 95, progress_callback)
                         # Use reformulated prompt for better validation context
                         reformulated_for_validation = process_state.get('reformulated_prompt', reformulated_prompt)
-                        valid, mcp_message = validate_with_mcp_step(
+                        valid, validation_message = validate_and_fix_with_repomix(
                             target_directory,
                             api_key=api_key,
                             model=selected_model,
@@ -416,9 +415,9 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                             progress_callback=progress_callback
                         )
                         if valid:
-                            update_progress(10, f"✅ MCP validation/correction: {mcp_message}", 100, progress_callback)
+                            update_progress(10, f"✅ RepoMix validation: {validation_message}", 100, progress_callback)
                         else:
-                            update_progress(10, f"⚠️ MCP validation failed: {mcp_message}", 100, progress_callback)
+                            update_progress(10, f"⚠️ RepoMix validation failed: {validation_message}", 100, progress_callback)
                     
                     # Save path for preview mode if in Flask context
                     if current_app:
@@ -446,5 +445,3 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         if current_app:
             current_app.config['used_tools_details'] = process_state.get('used_tools_details', [])
         return False
-
-
