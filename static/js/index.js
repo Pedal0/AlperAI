@@ -243,20 +243,19 @@ document.addEventListener("DOMContentLoaded", function () {
       const progressBar = document.getElementById("progressBar");
       const currentStep = document.getElementById("currentStep");
       const tipBox = document.getElementById("tipBox");
-      const tipText = document.getElementById("tipText");
-
-      // Ajout : zone d'affichage MCP
+      const tipText = document.getElementById("tipText");      // Ajout : zone d'affichage MCP
       let mcpMessage = null;
       let mcpBox = document.getElementById("mcpBox");
       if (!mcpBox) {
         mcpBox = document.createElement("div");
         mcpBox.className = "alert alert-success mt-3 d-none";
         mcpBox.id = "mcpBox";
-        // Insérer juste après la barre de progression
-        const progressElem = progressBar.parentElement;
-        progressElem.parentElement.insertBefore(
+        // Insérer après le message d'étape actuelle (avant les tips)
+        const currentStepElem = currentStep.parentElement;
+        const tipBox = document.getElementById("tipBox");
+        currentStepElem.parentElement.insertBefore(
           mcpBox,
-          progressElem.nextSibling
+          tipBox
         );
       }
 
@@ -321,7 +320,45 @@ document.addEventListener("DOMContentLoaded", function () {
             "An error occurred while communicating with the server: " +
               error.message
           );
-        });
+        });      // Function to add icons to step messages
+      function addIconToStep(stepMessage) {
+        // Map common step messages to appropriate icons
+        const iconMap = {
+          'Initializing': 'fas fa-play-circle',
+          'Analyzing user needs': 'fas fa-search',
+          'Define project structure': 'fas fa-sitemap',
+          'Generating code': 'fas fa-code',
+          'Generating frontend': 'fas fa-palette',
+          'Generating backend': 'fas fa-server',
+          'Generating documentation': 'fas fa-file-alt',
+          'Generating tests': 'fas fa-vial',
+          'Enhancement and refinement': 'fas fa-magic',
+          'Finalizing': 'fas fa-check-circle',
+          'Generation complete': 'fas fa-check-double',
+          'Analyzing': 'fas fa-search',
+          'Structure': 'fas fa-sitemap',
+          'Code': 'fas fa-code',
+          'Frontend': 'fas fa-palette',
+          'Backend': 'fas fa-server',
+          'Documentation': 'fas fa-file-alt',
+          'Tests': 'fas fa-vial',
+          'Enhancement': 'fas fa-magic',
+          'Complete': 'fas fa-check-circle',
+          'MCP': 'fas fa-tools',
+          'Outils': 'fas fa-tools'
+        };
+
+        // Find matching icon
+        let icon = 'fas fa-cog'; // default icon
+        for (const [key, iconClass] of Object.entries(iconMap)) {
+          if (stepMessage.toLowerCase().includes(key.toLowerCase())) {
+            icon = iconClass;
+            break;
+          }
+        }
+
+        return `<i class="${icon} me-2"></i>${stepMessage}`;
+      }
 
       // Function to poll the server for generation progress
       function pollGenerationProgress() {
@@ -331,11 +368,9 @@ document.addEventListener("DOMContentLoaded", function () {
             .then((data) => {
               // Update progress bar
               const progress = data.progress || 0;
-              progressBar.style.width = `${progress}%`;
-
-              // Update current step
+              progressBar.style.width = `${progress}%`;              // Update current step
               if (data.current_step) {
-                currentStep.textContent = data.current_step;
+                currentStep.innerHTML = addIconToStep(data.current_step);
                 // Only show MCP message if it's not the generic tools enabled message
                 if (
                   (data.current_step.includes("Outils MCP activés") ||
@@ -359,13 +394,11 @@ document.addEventListener("DOMContentLoaded", function () {
               if (mcpMessage) {
                 mcpBox.textContent = mcpMessage;
                 mcpBox.classList.remove("d-none");
-              }
-
-              // If generation is complete
+              }              // If generation is complete
               if (data.status === "completed") {
                 clearInterval(pollInterval);
                 clearInterval(tipInterval);
-                currentStep.textContent = "Generation complete!";
+                currentStep.innerHTML = addIconToStep("Generation complete!");
                 mcpBox.classList.add("d-none"); // Masquer à la fin
                 // Redirect to results page
                 setTimeout(() => {
