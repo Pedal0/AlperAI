@@ -19,19 +19,10 @@ def validate_and_fix_with_repomix(target_directory, api_key=None, model=None, us
         user_prompt: Prompt original de l'utilisateur
         reformulated_prompt: Prompt reformulé
         progress_callback: Fonction de callback pour le progrès
-    
-    Returns:
+      Returns:
         tuple: (success, message)
     """
     try:
-        # ÉTAPE PRÉLIMINAIRE: Nettoyer les marqueurs Markdown parasites
-        if progress_callback:
-            progress_callback(9, "🧹 Cleaning markdown artifacts...", 93)
-        
-        cleanup_count = clean_markdown_artifacts(target_directory)
-        if cleanup_count > 0:
-            logging.info(f"Cleaned {cleanup_count} files with markdown artifacts")
-        
         if progress_callback:
             progress_callback(9, "🔍 RepoMix codebase analysis...", 95)
         
@@ -136,14 +127,21 @@ Begin analysis:"""
             
             if progress_callback:
                 progress_callback(9, "⚡ Applying fixes...", 98)
-            
-            # Étape 3: Appliquer les corrections
+              # Étape 3: Appliquer les corrections
             if "🔧" in ai_response or "APPLY_FIXES" in ai_response:
                 fixes_applied = apply_simple_fixes(target_directory, ai_response)
                 
+                # CRITIQUE: Nettoyage final après toutes les corrections
                 if fixes_applied > 0:
-                    message = f"✅ {fixes_applied} issues automatically fixed"
-                    logging.info(f"Applied {fixes_applied} RepoMix-based fixes")
+                    if progress_callback:
+                        progress_callback(9, "🧹 Final cleanup of corrected files...", 99)
+                    
+                    final_cleanup_count = clean_markdown_artifacts(target_directory)
+                    if final_cleanup_count > 0:
+                        logging.info(f"🧹 Final cleanup: removed markdown artifacts from {final_cleanup_count} additional files after fixes")
+                    
+                    message = f"✅ {fixes_applied} issues automatically fixed + {final_cleanup_count} files cleaned"
+                    logging.info(f"Applied {fixes_applied} RepoMix-based fixes with final cleanup")
                 else:
                     message = f"Issues detected but no fixes applied"
                     logging.warning("AI found issues but couldn't apply fixes")
@@ -187,13 +185,35 @@ def apply_simple_fixes(target_directory, ai_response):
             filename = filename.strip()
             file_content = file_content.strip()
             
-            try:
-                # Appliquer la correction
+            try:                # Appliquer la correction
                 file_path = target_path / filename
                 file_path.parent.mkdir(parents=True, exist_ok=True)
                 
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(file_content)
+                
+                # CRITIQUE: Nettoyer immédiatement les marqueurs markdown après correction
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Nettoyer les marqueurs markdown parasites
+                    import re
+                    original_content = content
+                    content = re.sub(r'^```[a-zA-Z0-9_+-]*\n?', '', content, flags=re.MULTILINE)
+                    content = re.sub(r'\n?```\s*$', '', content, flags=re.MULTILINE)
+                    content = re.sub(r'^```[a-zA-Z0-9_+-]*$', '', content, flags=re.MULTILINE)
+                    content = re.sub(r'^```$', '', content, flags=re.MULTILINE)
+                    content = content.strip()
+                    
+                    # Réécrire si des marqueurs ont été supprimés
+                    if content != original_content and content:
+                        with open(file_path, 'w', encoding='utf-8') as f:
+                            f.write(content)
+                        logging.info(f"🧹 Auto-cleaned markdown artifacts from fixed file: {filename}")
+                
+                except Exception as cleanup_error:
+                    logging.warning(f"Could not auto-clean markdown from {filename}: {cleanup_error}")
                 
                 fixes_applied += 1
                 logging.info(f"Applied RepoMix fix to: {filename}")
