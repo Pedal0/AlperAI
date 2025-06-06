@@ -184,9 +184,7 @@ def _enhance_readme(project_dir, readme_path, original_content, api_key, model_n
 Il se contente de mentionner les scripts start.bat/start.sh sans expliquer les étapes manuelles.
 
 README original:
-```
 {original_content}
-```
 
 Veuillez améliorer ce README pour inclure des instructions détaillées pas à pas sur comment:
 1. Installer toutes les dépendances nécessaires

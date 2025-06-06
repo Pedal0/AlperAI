@@ -321,33 +321,40 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                         add_used_tool(process_state, tool_name, {'error': str(e)})  # Record the tool even in case of error
 
             process_state['last_code_generation_response'] = code_response_text
-            update_progress(4, "✅ Code generation response received.", 65, progress_callback)
-
-            # == STEP 5: Write code to files ==
+            update_progress(4, "✅ Code generation response received.", 65, progress_callback)            # == STEP 5: Write code to files ==
             update_progress(5, "Writing code to files...", 70, progress_callback)
             files_written = []
             errors = []
             generation_incomplete = False
-            
             files_written, errors, generation_incomplete = parse_and_write_code(target_directory, code_response_text)
 
+            # == ÉTAPE CRITIQUE: Nettoyage universel des marqueurs Markdown ==
+            if files_written:
+                update_progress(5, "🧹 Cleaning markdown artifacts from generated files...", 72, progress_callback)
+                from src.mcp.simple_validation_system import clean_markdown_artifacts
+                
+                cleanup_count = clean_markdown_artifacts(target_directory)
+                if cleanup_count > 0:
+                    update_progress(5, f"✅ Cleaned {cleanup_count} files of markdown artifacts.", 74, progress_callback)
+                    logging.info(f"🧹 Cleaned markdown artifacts from {cleanup_count} files")
+                else:
+                    update_progress(5, "✅ No markdown artifacts found to clean.", 74, progress_callback)
+
             if files_written or errors:
-                update_progress(5, "✅ Response processing complete.", 75, progress_callback)
+                update_progress(5, "✅ Response processing complete.", 76, progress_callback)
                 
                 # Log results
                 for f in files_written:
                     logging.info(f"📄 File written: {Path(f).relative_to(Path(target_directory))}")
                 for err in errors:
-                    logging.error(f"❌ {err}")
-
-                # == STEP 6: Check empty files and generate missing code ==
+                    logging.error(f"❌ {err}")                # == STEP 6: Check empty files and generate missing code ==
                 if not errors and (files_written or generation_incomplete):
-                    update_progress(6, "Checking for empty files...", 77, progress_callback)
+                    update_progress(6, "Checking for empty files...", 78, progress_callback)
                     
                     empty_files = identify_empty_files(target_directory, structure_lines)
                     
                     if empty_files:
-                        update_progress(6, f"Found {len(empty_files)} empty files that need code generation.", 78, progress_callback)
+                        update_progress(6, f"Found {len(empty_files)} empty files that need code generation.", 79, progress_callback)
                         
                         # Check rate limit before calling the API again
                         if is_free_model(selected_model):
@@ -355,10 +362,10 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                             time_since_last_call = time.time() - process_state.get('last_api_call_time', 0)
                             if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
                                 wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
-                                update_progress(6, f"⏳ Free model detected. Waiting {wait_time:.1f} seconds before generating missing code...", 80, progress_callback)
+                                update_progress(6, f"⏳ Free model detected. Waiting {wait_time:.1f} seconds before generating missing code...", 81, progress_callback)
                                 time.sleep(wait_time)
                         
-                        update_progress(6, "Generating code for empty files...", 82, progress_callback)
+                        update_progress(6, "Generating code for empty files...", 83, progress_callback)
                         additional_files, additional_errors = generate_missing_code(
                             api_key, 
                             selected_model, 
@@ -366,14 +373,18 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                             reformulated_prompt, 
                             structure_lines,
                             code_response_text,
-                            target_directory
-                        )
+                            target_directory                        )
                         process_state['last_api_call_time'] = time.time()
-                        
                         if additional_files:
-                            update_progress(6, f"✅ Successfully generated code for {len(additional_files)} empty files.", 85, progress_callback)
+                            update_progress(6, f"✅ Successfully generated code for {len(additional_files)} empty files.", 86, progress_callback)
                             # Add to main file list
                             files_written.extend(additional_files)
+                            # Nettoyage des nouveaux fichiers générés
+                            update_progress(6, "🧹 Cleaning new files...", 87, progress_callback)
+                            from src.mcp.simple_validation_system import clean_markdown_artifacts
+                            additional_cleanup = clean_markdown_artifacts(target_directory)
+                            if additional_cleanup > 0:
+                                logging.info(f"🧹 Cleaned {additional_cleanup} additional files")
                         
                         if additional_errors:
                             for err in additional_errors:
@@ -381,12 +392,10 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                             # Add to main error list
                             errors.extend(additional_errors)
                     else:
-                        update_progress(6, "✅ No empty files found - all files contain code.", 85, progress_callback)
-                  # Final success message
+                        update_progress(6, "✅ No empty files found - all files contain code.", 86, progress_callback)                  # Final success message
                 if not errors:
-                    update_progress(7, "🎉 Application generated successfully!", 90, progress_callback)
-                    # == STEP 8: Generate launch scripts ==
-                    update_progress(8, "🛠️ Generating launch instructions based on README.md...", 92, progress_callback)
+                    update_progress(7, "🎉 Application generated successfully!", 91, progress_callback)                    # == STEP 8: Generate launch scripts ==
+                    update_progress(8, "🛠️ Generating launch instructions based on README.md...", 93, progress_callback)
                     try:
                         from src.preview.handler.generate_start_scripts import generate_start_scripts
                         generate_start_scripts(target_directory, api_key, selected_model)
@@ -399,15 +408,14 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                             logging.error(f"Failed to enhance README: {e}")
                     except Exception as e:
                         logging.error(f"Failed to generate launch instructions: {e}")
-                        update_progress(8, "⚠️ Failed to generate launch instructions.", 95, progress_callback)
-                      # == STEP 9: Automatic validation and self-correction via MCP ==
-                    from src.generation.steps.validate_with_mcp_step import validate_with_mcp_step
-                    mcp_validation_enabled = True  # TODO: make configurable
-                    if mcp_validation_enabled:
-                        update_progress(9, "🧪 Starting automatic MCP validation and self-correction...", 97, progress_callback)
+                        update_progress(8, "⚠️ Failed to generate launch instructions.", 95, progress_callback)                    # == STEP 9: Simple RepoMix-based validation and auto-correction ==
+                    from src.mcp.simple_validation_system import validate_and_fix_with_repomix
+                    repomix_validation_enabled = True  # Simple et fiable
+                    if repomix_validation_enabled:
+                        update_progress(9, "🔍 RepoMix codebase analysis and validation...", 95, progress_callback)
                         # Use reformulated prompt for better validation context
                         reformulated_for_validation = process_state.get('reformulated_prompt', reformulated_prompt)
-                        valid, mcp_message = validate_with_mcp_step(
+                        valid, validation_message = validate_and_fix_with_repomix(
                             target_directory,
                             api_key=api_key,
                             model=selected_model,
@@ -416,9 +424,9 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
                             progress_callback=progress_callback
                         )
                         if valid:
-                            update_progress(10, f"✅ MCP validation/correction: {mcp_message}", 100, progress_callback)
+                            update_progress(10, f"✅ RepoMix validation: {validation_message}", 100, progress_callback)
                         else:
-                            update_progress(10, f"⚠️ MCP validation failed: {mcp_message}", 100, progress_callback)
+                            update_progress(10, f"⚠️ RepoMix validation failed: {validation_message}", 100, progress_callback)
                     
                     # Save path for preview mode if in Flask context
                     if current_app:
@@ -446,5 +454,3 @@ def generate_application(api_key, selected_model, user_prompt, target_directory,
         if current_app:
             current_app.config['used_tools_details'] = process_state.get('used_tools_details', [])
         return False
-
-

@@ -41,6 +41,3 @@ def process_documentation_results(doc_results):
     
     return "\n".join(processed_info)
     pass
-
-
-

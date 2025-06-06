@@ -48,9 +48,9 @@ def generate_code_step(api_key, selected_model, reformulated_prompt, structure_l
     {url_reference if url_reference else ""}
     {url_context if url_context else ""}
     **Project Structure (for reference only):**
-    ```
+    
     {chr(10).join(structure_lines)}
-    ```
+    
     **Instructions:**
     1. Provide the full code for *all* files listed in the structure.
     2. Use the EXACT format `--- FILE: path/to/filename ---` on a line by itself before each file's code block. Start your response *immediately* with the first marker. No introduction text.    3. Ensure the code is functional, includes necessary imports, basic error handling, and comments.
