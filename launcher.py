@@ -130,72 +130,7 @@ except ImportError as e:
 LOCK_FILE = BASE_DIR / "launcher.lock"
 debug_log(f"LOCK_FILE path: {LOCK_FILE}")
 
-def file_hash(path):
-    if not os.path.exists(path):
-        debug_log(f"file_hash: Fichier non trouvé à {path}")
-        return None
-    with open(path, 'rb') as f:
-        return hashlib.sha256(f.read()).hexdigest()
-
-def update_code():
-    debug_log("Entrée dans update_code().")
-    try:
-        subprocess.run(['git', '--version'], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        debug_log("Git est installé.")
-    except Exception as e:
-        debug_log(f"Git non installé ou non trouvé: {e}")
-        print("Git n'est pas installé. Veuillez installer git pour activer la mise à jour automatique.")
-        return False # Retourner False si git n'est pas là
-
-    req_path_str = 'requirements.txt' # Garder comme string pour file_hash
-    req_path = BASE_DIR / req_path_str # Utiliser BASE_DIR pour le chemin complet
-    debug_log(f"Chemin requirements.txt: {req_path}")
-
-    req_hash_before = file_hash(req_path)
-    debug_log(f"Hash de requirements.txt avant pull: {req_hash_before}")
-
-    print("Vérification des mises à jour sur la branche main...")
-    try:
-        # Assurez-vous que git opère dans le bon répertoire si nécessaire
-        # Pour l'instant, on suppose que CWD est la racine du repo ou que le repo est trouvable par git
-        git_pull_cwd = BASE_DIR # Exécuter git pull dans le répertoire de base de l'application
-        debug_log(f"Exécution de git fetch/pull dans {git_pull_cwd}")
-        subprocess.run(['git', 'fetch'], check=True, timeout=60, cwd=git_pull_cwd)
-        subprocess.run(['git', 'pull', 'origin', 'main'], check=True, timeout=60, cwd=git_pull_cwd)
-        debug_log("Git fetch et pull terminés.")
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-        debug_log(f"Erreur Git lors de la mise à jour: {e}")
-        print(f"Erreur Git lors de la mise à jour: {e}")
-        return False
-
-    req_hash_after = file_hash(req_path)
-    debug_log(f"Hash de requirements.txt après pull: {req_hash_after}")
-
-    if req_hash_before != req_hash_after and req_hash_after is not None:
-        debug_log("requirements.txt a changé, réinstallation des dépendances...")
-        print("requirements.txt a changé, réinstallation des dépendances...")
-        try:
-            subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', req_path], check=True, timeout=300)
-            debug_log("Dépendances réinstallées.")
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-            debug_log(f"Erreur lors de l'installation des dépendances: {e}")
-            print(f"Erreur lors de l'installation des dépendances: {e}")
-            return False
-    elif req_hash_before is None and req_hash_after is not None:
-        debug_log("Nouveau fichier requirements.txt détecté, installation des dépendances...")
-        print("Nouveau fichier requirements.txt détecté, installation des dépendances...")
-        try:
-            subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', req_path], check=True, timeout=300)
-            debug_log("Nouvelles dépendances installées.")
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-            debug_log(f"Erreur lors de l'installation des nouvelles dépendances: {e}")
-            print(f"Erreur lors de l'installation des nouvelles dépendances: {e}")
-            return False
-    else:
-        debug_log("Pas de changement dans requirements.txt ou fichier non trouvé.")
-        print("Pas de changement dans requirements.txt.")
-    debug_log("Sortie de update_code().")
-    return True
+# Fonction de mise à jour automatique supprimée pour éviter les problèmes lors de la compilation
 
 def is_port_in_use(port, host='127.0.0.1'):
     s = None
@@ -402,12 +337,8 @@ def main():
     debug_log(f"Entrée dans main() - PID: {os.getpid()}.")
     check_already_running()
     
-    update_successful = update_code()
-    # update_code() retourne False si git n'est pas là ou si une erreur survient.
-    # On continue même si la mise à jour échoue, mais on logue.
-    if not update_successful:
-        debug_log("Mise à jour du code non effectuée ou échouée. Lancement avec la version actuelle.")
-        # print("La mise à jour du code a échoué ou n'a pas été effectuée. Lancement avec la version actuelle si possible.")
+    # Mise à jour automatique Git supprimée pour éviter les problèmes lors de la compilation
+    debug_log("Lancement direct sans mise à jour automatique.")
 
     server_started_by_us = start_server_in_thread()
 
