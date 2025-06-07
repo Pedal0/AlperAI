@@ -47,5 +47,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='static/images/favicon.ico'  # Assurez-vous que favicon.ico existe à cet emplacement
+    icon='static/images/favicon.ico',  # Assurez-vous que favicon.ico existe à cet emplacement
+    onefile=True  # ✅ Tout dans un seul fichier .exe
 )
