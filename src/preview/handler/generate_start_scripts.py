@@ -33,7 +33,7 @@ async def get_launch_commands_from_ai(project_dir: Path, readme_content: str, pr
     log_callback(f"Requesting launch commands from AI for project: {project_dir}")
 
     prompt = f"""
-Given the project information below, please provide the necessary shell commands to set up and run this project.
+Given the project information below, provide SIMPLE and MINIMAL shell commands to set up and run this project.
 Project Directory: {project_dir}
 Project Types: {', '.join(project_types) if project_types else 'Unknown'}
 
@@ -50,9 +50,11 @@ Project Structure:
 IMPORTANT: Your response MUST be a single valid JSON object, WITHOUT any code block markers (no triple backticks, no markdown, no explanations, just the JSON object itself).
 
 STRICT REQUIREMENTS:
+- Keep commands SIMPLE and MINIMAL - prefer short, essential commands only
+- NEVER use port 5000 (it's occupied) - use ports like 3000, 8000, 8080, or any other port
 - The JSON object must contain two keys:
-  1. "commands": A list of strings, where each string is a shell command to be executed in sequence. These commands should cover all necessary steps like installing dependencies and then starting the application. Assume the commands will be run from the root of the project directory. If the project runs a server, the last command should be the one that starts the server and keeps running. For static HTML/CSS/JS projects, ALWAYS provide a real command to launch a local server (for example: 'python -m http.server 8000' or 'npx serve' or 'npx http-server'), NEVER just an echo or instruction to open index.html manually. DO NOT create, write, or mention any batch (.bat), shell (.sh), or script files. DO NOT output any file content, only the JSON object as described. DO NOT output any command that creates or writes to a file (e.g., do not use 'echo ... > start.sh'). DO NOT include any 'cd ...' command, as the working directory is already set correctly. If you suggest a Python server, prefer 'python -m http.server 8000 --bind 127.0.0.1' to ensure local accessibility.
-  2. "env": An optional dictionary of environment variables (string key-value pairs) that might be needed for the commands. Example: {{"PORT": "8080", "NODE_ENV": "development"}}. If no specific environment variables are needed, this can be an empty dictionary or omitted.
+  1. "commands": A list of strings, where each string is a shell command to be executed in sequence. These commands should cover ONLY the essential steps: installing dependencies (if needed) and starting the application. Keep it to 2-3 commands maximum. Assume the commands will be run from the root of the project directory. If the project runs a server, the last command should be the one that starts the server and keeps running. For static HTML/CSS/JS projects, use simple servers like 'python -m http.server 8000' or 'npx serve -p 3000'. DO NOT create, write, or mention any batch (.bat), shell (.sh), or script files. DO NOT output any file content, only the JSON object as described. DO NOT output any command that creates or writes to a file. DO NOT include any 'cd ...' command, as the working directory is already set correctly.
+  2. "env": An optional dictionary of environment variables (string key-value pairs) that might be needed for the commands. Keep this minimal - only include if absolutely necessary. If no specific environment variables are needed, this can be an empty dictionary or omitted.
 
 Example of a valid JSON response:
 {{
@@ -274,13 +276,15 @@ def generate_start_scripts(project_dir, api_key=None, model_name="openrouter/ant
 # --- Removed old helper functions like _convert_to_batch, _add_default_setup_commands_sh, etc. ---
 # --- as the AI is now responsible for generating the full command list. ---
 
-# Example usage (if run directly, for testing):
-if __name__ == '__main__':
+def test_command_generation():
+    """Test function for command generation system."""
+    # Setup logging
     logging.basicConfig(level=logging.INFO)
+    
     # Create a dummy project structure for testing
     test_project_dir = Path("./test_project_ai_launch")
     test_project_dir.mkdir(exist_ok=True)
-    (test_project_dir / "README.md").write_text("This is a test project.\\n\\nTo run: \\n1. npm install\\n2. npm start")
+    (test_project_dir / "README.md").write_text("This is a test project.\n\nTo run: \n1. npm install\n2. npm start")
     (test_project_dir / "package.json").write_text('{ "name": "test", "scripts": { "start": "node index.js" } }')
     (test_project_dir / "index.js").write_text('console.log("Hello from test project!");')
 
@@ -296,10 +300,17 @@ if __name__ == '__main__':
         config_file = test_project_dir / "launch_commands.json"
         if config_file.exists():
             with open(config_file, 'r') as f:
-                logger.info(f"Contents of {config_file}:\\n{f.read()}")
+                logger.info(f"Contents of {config_file}:\n{f.read()}")
     else:
         logger.error("Test failed.")
 
     # Cleanup (optional)
     # import shutil
     # shutil.rmtree(test_project_dir)
+    
+    return success
+
+
+# Example usage (if run directly, for testing):
+if __name__ == '__main__':
+    test_command_generation()

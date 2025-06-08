@@ -129,22 +129,31 @@ Begin analysis:"""
                 progress_callback(9, "⚡ Applying fixes...", 98)
               # Étape 3: Appliquer les corrections
             if "🔧" in ai_response or "APPLY_FIXES" in ai_response:
-                fixes_applied = apply_simple_fixes(target_directory, ai_response)
-                
-                # CRITIQUE: Nettoyage final après toutes les corrections
-                if fixes_applied > 0:
-                    if progress_callback:
-                        progress_callback(9, "🧹 Final cleanup of corrected files...", 99)
-                    
-                    final_cleanup_count = clean_markdown_artifacts(target_directory)
-                    if final_cleanup_count > 0:
-                        logging.info(f"🧹 Final cleanup: removed markdown artifacts from {final_cleanup_count} additional files after fixes")
-                    
-                    message = f"✅ {fixes_applied} issues automatically fixed + {final_cleanup_count} files cleaned"
-                    logging.info(f"Applied {fixes_applied} RepoMix-based fixes with final cleanup")
+                # SAFETY CHECK: Make sure we don't apply fixes if AI says no issues found
+                if ("NO ISSUES FOUND" in ai_response.upper() or 
+                    "ALL CODE VALIDATED" in ai_response.upper() or 
+                    "CODE VALIDATION PASSED" in ai_response.upper() or
+                    "EVERYTHING IS GOOD" in ai_response.upper() or
+                    "✅" in ai_response and ("NO ISSUES" in ai_response.upper() or "NO PROBLEMS" in ai_response.upper())):
+                    message = "✅ All code validated - no issues found (safety check prevented unnecessary fixes)"
+                    logging.info("RepoMix validation passed - safety check prevented fix application when no issues found")
                 else:
-                    message = f"Issues detected but no fixes applied"
-                    logging.warning("AI found issues but couldn't apply fixes")
+                    fixes_applied = apply_simple_fixes(target_directory, ai_response)
+                
+                    # CRITIQUE: Nettoyage final après toutes les corrections
+                    if fixes_applied > 0:
+                        if progress_callback:
+                            progress_callback(9, "🧹 Final cleanup of corrected files...", 99)
+                        
+                        final_cleanup_count = clean_markdown_artifacts(target_directory)
+                        if final_cleanup_count > 0:
+                            logging.info(f"🧹 Final cleanup: removed markdown artifacts from {final_cleanup_count} additional files after fixes")
+                        
+                        message = f"✅ {fixes_applied} issues automatically fixed + {final_cleanup_count} files cleaned"
+                        logging.info(f"Applied {fixes_applied} RepoMix-based fixes with final cleanup")
+                    else:
+                        message = f"Issues detected but no fixes applied"
+                        logging.warning("AI found issues but couldn't apply fixes")
             else:
                 message = "✅ All code validated - no issues found"
                 logging.info("RepoMix validation passed - no issues found")
@@ -176,10 +185,31 @@ def apply_simple_fixes(target_directory, ai_response):
         fixes_applied = 0
         target_path = Path(target_directory)
         
+        # SAFETY CHECK: Don't apply fixes if response indicates no issues
+        if ("NO ISSUES FOUND" in ai_response.upper() or 
+            "ALL CODE VALIDATED" in ai_response.upper() or 
+            "CODE VALIDATION PASSED" in ai_response.upper() or
+            "EVERYTHING IS GOOD" in ai_response.upper() or
+            "✅" in ai_response and ("NO ISSUES" in ai_response.upper() or "NO PROBLEMS" in ai_response.upper())):
+            logging.info("Skipping fix application - AI response indicates no issues found")
+            return 0
+        
         # Parser les corrections avec regex
         import re
         fix_pattern = r'=== FIX_FILE: (.+?) ===(.*?)=== END_FIX ==='
         fixes = re.findall(fix_pattern, ai_response, re.DOTALL)
+        
+        # SAFETY CHECK: Don't proceed if no proper fix patterns found
+        if not fixes:
+            if ("NO ISSUES" in ai_response.upper() or 
+                "EVERYTHING IS GOOD" in ai_response.upper() or
+                "ALL CODE VALIDATED" in ai_response.upper() or
+                "NO FIXES NEEDED" in ai_response.upper()):
+                logging.info("No fixes applied - AI response indicates no issues to fix")
+                return 0
+            else:
+                logging.warning(f"No valid FIX_FILE patterns found in AI response: {ai_response[:200]}...")
+                return 0
         
         for filename, file_content in fixes:
             filename = filename.strip()
@@ -290,8 +320,7 @@ def clean_markdown_artifacts(target_directory):
                         continue
                     
                     original_content = content
-                    
-                    # NETTOYAGE UNIVERSEL - Détection automatique de patterns Markdown
+                      # NETTOYAGE UNIVERSEL - Détection automatique de patterns Markdown
                     import re
                     
                     # Supprimer les marqueurs de début ```[langage]
@@ -304,6 +333,13 @@ def clean_markdown_artifacts(target_directory):
                     # Supprimer aussi les marqueurs en milieu de ligne (cas rares)
                     content = re.sub(r'^```[a-zA-Z0-9_+-]*$', '', content, flags=re.MULTILINE)
                     content = re.sub(r'^```$', '', content, flags=re.MULTILINE)
+                    
+                    # Supprimer les marqueurs RepoMix et autres artifacts spécifiques
+                    content = re.sub(r'^---\s*END\s*OF\s*FILES?\s*---.*$', '', content, flags=re.MULTILINE | re.IGNORECASE)
+                    content = re.sub(r'^--\s*END\s*FILE--.*$', '', content, flags=re.MULTILINE | re.IGNORECASE)
+                    content = re.sub(r'^--\s*END--.*$', '', content, flags=re.MULTILINE)
+                    content = re.sub(r'^###\s*END.*$', '', content, flags=re.MULTILINE)
+                    content = re.sub(r'^\s*-{3,}\s*END\s*-{3,}.*$', '', content, flags=re.MULTILINE | re.IGNORECASE)
                     
                     # Nettoyer les espaces excessifs en début/fin
                     content = content.strip()

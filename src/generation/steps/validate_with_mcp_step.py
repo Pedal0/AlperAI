@@ -190,18 +190,26 @@ Begin comprehensive validation now:"""
             
             # Check if fixes are needed and apply them automatically
             if "🔧" in validation_result or "ISSUES FOUND" in validation_result.upper():
-                if progress_callback:
-                    progress_callback(9, "🔧 Issues found - applying automatic fixes...", 98)
-                
-                # Apply automatic fixes
-                fixes_applied = apply_automatic_fixes(target_directory, validation_result, project_files, api_key, model)
-                
-                if fixes_applied > 0:
-                    summary = f"✅ {fixes_applied} issues automatically fixed"
-                    logging.info(f"Applied {fixes_applied} automatic fixes to the project")
+                # SAFETY CHECK: Make sure we don't apply fixes if AI says no issues found
+                if ("NO ISSUES FOUND" in validation_result.upper() or 
+                    "ALL CODE VALIDATED" in validation_result.upper() or 
+                    "EVERYTHING IS GOOD" in validation_result.upper() or
+                    "✅" in validation_result and ("NO ISSUES" in validation_result.upper() or "NO PROBLEMS" in validation_result.upper())):
+                    summary = "✅ All code validated - no issues found (safety check prevented unnecessary fixes)"
+                    logging.info("Validation passed - safety check prevented fix application when no issues found")
                 else:
-                    summary = f"Issues detected but no automatic fixes applied: {validation_result[:200]}..."
-                    logging.info(f"Validation found issues but could not auto-fix: {validation_result}")
+                    if progress_callback:
+                        progress_callback(9, "🔧 Issues found - applying automatic fixes...", 98)
+                    
+                    # Apply automatic fixes
+                    fixes_applied = apply_automatic_fixes(target_directory, validation_result, project_files, api_key, model)
+                    
+                    if fixes_applied > 0:
+                        summary = f"✅ {fixes_applied} issues automatically fixed"
+                        logging.info(f"Applied {fixes_applied} automatic fixes to the project")
+                    else:
+                        summary = f"Issues detected but no automatic fixes applied: {validation_result[:200]}..."
+                        logging.info(f"Validation found issues but could not auto-fix: {validation_result}")
             else:
                 summary = "All code validated - no issues found"
                 logging.info("Validation passed - no issues found")
@@ -223,6 +231,14 @@ def apply_automatic_fixes(target_directory, validation_result, project_files, ap
     try:
         fixes_applied = 0
         target_path = Path(target_directory)
+        
+        # SAFETY CHECK: Don't apply fixes if validation indicates no issues
+        if ("NO ISSUES FOUND" in validation_result.upper() or 
+            "ALL CODE VALIDATED" in validation_result.upper() or 
+            "EVERYTHING IS GOOD" in validation_result.upper() or
+            "✅" in validation_result and ("NO ISSUES" in validation_result.upper() or "NO PROBLEMS" in validation_result.upper())):
+            logging.info("Skipping fix application - validation indicates no issues found")
+            return 0
         
         # Create a more focused prompt for generating specific fixes
         fix_request = f"""AUTOMATIC CODE FIXING TASK
@@ -264,13 +280,24 @@ Begin generating fixes now:"""
         if response and response.get("choices"):
             fix_content = response["choices"][0]["message"]["content"]
             
-            # Parse the fixes and apply them
+            # SAFETY CHECK: Don't proceed if no proper fix patterns found
             import re
-            
-            # Find all file fixes using regex
             fix_pattern = r'=== FIX_FILE: (.+?) ===(.*?)=== END_FIX ==='
             fixes = re.findall(fix_pattern, fix_content, re.DOTALL)
             
+            if not fixes:
+                if ("NO ISSUES" in fix_content.upper() or 
+                    "EVERYTHING IS GOOD" in fix_content.upper() or
+                    "ALL CODE VALIDATED" in fix_content.upper() or
+                    "NO FIXES NEEDED" in fix_content.upper()):
+                    logging.info("No codebase fixes applied - AI response indicates no issues to fix")
+                    return 0
+                else:
+                    logging.warning(f"No valid FIX_FILE patterns found in codebase AI response: {fix_content[:200]}...")
+                    return 0
+            
+            # Parse the fixes and apply them
+            # Find all file fixes using regex
             for filename, file_content in fixes:
                 filename = filename.strip()
                 file_content = file_content.strip()
@@ -305,6 +332,14 @@ def apply_codebase_fixes(target_directory, analysis_result, codebase_context, ap
     try:
         fixes_applied = 0
         target_path = Path(target_directory)
+        
+        # SAFETY CHECK: Don't apply fixes if analysis indicates no issues
+        if ("NO ISSUES FOUND" in analysis_result.upper() or 
+            "ALL CODE VALIDATED" in analysis_result.upper() or 
+            "EVERYTHING IS GOOD" in analysis_result.upper() or
+            "✅" in analysis_result and ("NO ISSUES" in analysis_result.upper() or "NO PROBLEMS" in analysis_result.upper())):
+            logging.info("Skipping codebase fix application - analysis indicates no issues found")
+            return 0
         
         if progress_callback:
             progress_callback(9, "🛠️ Generating intelligent fixes with codebase context...", 98)

@@ -141,24 +141,33 @@ Begin comprehensive validation:"""
             
             # Analyser les résultats et appliquer les corrections si nécessaire
             if "🔧" in validation_result or "ISSUES FOUND" in validation_result.upper():
-                if progress_callback:
-                    progress_callback(9, "⚡ Applying automatic corrections...", 99)
-                
-                # Appliquer les corrections automatiques
-                fixes_applied = apply_advanced_fixes(
-                    target_directory, 
-                    validation_result, 
-                    codebase_content,
-                    api_key, 
-                    model
-                )
-                
-                if fixes_applied > 0:
-                    summary = f"✅ {fixes_applied} issues automatically corrected"
-                    logging.info(f"Applied {fixes_applied} automatic corrections")
+                # SAFETY CHECK: Make sure we don't apply fixes if AI says no issues found
+                if ("NO ISSUES FOUND" in validation_result.upper() or 
+                    "ALL CODE VALIDATED" in validation_result.upper() or 
+                    "VALIDATION COMPLETE - NO ISSUES" in validation_result.upper() or
+                    "EVERYTHING IS GOOD" in validation_result.upper() or
+                    "✅" in validation_result and ("NO ISSUES" in validation_result.upper() or "NO PROBLEMS" in validation_result.upper())):
+                    summary = "✅ All code validated - no issues found (safety check prevented unnecessary fixes)"
+                    logging.info("Advanced validation passed - safety check prevented fix application when no issues found")
                 else:
-                    summary = f"Issues detected but no automatic fixes applied: {validation_result[:200]}..."
-                    logging.warning("Validation found issues but could not auto-fix")
+                    if progress_callback:
+                        progress_callback(9, "⚡ Applying automatic corrections...", 99)
+                    
+                    # Appliquer les corrections automatiques
+                    fixes_applied = apply_advanced_fixes(
+                        target_directory, 
+                        validation_result, 
+                        codebase_content,
+                        api_key, 
+                        model
+                    )
+                    
+                    if fixes_applied > 0:
+                        summary = f"✅ {fixes_applied} issues automatically corrected"
+                        logging.info(f"Applied {fixes_applied} automatic corrections")
+                    else:
+                        summary = f"Issues detected but no automatic fixes applied: {validation_result[:200]}..."
+                        logging.warning("Validation found issues but could not auto-fix")
             else:
                 summary = "✅ All code validated - no issues found"
                 logging.info("Advanced validation passed - no issues found")
@@ -192,6 +201,15 @@ def apply_advanced_fixes(target_directory, validation_result, codebase_content, 
     try:
         fixes_applied = 0
         target_path = Path(target_directory)
+        
+        # SAFETY CHECK: Don't apply fixes if validation indicates no issues
+        if ("NO ISSUES FOUND" in validation_result.upper() or 
+            "ALL CODE VALIDATED" in validation_result.upper() or 
+            "VALIDATION COMPLETE - NO ISSUES" in validation_result.upper() or
+            "EVERYTHING IS GOOD" in validation_result.upper() or
+            "✅" in validation_result and ("NO ISSUES" in validation_result.upper() or "NO PROBLEMS" in validation_result.upper())):
+            logging.info("Skipping advanced fix application - validation indicates no issues found")
+            return 0
         
         # Créer un prompt spécialisé pour générer des corrections automatiques
         fix_prompt = f"""AUTOMATIC CODE CORRECTION SYSTEM
@@ -239,13 +257,24 @@ Begin generating comprehensive fixes:"""
         if response and response.get("choices"):
             fix_content = response["choices"][0]["message"]["content"]
             
-            # Parser et appliquer les corrections
+            # SAFETY CHECK: Don't proceed if no proper fix patterns found
             import re
-            
-            # Trouver tous les fichiers à corriger
             fix_pattern = r'=== FIX_FILE: (.+?) ===(.*?)=== END_FIX ==='
             fixes = re.findall(fix_pattern, fix_content, re.DOTALL)
             
+            if not fixes:
+                if ("NO ISSUES" in fix_content.upper() or 
+                    "EVERYTHING IS GOOD" in fix_content.upper() or
+                    "ALL CODE VALIDATED" in fix_content.upper() or
+                    "NO FIXES NEEDED" in fix_content.upper()):
+                    logging.info("No advanced fixes applied - AI response indicates no issues to fix")
+                    return 0
+                else:
+                    logging.warning(f"No valid FIX_FILE patterns found in advanced AI response: {fix_content[:200]}...")
+                    return 0
+            
+            # Parser et appliquer les corrections
+            # Trouver tous les fichiers à corriger
             for filename, file_content in fixes:
                 filename = filename.strip()
                 file_content = file_content.strip()

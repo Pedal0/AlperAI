@@ -193,11 +193,14 @@ def clean_code_block(code_block):
     # Supprimer aussi les marqueurs isolés (cas rares mais possibles)
     code_block = re.sub(r'^```[a-zA-Z0-9_+-]*$', '', code_block, flags=re.MULTILINE)
     code_block = re.sub(r'^```$', '', code_block, flags=re.MULTILINE)
-    
-    # Supprimer les marqueurs de fin de fichier personnalisés de l'IA
+      # Supprimer les marqueurs de fin de fichier personnalisés de l'IA
     code_block = re.sub(r'^\s*--END FILE--.*$', '', code_block, flags=re.MULTILINE)
     code_block = re.sub(r'^\s*--END--.*$', '', code_block, flags=re.MULTILINE)
     code_block = re.sub(r'^\s*### END.*$', '', code_block, flags=re.MULTILINE)
+    
+    # Supprimer les marqueurs RepoMix et autres artifacts spécifiques
+    code_block = re.sub(r'^---\s*END\s*OF\s*FILES?\s*---.*$', '', code_block, flags=re.MULTILINE | re.IGNORECASE)
+    code_block = re.sub(r'^\s*-{3,}\s*END\s*-{3,}.*$', '', code_block, flags=re.MULTILINE | re.IGNORECASE)
     
     return code_block.strip()
 
