@@ -21,14 +21,14 @@ from src.api.openrouter_api import get_openrouter_completion # Added import
 logger = logging.getLogger(__name__)
 
 # Regex for port detection
-SERVE_OUTPUT_REGEX = re.compile(r"https?://[a-zA-Z0-9.-]+:(\\d{4,5})") # New regex for common server outputs
+SERVE_OUTPUT_REGEX = re.compile(r"https?://[a-zA-Z0-9.-]+:(\d{4,5})")  # New regex for common server outputs
 
 PORT_REGEX_1 = re.compile(
-    r"""\\b(?:port|address|listening on|host|server at|endpoint)\\b\\s*[:=]?\\s*(?:(?:[a-zA-Z0-9.-]+|\\[[^]]+\\]):)?(\\d{4,5})\\b""",  # Corrected word boundaries and bracket matching
+    r"""\b(?:port|address|listening on|host|server at|endpoint)\b\s*[:=]?\s*(?:(?:[a-zA-Z0-9.-]+|\[[^\]]+\]):)?(\d{4,5})\b""",  # Corrected word boundaries and bracket matching
     re.IGNORECASE
 )
 PORT_REGEX_2 = re.compile(
-    r"""(?:https?://)?(?:[a-zA-Z0-9.-]+|\\[[^]]+\\]):(\\d{4,5})\\b""",  # Corrected word boundaries and bracket matching
+    r"""(?:https?://)?(?:[a-zA-Z0-9.-]+|\[[^\]]+\]):(\d{4,5})\b""",  # Corrected word boundaries and bracket matching
     re.IGNORECASE
 )
 
@@ -73,6 +73,7 @@ def extract_url_and_port_from_line(line: str):
     """
     Extracts a (url, port) tuple from a log line using regexes.
     Returns (url, port) if found, else (None, None).
+    Converts IPv6 format to localhost for better browser compatibility.
     """
     # Try to match a URL with port, including IPv6 brackets
     match_serve = re.search(r"(https?://(?:[a-zA-Z0-9.-]+|\[[^\]]+\]):(\d{4,5}))", line)
@@ -82,7 +83,25 @@ def extract_url_and_port_from_line(line: str):
         try:
             port = int(port_str)
             if 1024 <= port <= 65535:
-                logger.info(f"URL {url} and port {port} detected from line: {line}")
+                # Convert IPv6 format to localhost for better browser compatibility
+                if "[::]" in url or "[::1]" in url or "0.0.0.0" in url:
+                    url = f"http://localhost:{port}"
+                    logger.info(f"Converted IPv6/wildcard URL to localhost format: {url} (port {port}) from line: {line}")
+                else:
+                    logger.info(f"URL {url} and port {port} detected from line: {line}")
+                return url, port
+        except ValueError:
+            pass
+    
+    # Additional pattern for Python's http.server IPv6 format: "http://[::]:8000"
+    ipv6_match = re.search(r"http://\[::\]:(\d{4,5})", line)
+    if ipv6_match:
+        port_str = ipv6_match.group(1)
+        try:
+            port = int(port_str)
+            if 1024 <= port <= 65535:
+                url = f"http://localhost:{port}"
+                logger.info(f"Converted IPv6 URL to localhost format: {url} (port {port}) from line: {line}")
                 return url, port
         except ValueError:
             pass
