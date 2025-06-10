@@ -1,0 +1,46 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="sparkleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffd700;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#ff6b6b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4ecdc4;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background rounded square -->
+  <rect x="4" y="4" width="32" height="32" rx="10" fill="url(#logoGradient)"/>
+  
+  <!-- Modern geometric M -->
+  <path d="M12 14 L12 26 M12 14 L20 22 L28 14 M28 14 L28 26" 
+        stroke="white" 
+        stroke-width="2.5" 
+        fill="none" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"/>
+  
+  <!-- AI Sparkles/Stars around the logo -->
+  <!-- Large sparkle top right -->
+  <g transform="translate(30, 8)">
+    <path d="M0 -3 L1 -1 L3 0 L1 1 L0 3 L-1 1 L-3 0 L-1 -1 Z" fill="url(#sparkleGradient)"/>
+  </g>
+  
+  <!-- Medium sparkle bottom left -->
+  <g transform="translate(8, 32)">
+    <path d="M0 -2 L0.7 -0.7 L2 0 L0.7 0.7 L0 2 L-0.7 0.7 L-2 0 L-0.7 -0.7 Z" fill="url(#sparkleGradient)" opacity="0.8"/>
+  </g>
+  
+  <!-- Small sparkle top left -->
+  <g transform="translate(10, 10)">
+    <path d="M0 -1.5 L0.5 -0.5 L1.5 0 L0.5 0.5 L0 1.5 L-0.5 0.5 L-1.5 0 L-0.5 -0.5 Z" fill="url(#sparkleGradient)" opacity="0.7"/>
+  </g>
+  
+  <!-- Tiny sparkle bottom right -->
+  <g transform="translate(32, 30)">
+    <path d="M0 -1 L0.3 -0.3 L1 0 L0.3 0.3 L0 1 L-0.3 0.3 L-1 0 L-0.3 -0.3 Z" fill="white" opacity="0.6"/>
+  </g>
+</svg>
