@@ -21,7 +21,7 @@ import re
 import logging
 from pathlib import Path
 from ...api.openrouter_api import call_openrouter_api
-from src.utils.prompt_loader import get_agent_prompt
+from src.utils.prompt_loader import get_agent_prompt, get_system_prompt_with_best_practices
 
 logger = logging.getLogger(__name__)
 
@@ -186,8 +186,7 @@ def _enhance_readme(project_dir, readme_path, original_content, api_key, model_n
                 project_info_str += f"\nFichiers principaux: {', '.join(value)}"
             else:
                 project_info_str += f"\n\n{key}:\n```\n{value}\n```"
-        
-        # Construire le prompt avec le prompt loader
+          # Construire le prompt avec le prompt loader
         prompt = get_agent_prompt(
             'readme_enhancement_agent',
             'enhancement_prompt',
@@ -195,11 +194,17 @@ def _enhance_readme(project_dir, readme_path, original_content, api_key, model_n
             project_info=project_info_str
         )
         
+        # Load system prompt with best practices
+        system_prompt = get_system_prompt_with_best_practices('readme_enhancement_agent')
+        
         # Appeler l'API
         response = call_openrouter_api(
             api_key, 
             model_name,
-            [{"role": "user", "content": prompt}],
+            [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
             temperature=0.3, 
             max_retries=2
         )

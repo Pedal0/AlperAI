@@ -23,8 +23,7 @@ import logging
 from src.api.openrouter_api import call_openrouter_api
 from src.utils.model_utils import is_free_model
 from src.config.constants import RATE_LIMIT_DELAY_SECONDS
-from src.utils.prompt_loader import get_agent_prompt
-from src.utils.prompt_loader import get_agent_prompt
+from src.utils.prompt_loader import get_agent_prompt, get_system_prompt_with_best_practices
 
 def define_project_structure(api_key, selected_model, reformulated_prompt, url_context, progress_callback=None, process_state=None):
     def update_progress(step, message, progress=None):
@@ -37,16 +36,24 @@ def define_project_structure(api_key, selected_model, reformulated_prompt, url_c
         last_api_call_time = process_state.get('last_api_call_time', 0) if process_state else 0
         time_since_last_call = current_time - last_api_call_time
         if time_since_last_call < RATE_LIMIT_DELAY_SECONDS:
-            wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call
+            wait_time = RATE_LIMIT_DELAY_SECONDS - time_since_last_call            
             update_progress(2, f"⏳ Modèle gratuit détecté. Attente de {wait_time:.1f} secondes (limite de taux)...", 45)
-            time.sleep(wait_time)    # Generate project structure prompt using prompt loader
+            time.sleep(wait_time)
+    
+    # Load system prompt with best practices
+    system_prompt = get_system_prompt_with_best_practices('project_structure_agent')
+    
+    # Generate project structure prompt using prompt loader
     prompt_structure = get_agent_prompt(
         'project_structure_agent',
         'structure_definition_prompt',
         reformulated_prompt=reformulated_prompt,
         url_context=url_context if url_context else ""
     )
-    messages_structure = [{"role": "user", "content": prompt_structure}]
+    messages_structure = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": prompt_structure}
+    ]
     # Appel OpenRouter avec paramètre structured output
     response_structure = call_openrouter_api(
         api_key,
