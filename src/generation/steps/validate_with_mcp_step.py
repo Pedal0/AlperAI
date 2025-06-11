@@ -10,7 +10,7 @@ from src.api.openrouter_api import call_openrouter_api
 from src.mcp.codebase_client import CodebaseMCPClient
 from src.mcp.setup_codebase_mcp import is_codebase_mcp_available
 from src.mcp.advanced_validation_system import validate_with_advanced_analysis
-from src.utils.prompt_loader import get_agent_prompt
+from src.utils.prompt_loader import get_agent_prompt, get_system_prompt_with_best_practices
 
 def validate_with_mcp_step(target_directory, api_key=None, model=None, user_prompt=None, reformulated_prompt=None, progress_callback=None):
     """Validate and auto-correct generated code using codebase-mcp for advanced analysis."""
@@ -140,9 +140,8 @@ def validate_with_direct_analysis(target_directory, api_key, model, user_prompt,
         )
         
         if progress_callback:
-            progress_callback(9, "🧪 Analyzing project files with AI...", 98)
-          # Use AI to validate the code
-        system_prompt = get_agent_prompt('validation_mcp_agent', 'code_review_system_prompt')
+            progress_callback(9, "🧪 Analyzing project files with AI...", 98)        # Use AI to validate the code
+        system_prompt = get_system_prompt_with_best_practices('validation_mcp_agent')
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": project_context}

@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from src.api.openrouter_api import call_openrouter_api
 from src.mcp.simple_codebase_client import create_simple_codebase_client
-from src.utils.prompt_loader import get_agent_prompt
+from src.utils.prompt_loader import get_agent_prompt, get_system_prompt_with_best_practices
 
 def validate_with_codebase_analysis(target_directory, api_key=None, model=None, user_prompt=None, reformulated_prompt=None, progress_callback=None):
     """
