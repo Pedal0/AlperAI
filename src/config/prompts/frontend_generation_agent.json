@@ -1,0 +1,7 @@
+{
+  "agent_name": "Frontend Generation Agent",
+  "description": "Agent spécialisé pour la génération de code frontend avec design amélioré",
+  "prompts": {
+    "enhanced_frontend_prompt": "FRONTEND DEVELOPMENT - ENHANCED DESIGN REQUIREMENTS:\n\n{reformulated_prompt}\n\nImportant design requirements:\n- Create a modern, visually appealing interface\n- Use a clean color palette (consider using CSS variables for consistency)\n- Add subtle animations and hover effects for better UX\n- Ensure mobile-first responsive design\n- Use semantic HTML elements\n- Add proper accessibility attributes (alt texts, ARIA labels)\n- Include a professional-looking header/navigation if applicable\n- Style forms with proper validation feedback\n- Use modern CSS features (border-radius, box-shadow, gradients where appropriate)"
+  }
+}

@@ -21,6 +21,7 @@ import re
 import logging
 from pathlib import Path
 from ...api.openrouter_api import call_openrouter_api
+from src.utils.prompt_loader import get_agent_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -178,30 +179,21 @@ def _enhance_readme(project_dir, readme_path, original_content, api_key, model_n
         if start_sh.exists():
             with open(start_sh, 'r', encoding='utf-8') as f:
                 project_info['start.sh'] = f.read()
-        
-        # Construire le prompt
-        prompt = f"""Le README.md suivant ne contient pas d'instructions détaillées pour installer et exécuter le projet. 
-Il se contente de mentionner les scripts start.bat/start.sh sans expliquer les étapes manuelles.
-
-README original:
-{original_content}
-
-Veuillez améliorer ce README pour inclure des instructions détaillées pas à pas sur comment:
-1. Installer toutes les dépendances nécessaires
-2. Configurer l'environnement si nécessaire
-3. Exécuter l'application manuellement
-
-Ne mentionnez pas simplement les scripts start.bat/start.sh, mais donnez les commandes exactes à exécuter.
-
-Informations sur le projet:
-"""
-
-        # Ajouter les informations sur le projet au prompt
+          # Préparer les informations du projet pour le prompt
+        project_info_str = ""
         for key, value in project_info.items():
             if key == 'files':
-                prompt += f"\nFichiers principaux: {', '.join(value)}"
+                project_info_str += f"\nFichiers principaux: {', '.join(value)}"
             else:
-                prompt += f"\n\n{key}:\n```\n{value}\n```"
+                project_info_str += f"\n\n{key}:\n```\n{value}\n```"
+        
+        # Construire le prompt avec le prompt loader
+        prompt = get_agent_prompt(
+            'readme_enhancement_agent',
+            'enhancement_prompt',
+            original_content=original_content,
+            project_info=project_info_str
+        )
         
         # Appeler l'API
         response = call_openrouter_api(

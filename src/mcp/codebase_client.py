@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 from contextlib import contextmanager
 from typing import Optional, Dict, Any
+from src.utils.prompt_loader import get_agent_prompt
 
 class CodebaseMCPClient:
     """
@@ -233,54 +234,15 @@ class CodebaseMCPClient:
         
         # Obtenir l'analyse complète de la codebase
         codebase_analysis = await self.get_codebase_analysis(target_directory, "xml")
-        
-        # Prompt d'analyse utilisant l'analyse RepoMix
-        analysis_prompt = f"""ANALYSE AVANCÉE DE CODEBASE AVEC REPOMIX
-
-CONTEXTE DU PROJET:
-- Répertoire: {target_directory}
-- Demande utilisateur: {user_prompt}
-- Exigences reformulées: {reformulated_prompt}
-
-ANALYSE REPOMIX COMPLÈTE:
-{codebase_analysis[:20000]}{"..." if len(codebase_analysis) > 20000 else ""}
-
-VOTRE MISSION:
-Effectuez une analyse approfondie de cette codebase générée automatiquement et identifiez TOUS les problèmes à corriger.
-
-CHECKLIST D'ANALYSE CRITIQUE:
-🔍 STRUCTURE: Architecture, organisation des fichiers, nommage
-🔍 SYNTAXE: Erreurs Python, JavaScript, TypeScript, HTML, CSS
-🔍 IMPORTS: Déclarations manquantes, imports inutiles, chemins incorrects
-🔍 DÉPENDANCES: package.json, requirements.txt, versions compatibles
-🔍 API: Cohérence frontend-backend, routes, paramètres, formats
-🔍 BASE DE DONNÉES: Modèles, migrations, connexions
-🔍 CONFIGURATION: Variables d'environnement, fichiers config
-🔍 SÉCURITÉ: Vulnérabilités évidentes, validation des données
-🔍 PERFORMANCE: Goulots d'étranglement, optimisations
-🔍 TESTS: Couverture, qualité des tests
-🔍 FONCTIONNALITÉ: Logique métier, flux de données
-
-FORMAT DE RÉPONSE:
-Si des problèmes sont trouvés:
-"🔧 PROBLÈMES DÉTECTÉS:
-
-CRITIQUES (cassent l'application):
-1. [Description détaillée] dans [fichier:ligne] - Solution: [correction spécifique]
-
-IMPORTANTS (dégradent l'expérience):
-2. [Description détaillée] dans [fichier:ligne] - Solution: [correction spécifique]
-
-MINEURS (bonnes pratiques):
-3. [Description détaillée] dans [fichier:ligne] - Solution: [correction spécifique]
-
-AMÉLIORATIONS SUGGÉRÉES:
-- [Suggestion d'amélioration avec justification]"
-
-Si aucun problème:
-"✅ CODEBASE VALIDÉE - Aucun problème détecté"
-
-IMPORTANT: Soyez exhaustif et précis. Cette analyse sera utilisée pour des corrections automatiques."""
+          # Generate analysis prompt using prompt loader
+        analysis_prompt = get_agent_prompt(
+            'codebase_analysis_agent',
+            'analysis_prompt',
+            target_directory=target_directory,
+            user_prompt=user_prompt,
+            reformulated_prompt=reformulated_prompt,
+            codebase_analysis=codebase_analysis[:20000] + ("..." if len(codebase_analysis) > 20000 else "")
+        )
 
         # Appel à l'IA pour l'analyse
         messages = [

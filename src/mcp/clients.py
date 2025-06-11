@@ -14,11 +14,12 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>
 
 """
-MCP client implementations for interacting with various MCP servers.
+MCP (Model Context Protocol) client implementations for interacting with AI tools.
+Provides simplified clients that work with OpenRouter API without needing full MCP SDK.
 """
+
 import json
 import asyncio
-
 from contextlib import AsyncExitStack
 from typing import Optional, Dict, Any, List
 
@@ -29,6 +30,8 @@ from src.config.frontend_resources import (
     get_animation_resource,
     get_templates_by_type
 )
+from src.utils.prompt_loader import get_agent_prompt
+from src.utils.openrouter_model_utils import model_supports_tools, get_fallback_model_for_tools
 
 class SimpleMCPClient:
     """
@@ -45,10 +48,23 @@ class SimpleMCPClient:
             model (str): Model to use for generation
         """
         self.api_key = api_key
-        self.model = model
+        self.original_model = model
         self.messages = []
-        self.tools = get_default_tools()
         self.tool_results_cache = {}  # Cache tool results to avoid duplicate calls
+        
+        # Check if the model supports tools
+        self.supports_tools = model_supports_tools(model)
+        
+        if self.supports_tools:
+            self.model = model
+            self.tools = get_default_tools()
+            print(f"✅ Model {model} supports tools - MCP tools enabled")
+        else:
+            # Use a fallback model for tool calls, but keep original for regular generation
+            self.tool_model = get_fallback_model_for_tools(model)
+            self.model = model  # Keep original for non-tool calls
+            self.tools = get_default_tools()
+            print(f"⚠️ Model {model} doesn't support tools - using {self.tool_model} for MCP operations")
         
     def add_message(self, role, content, tool_call_id=None, name=None):
         """
@@ -82,7 +98,7 @@ class SimpleMCPClient:
         # Check cache first to avoid duplicate calls
         cache_key = f"{tool_name}:{json.dumps(tool_args, sort_keys=True)}"
         if cache_key in self.tool_results_cache:
-            st.info(f"Using cached results for {tool_name}")
+            print(f"Using cached results for {tool_name}")
             return self.tool_results_cache[cache_key]
         
         # Prepare resource information based on tool type
@@ -96,52 +112,43 @@ class SimpleMCPClient:
             framework_info = get_library_info(framework)
             
             if sources:
-                resource_info += f"\nRelevant resources for {component_type} in {framework}:\n"
+                resource_info += f"\\nRelevant resources for {component_type} in {framework}:\\n"
                 for src in sources:
-                    resource_info += f"- {src}\n"
+                    resource_info += f"- {src}\\n"
             
             if framework_info:
-                resource_info += f"\nFramework information:\n"
-                resource_info += f"- Documentation: {framework_info['docs']}\n"
-                resource_info += f"- CDN: {framework_info['cdn']}\n"
-                resource_info += f"- GitHub: {framework_info['github']}\n"
+                resource_info += f"\\nFramework information:\\n"
+                resource_info += f"- Documentation: {framework_info['docs']}\\n"
+                resource_info += f"- CDN: {framework_info['cdn']}\\n"
+                resource_info += f"- GitHub: {framework_info['github']}\\n"
         
         elif tool_name == "search_frontend_templates" and "template_type" in tool_args:
             template_type = tool_args["template_type"]
             template_links = get_templates_by_type(template_type)
             
             if template_links:
-                resource_info += f"\nRelevant {template_type} template resources:\n"
+                resource_info += f"\\nRelevant {template_type} template resources:\\n"
                 for link in template_links:
-                    resource_info += f"- {link}\n"
+                    resource_info += f"- {link}\\n"
         
         elif tool_name == "search_animation_resources" and "animation_type" in tool_args:
             animation_type = tool_args["animation_type"]
             
-            resource_info += f"\nRelevant animation resources for {animation_type}:\n"
+            resource_info += f"\\nRelevant animation resources for {animation_type}:\\n"
             animation_resources = get_animation_resource(animation_type)
             if animation_resources:
                 # get_animation_resource returns a single resource dict
                 info = animation_resources
-                resource_info += f"- {info['name']}: {info['url']} (CDN: {info.get('cdn', 'N/A')})\n"
+                resource_info += f"- {info['name']}: {info['url']} (CDN: {info.get('cdn', 'N/A')})\\n"
         
-        # Create a special prompt for the tool execution
-        tool_prompt = f"""
-        You are executing the tool '{tool_name}' with the following arguments:
-        {json.dumps(tool_args, indent=2)}
-        
-        {resource_info}
-        
-        Please provide the requested information based on your knowledge and the resources provided.
-        For a web_search tool, provide relevant search results.
-        For a search_documentation tool, provide relevant documentation with code examples.
-        For a search_frontend_components tool, describe and provide HTML/CSS/JS code snippets for relevant components.
-        For a search_frontend_templates tool, describe templates and provide links to resources.
-        For a search_animation_resources tool, provide animation code examples and usage instructions.
-        
-        Your response should be comprehensive and include practical, ready-to-use code where appropriate.
-        Format code examples using markdown code blocks with the appropriate language tag.
-        """
+        # Create tool execution prompt using prompt loader
+        tool_prompt = get_agent_prompt(
+            'tool_execution_agent',
+            'tool_execution_prompt',
+            tool_name=tool_name,
+            tool_args=json.dumps(tool_args, indent=2),
+            resource_info=resource_info
+        )
         
         # Make a separate API call to simulate the tool
         tool_messages = [{"role": "user", "content": tool_prompt}]
@@ -182,13 +189,17 @@ class SimpleMCPClient:
         # Add user query
         self.add_message("user", query)
         
-        # Create initial request with tools
+        # Determine which model to use and whether to include tools
+        model_to_use = self.tool_model if hasattr(self, 'tool_model') and not self.supports_tools else self.model
+        tools_to_use = self.tools if self.supports_tools else None
+        
+        # Create initial request with or without tools based on model support
         response = call_openrouter_api(
             self.api_key, 
-            self.model, 
+            model_to_use, 
             self.messages, 
             temperature=0.4,
-            tools=self.tools
+            tools=tools_to_use
         )
         
         final_text = []
@@ -196,10 +207,10 @@ class SimpleMCPClient:
         
         if response and response.get("choices"):
             content = response["choices"][0]["message"]
-            self.add_message("assistant", content.get("content", ""), )
+            self.add_message("assistant", content.get("content", ""))
             
-            # Handle tool calls if any
-            if content.get("tool_calls"):
+            # Handle tool calls if any and if model supports tools
+            if self.supports_tools and content.get("tool_calls"):
                 for tool_call in content["tool_calls"]:
                     function_info = tool_call.get("function", {})
                     tool_name = function_info.get("name")
@@ -232,7 +243,7 @@ class SimpleMCPClient:
                 # Final response after tool execution
                 response = call_openrouter_api(
                     self.api_key,
-                    self.model,
+                    model_to_use,
                     self.messages,
                     temperature=0.4
                 )
@@ -244,9 +255,32 @@ class SimpleMCPClient:
             else:
                 # No tool calls, just return the response
                 final_text.append(content.get("content", ""))
+                
+        # If model doesn't support tools but query suggests tool usage, simulate basic search
+        elif not self.supports_tools and any(keyword in query.lower() for keyword in ["search", "find", "documentation", "component", "template"]):
+            # Simulate a basic search response without actual tools
+            simulated_response = f"Based on your query about: {query}\\n\\nHere are some general recommendations and resources:\\n"
+            
+            if "search" in query.lower() or "find" in query.lower():
+                simulated_response += "- For web development, consider using modern frameworks like React, Vue, or vanilla JavaScript\\n"
+                simulated_response += "- Popular CSS frameworks include Bootstrap, Tailwind CSS, and Bulma\\n"
+                simulated_response += "- For backend development, Flask, Django (Python), Express (Node.js) are good choices\\n"
+            
+            if "documentation" in query.lower():
+                simulated_response += "- MDN Web Docs (developer.mozilla.org) for web standards\\n"
+                simulated_response += "- Official framework documentation is always the best source\\n"
+                simulated_response += "- GitHub repositories often have excellent README files\\n"
+            
+            if "component" in query.lower():
+                simulated_response += "- Component libraries: Material-UI, Ant Design, Chakra UI\\n"
+                simulated_response += "- CSS-only components: Pure CSS, Semantic UI\\n"
+                simulated_response += "- Icon libraries: Font Awesome, Heroicons, Feather\\n"
+            
+            final_text.append(simulated_response)
+            self.add_message("assistant", simulated_response)
         
         result = {
-            "text": "\n".join(final_text) if final_text else "Error processing query",
+            "text": "\\n".join(final_text) if final_text else "Error processing query",
             "tool_calls": tool_calls_info
         }
         

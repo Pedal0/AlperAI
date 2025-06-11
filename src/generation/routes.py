@@ -25,6 +25,7 @@ import traceback # Ensure traceback is imported
 from src.generation.generation_flow import generate_application
 from src.utils.model_utils import is_free_model
 from src.api.openrouter_api import extract_files_from_response, generate_code_with_openrouter
+from src.utils.prompt_loader import get_agent_prompt
 
 # Blueprint for generation
 bp_generation = Blueprint('generation', __name__)
@@ -134,8 +135,7 @@ def iterate_application_thread(task_id, api_key, model, reformulated_prompt, fee
             # Only send list of file paths to minimize tokens
             file_list = sorted(existing_files.keys())
             # Provide list of files
-            code_summary = "List of existing files:\n" + "\n".join(file_list) + "\n"
-            # Include brief previews of key HTML/CSS files to preserve style context
+            code_summary = "List of existing files:\n" + "\n".join(file_list) + "\n"            # Include brief previews of key HTML/CSS files to preserve style context
             detailed_context = ""
             for path in file_list:
                 if path.lower().endswith(('.html', '.css')):
@@ -144,35 +144,10 @@ def iterate_application_thread(task_id, api_key, model, reformulated_prompt, fee
                     detailed_context += f"FILE: {path}\n```\n{preview}\n```\n\n"
             if detailed_context:
                 code_summary += "\nDetailed file previews for style context:\n" + detailed_context
-            # Nouveau prompt système renforcé pour l'itération IA
-            system_prompt = '''You are a senior software engineer AI assistant. Your task is to improve the existing application code according to the user's instructions.
+            
+            # Load system prompt for iteration agent
+            system_prompt = get_agent_prompt('iteration_agent', 'iteration_system_prompt')
 
-STRICT RULES:
-- DO NOT modify any file, code, style, or structure unless it is EXPLICITLY requested by the user feedback.
-- PRESERVE all existing styles, layouts, and logic unless the user asks for a change.
-- If the user asks for a change, ONLY modify the minimal code required to achieve the request.
-- DO NOT refactor, optimize, or reformat code unless the user asks for it.
-- DO NOT change the structure, class names, CSS selectors, or HTML tags unless the user asks for it.
-- If you need to add code, do it in a way that does not break or alter the existing design and logic.
-- If the user feedback is ambiguous, DO NOT make assumptions: do the minimal change or ask for clarification.
-- If you detect a risk of breaking the style or structure, warn in a comment at the top of the file.
-
-EXAMPLES:
-Good:
-- User: "Add a button to the navbar" → Only add the button in the navbar, do not touch other parts.
-- User: "Change the background color to black" → Only change the background property, do not touch other CSS or HTML.
-Bad:
-- Changing unrelated styles, deleting or renaming classes, or reformatting the whole file.
-
-OUTPUT FORMAT:
-For each file to modify or add, clearly indicate:
-FILE: <file/path>
-Followed by the complete content of the file after modifications. Do not truncate code and provide full implementations. Ensure accuracy in file paths.
-
-FINAL CHECK:
-- Double check that you did NOT change anything except what the user requested.
-- If you made any change not strictly required, revert it.
-'''
             # --- Détection automatique des fichiers concernés par l'itération ---
             import re
             feedback_lower = feedback.lower()
@@ -221,7 +196,14 @@ FINAL CHECK:
             if style_summary:
                 detailed_context += f"\nRésumé du style global :\n{style_summary}\n"
             code_summary = "Liste des fichiers concernés :\n" + "\n".join(targeted_files) + "\n\nExtraits pertinents :\n" + detailed_context
-            user_prompt = f"""Here is the original project description:\n\n{reformulated_prompt}\n\nHere is an overview of the existing code:\n\n{code_summary}\n\nUser requested iteration with the following feedback:\n\n{feedback}\n\nPlease improve the existing code according to these instructions. Provide only the files that need to be modified or added."""
+            
+            # Load user prompt template for iteration
+            user_prompt = get_agent_prompt(
+                'iteration_agent',
+                'iteration_user_prompt',
+                feedback=feedback,
+                code_summary=code_summary
+            )
             generation_tasks[task_id]['progress'] = 50
             generation_tasks[task_id]['current_step'] = "Generating improvements..."
             # Debug: log prompt sizes to estimate token usage

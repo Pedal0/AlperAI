@@ -17,6 +17,7 @@ if platform.system() == "Windows":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 from src.api.openrouter_api import get_openrouter_completion # Added import
+from src.utils.prompt_loader import get_agent_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -305,16 +306,38 @@ async def get_ai_fix_for_launch_failure(project_dir: str, commands_data: dict, f
                     break
                 structure.append(f"{indent}  {f_name}")
         return "\n".join(structure)
-    structure_str = get_project_structure(Path(project_dir))
-
-    # 3. Construire le prompt enrichi
-    prompt = f"""The following command failed during project startup:\\n\\nProject Directory: {project_dir}\\nCommand: {commands_data['commands'][failed_command_index]}\\nSTDOUT:\\n{stdout}\\nSTDERR:\\n{stderr}\\n\\nProject structure:\\n{structure_str}\\n"""
+    structure_str = get_project_structure(Path(project_dir))    # 3. Construire le prompt enrichi avec le prompt loader
+    file_content_section = ""
+    fix_instructions = ""
+    
     if file_name and file_content:
-        prompt += f"\nThe file '{file_name}' mentioned in the error has the following content:\n--- FILE: {file_name} ---\n{file_content}\n--- END FILE ---\n"
-        prompt += "\nIf you can fix the error, please return a JSON object with keys: 'fixed' (true/false), 'new_commands_data' (if needed), 'message_to_user', and if a file needs to be replaced, add a 'file_patch' key with { 'filename': ..., 'content': ... } containing the corrected file content.\n"
+        file_content_section = get_agent_prompt(
+            'launch_failure_agent',
+            'file_content_section_with_file',
+            file_name=file_name,
+            file_content=file_content
+        )
+        fix_instructions = get_agent_prompt(
+            'launch_failure_agent',
+            'fix_instructions_with_file'
+        )
     else:
-        prompt += "\nIf you can fix the error, please return a JSON object with keys: 'fixed' (true/false), 'new_commands_data' (if needed), and 'message_to_user'.\n"
-    prompt += "If you cannot fix it, respond with 'fixed: false' and a 'message_to_user' explaining the issue or suggesting manual steps. Ensure the response is a single JSON object."
+        fix_instructions = get_agent_prompt(
+            'launch_failure_agent',
+            'fix_instructions_without_file'
+        )
+    
+    prompt = get_agent_prompt(
+        'launch_failure_agent',
+        'launch_failure_fix_prompt',
+        project_dir=project_dir,
+        failed_command=commands_data['commands'][failed_command_index],
+        stdout=stdout,
+        stderr=stderr,
+        project_structure=structure_str,
+        file_content_section=file_content_section,
+        fix_instructions=fix_instructions
+    )
 
     ai_response_str = None
     try:

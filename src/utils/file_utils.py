@@ -20,6 +20,7 @@ import re
 import logging
 import os
 from pathlib import Path
+from src.utils.prompt_loader import get_agent_prompt
 
 def parse_structure_and_prompt(response_text):
     """
@@ -417,32 +418,15 @@ def generate_missing_code(api_key, model, empty_files, reformulated_prompt, stru
     if detailed_previews:
         existing_summary += "\nStyle/context previews:\n" + detailed_previews
 
-    # Build the prompt for generating missing code
-    prompt = f"""
-    You need to complete code for files that were left empty in a previous generation.
-    
-    **Project Description:**
-    {reformulated_prompt}
-    
-    **Complete Project Structure:**
-    
-    {chr(10).join(structure_lines)}
-    
-    **Existing Project Files (summary):**
-    {existing_summary}
-    
-    **Files to Complete:**
-    {chr(10).join([f"- {f}" for f in empty_files])}
-    
-    **Instructions:**
-    1. Generate ONLY the code for the files listed under "Files to Complete".
-    2. Use the EXACT format `--- FILE: path/to/filename ---` on a line by itself before each file's code.
-    3. Ensure your code is consistent with the rest of the project structure and functionality.
-    4. Use appropriate imports, error handling, and comments.
-    5. DO NOT generate code for files not listed in "Files to Complete".
-    
-    Generate code for the missing files now:
-    """
+    # Build the prompt for generating missing code    # Generate completion prompt using prompt loader
+    prompt = get_agent_prompt(
+        'file_completion_agent',
+        'file_completion_prompt',
+        reformulated_prompt=reformulated_prompt,
+        structure_lines=chr(10).join(structure_lines),
+        existing_summary=existing_summary,
+        empty_files=chr(10).join([f"- {f}" for f in empty_files])
+    )
     
     messages = [{"role": "user", "content": prompt}]
     response = call_openrouter_api(api_key, model, messages, temperature=0.4, max_retries=2)
