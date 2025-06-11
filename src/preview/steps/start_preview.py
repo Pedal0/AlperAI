@@ -11,6 +11,7 @@ from src.preview.steps.get_start_command import get_start_command
 from src.preview.steps.get_app_url import get_app_url
 from src.preview.steps.log_entry import log_entry
 from src.preview.steps.improve_readme import improve_readme_for_preview
+from src.utils.prompt_loader import get_agent_prompt
 
 def start_preview(project_dir: str, session_id: str, running_processes=None, process_logs=None, session_ports=None, already_patched=False, ai_model=None, api_key=None):
     if running_processes is None or process_logs is None or session_ports is None:
@@ -75,19 +76,18 @@ def start_preview(project_dir: str, session_id: str, running_processes=None, pro
                     if isinstance(launch_config, dict) and "model" in launch_config and launch_config["model"]:
                         model_name = launch_config["model"]
                 except Exception:
-                    pass
-            # Compose AI prompt
-            ai_prompt = f"""
-A project failed to start due to an error. Here is the error message:
----
-{message}
----
-"""
+                    pass            # Compose AI prompt using prompt loader
+            file_content_section = ""
             if file_path and file_content:
-                ai_prompt += f"\nHere is the FULL content of the blocking file ({file_path.name}):\n---\n{file_content}\n---\n"
-            ai_prompt += f"\nProject structure:\n---\n{structure_str}\n---\n"
-            ai_prompt += ("\nPlease rewrite the ENTIRE content of the blocking file above so that the application can start without error. "
-                          "Return ONLY the new file content between triple backticks, with no explanation, and ensure the file is valid for its type. ")
+                file_content_section = f"\nHere is the FULL content of the blocking file ({file_path.name}):\n---\n{file_content}\n---\n"
+            
+            ai_prompt = get_agent_prompt(
+                'auto_patch_agent',
+                'auto_patch_prompt',
+                error_message=message,
+                file_content_section=file_content_section,
+                project_structure=structure_str
+            )
             # Call the AI
             try:
                 import asyncio

@@ -21,6 +21,7 @@ import json
 import logging
 from pathlib import Path
 from src.api.openrouter_api import get_openrouter_completion
+from src.utils.prompt_loader import get_agent_prompt
 import asyncio
 
 logger = logging.getLogger(__name__)
@@ -32,48 +33,15 @@ async def get_launch_commands_from_ai(project_dir: Path, readme_content: str, pr
     """
     log_callback(f"Requesting launch commands from AI for project: {project_dir}")
 
-    prompt = f"""
-Given the project information below, provide SIMPLE and MINIMAL shell commands to set up and run this project.
-Project Directory: {project_dir}
-Project Types: {', '.join(project_types) if project_types else 'Unknown'}
-
-README.md content:
----
-{readme_content}
----
-
-Project Structure:
----
-{project_structure}
----
-
-IMPORTANT: Your response MUST be a single valid JSON object, WITHOUT any code block markers (no triple backticks, no markdown, no explanations, just the JSON object itself).
-
-STRICT REQUIREMENTS:
-- Keep commands SIMPLE and MINIMAL - prefer short, essential commands only
-- NEVER use port 5000 (it's occupied) - use ports like 3000, 8000, 8080, or any other port
-- The JSON object must contain two keys:
-  1. "commands": A list of strings, where each string is a shell command to be executed in sequence. These commands should cover ONLY the essential steps: installing dependencies (if needed) and starting the application. Keep it to 2-3 commands maximum. Assume the commands will be run from the root of the project directory. If the project runs a server, the last command should be the one that starts the server and keeps running. For static HTML/CSS/JS projects, use simple servers like 'python -m http.server 8000' or 'npx serve -p 3000'. DO NOT create, write, or mention any batch (.bat), shell (.sh), or script files. DO NOT output any file content, only the JSON object as described. DO NOT output any command that creates or writes to a file. DO NOT include any 'cd ...' command, as the working directory is already set correctly.
-  2. "env": An optional dictionary of environment variables (string key-value pairs) that might be needed for the commands. Keep this minimal - only include if absolutely necessary. If no specific environment variables are needed, this can be an empty dictionary or omitted.
-
-Example of a valid JSON response:
-{{
-  "commands": [
-    "npm install",
-    "npm run build",
-    "npm start"
-  ],
-  "env": {{
-    "PORT": "3000"
-  }}
-}}
-
-If you cannot determine the commands, respond with:
-{{
-  "commands": [],
-  "error": "Could not determine launch commands."
-}}
-"""
+    # Generate prompt using the prompt loader
+    prompt = get_agent_prompt(
+        'launch_scripts_agent',
+        'launch_commands_prompt',
+        project_dir=project_dir,
+        project_types=', '.join(project_types) if project_types else 'Unknown',
+        readme_content=readme_content,
+        project_structure=project_structure
+    )
 
     log_callback(f"Attempting to get launch commands from AI model: {model_name}")
     ai_response_str = None
@@ -99,8 +67,6 @@ If you cannot determine the commands, respond with:
             "error": f"Exception during AI call: {str(e)}"
         })
     
-    # log_callback(f"AI response: {ai_response_str}") # Full response might be too verbose
-
     # --- PATCH: Remove code block markers if present in AI response ---
     if ai_response_str and ai_response_str.strip().startswith('```'):
         import re as _re
@@ -145,12 +111,6 @@ def get_project_structure(project_dir: Path, max_depth=2, max_files_per_dir=10):
                 structure.append(f"{indent}  ... (and more files)")
                 break
             structure.append(f"{indent}  {f_name}")
-        
-        # Limit number of directories shown at current level if too many (optional)
-        # if len(dirs) > max_files_per_dir and depth < max_depth: # Example limit
-        #     dirs_to_show = sorted(dirs)[:max_files_per_dir]
-        #     structure.append(f"{indent}  ... (and more directories)")
-        #     dirs[:] = dirs_to_show
             
     return "\\n".join(structure)
 
@@ -181,8 +141,7 @@ async def generate_launch_config_from_ai(project_dir_str: str, log_callback=prin
     else:
         log_callback("No README.md found in the project directory.")
 
-    # Basic project type detection (can be enhanced)
-    # This is a simplified version of what detect_project_type might do.
+    # Basic project type detection
     project_types = []
     if (project_dir / 'package.json').exists():
         project_types.append('node')
@@ -196,10 +155,9 @@ async def generate_launch_config_from_ai(project_dir_str: str, log_callback=prin
     log_callback(f"Project structure for AI:\\n{structure_str}")
 
     # Get launch commands from AI
-    # This needs to be called from an async context or run in an event loop.
     launch_config = await get_launch_commands_from_ai(
         project_dir, readme_content, structure_str, project_types, log_callback,
-        api_key=api_key, model_name=model_name # Pass through api_key and model_name
+        api_key=api_key, model_name=model_name
     )
 
     if launch_config and launch_config.get("commands"):
@@ -210,10 +168,9 @@ async def generate_launch_config_from_ai(project_dir_str: str, log_callback=prin
             return launch_config
         except Exception as e:
             log_callback(f"Error saving launch configuration to {launch_config_path}: {e}")
-            return None # Or return launch_config if saving is optional but commands were received
+            return None
     else:
         log_callback("Failed to get valid launch commands from AI.")
-        # Optionally, create an empty or error-indicating launch_commands.json
         error_config = {"commands": [], "env": {}, "error": "Failed to generate launch commands via AI."}
         try:
             with open(launch_config_path, 'w', encoding='utf-8') as f:
@@ -223,9 +180,7 @@ async def generate_launch_config_from_ai(project_dir_str: str, log_callback=prin
             log_callback(f"Error saving empty/error launch configuration: {e}")
         return None
 
-# The old generate_start_scripts function is replaced.
-# If you need a synchronous wrapper for generate_launch_config_from_ai:
-def generate_start_scripts(project_dir, api_key=None, model_name="openrouter/anthropic/claude-3-haiku"): # api_key and model_name are used to configure the AI call
+def generate_start_scripts(project_dir, api_key=None, model_name="openrouter/anthropic/claude-3-haiku"):
     """
     Synchronous wrapper to generate launch configuration from AI.
     This function will run the async part in a new event loop.
@@ -233,48 +188,25 @@ def generate_start_scripts(project_dir, api_key=None, model_name="openrouter/ant
     logger.info(f"Attempting to generate AI launch configuration for {project_dir}")
     try:
         loop = asyncio.get_running_loop()
-        # If there's a running loop, we might be in an async context already.
-        # However, calling loop.run_until_complete on a task that's part of the *current* loop's execution
-        # can lead to issues. It's safer to create a new task if we are already in an async func.
-        # For simplicity here, we assume this sync wrapper is called from a sync context.
-        # If called from async, the caller should 'await generate_launch_config_from_ai(...)' directly.
-        if loop.is_running(): # This check might be too simplistic for nested loops or different threads
+        if loop.is_running():
              logger.warning("generate_start_scripts (sync) called from a running event loop. This might lead to issues. Consider awaiting generate_launch_config_from_ai directly.")
-             # Fallback or error, as run_until_complete cannot be used this way easily.
-             # One option is to schedule it and block, but that's complex.
-             pass # Allow it to proceed, but it's a code smell.
-
-
     except RuntimeError: # No current event loop
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
     
     config = None
     try:
-        # Pass api_key and model_name to the async function
         config = loop.run_until_complete(generate_launch_config_from_ai(project_dir, logger.info, api_key=api_key, model_name=model_name))
     finally:
-        # If we created a new loop, we should close it.
-        # If we got an existing loop, we should not close it here.
-        # This logic is tricky. A common pattern is to ensure set_event_loop(None) if a new one was made.
-        # For now, if a new loop was created and is not running, close it.
-        # This might need more robust handling depending on the application structure.
-        if not asyncio.get_event_loop().is_running() and 'loop' in locals() and loop is not asyncio.get_event_loop():
-             # Check if 'loop' was the one we set and it's different from a potentially new global one.
-             # This is still a bit fragile.
-             pass # Avoid closing if unsure, could affect other parts of the app.
-
+        pass
 
     if config and config.get("commands"):
         logger.info(f"AI Launch configuration generated successfully for {project_dir}")
-        return True # Indicates success (config file was written or commands obtained)
+        return True
     else:
         logger.error(f"Failed to generate AI launch configuration for {project_dir}")
         return False
 
-
-# --- Removed old helper functions like _convert_to_batch, _add_default_setup_commands_sh, etc. ---
-# --- as the AI is now responsible for generating the full command list. ---
 
 def test_command_generation():
     """Test function for command generation system."""
@@ -284,29 +216,22 @@ def test_command_generation():
     # Create a dummy project structure for testing
     test_project_dir = Path("./test_project_ai_launch")
     test_project_dir.mkdir(exist_ok=True)
-    (test_project_dir / "README.md").write_text("This is a test project.\n\nTo run: \n1. npm install\n2. npm start")
+    (test_project_dir / "README.md").write_text("This is a test project.\\n\\nTo run: \\n1. npm install\\n2. npm start")
     (test_project_dir / "package.json").write_text('{ "name": "test", "scripts": { "start": "node index.js" } }')
     (test_project_dir / "index.js").write_text('console.log("Hello from test project!");')
 
     logger.info(f"Testing AI launch config generation for: {test_project_dir.resolve()}")
     
-    # Since generate_launch_config_from_ai is async, we need an event loop to run it.
-    # The generate_start_scripts function handles this.
     success = generate_start_scripts(str(test_project_dir.resolve()))
 
     if success:
         logger.info("Test completed. Check launch_commands.json in test_project_ai_launch directory.")
-        # You can also load and print the json file here
         config_file = test_project_dir / "launch_commands.json"
         if config_file.exists():
             with open(config_file, 'r') as f:
-                logger.info(f"Contents of {config_file}:\n{f.read()}")
+                logger.info(f"Contents of {config_file}:\\n{f.read()}")
     else:
         logger.error("Test failed.")
-
-    # Cleanup (optional)
-    # import shutil
-    # shutil.rmtree(test_project_dir)
     
     return success
 

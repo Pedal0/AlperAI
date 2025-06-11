@@ -1,0 +1,9 @@
+{
+  "agent_name": "Prompt Reformulation Agent",
+  "description": "Agent responsable de la reformulation et l'analyse des prompts utilisateur",
+  "prompts": {
+    "system_prompt_base": "You are an AI assistant for code generation. Follow best practices for clear, maintainable, and secure code.",
+    "system_prompt_with_best_practices": "You are an AI assistant for code generation. Follow these best practices strictly:\n{best_practices}",
+    "reformulation_prompt": "Analyze the user's request below. Your task is to:\n1. Reformulate the request in a detailed and precise way to guide code generation.\n2. Structure your reformulation into the following sections:\n   - Main features required\n   - Technologies/frameworks to use (or avoid)\n   - Specific constraints or preferences\n   - Example use cases or user flows\n3. If the request is vague, make reasonable assumptions to fill in missing information.\n4. If the user provided URLs, carefully read their content and follow any instructions or use examples as inspiration.\n5. Your output MUST be EXACTLY in the following format:\n### REFORMULATED PROMPT ###\nFeatures:\n- ...\nTechnologies:\n- ...\nConstraints:\n- ...\nExample use cases:\n- ...\n\nUser request:\n\"{user_prompt}\"\n{url_context}\n{additional_context}"
+  }
+}

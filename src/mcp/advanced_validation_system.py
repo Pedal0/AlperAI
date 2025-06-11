@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 from src.api.openrouter_api import call_openrouter_api
 from src.mcp.simple_codebase_client import create_simple_codebase_client
+from src.utils.prompt_loader import get_agent_prompt
 
 def validate_with_codebase_analysis(target_directory, api_key=None, model=None, user_prompt=None, reformulated_prompt=None, progress_callback=None):
     """
@@ -40,8 +41,7 @@ def validate_with_codebase_analysis(target_directory, api_key=None, model=None, 
         
         # Analyser la structure du projet
         project_structure = codebase_client.analyze_project_structure(target_directory)
-        
-        # Obtenir l'analyse complète de la codebase
+          # Obtenir l'analyse complète de la codebase
         success, codebase_content = codebase_client.get_codebase_analysis(
             target_directory, 
             output_format="markdown", 
@@ -54,80 +54,24 @@ def validate_with_codebase_analysis(target_directory, api_key=None, model=None, 
         if progress_callback:
             progress_callback(9, "🧠 AI-powered comprehensive validation...", 97)
         
-        # Créer un prompt de validation ultra-complet
-        validation_prompt = f"""ADVANCED CODEBASE VALIDATION AND AUTO-CORRECTION
-
-You are performing comprehensive validation on a freshly generated project.
-
-ORIGINAL USER REQUEST: {user_prompt or 'Not specified'}
-REFORMULATED REQUIREMENTS: {reformulated_prompt or 'Not specified'}
-
-PROJECT STRUCTURE ANALYSIS:
-- Total files: {project_structure.get('total_files', 0)}
-- Total size: {project_structure.get('total_size', 0)} bytes
-- File types: {project_structure.get('file_types', {})}
-- Directories: {len(project_structure.get('directories', []))}
-
-COMPLETE CODEBASE ANALYSIS:
-{codebase_content[:20000]}{"..." if len(codebase_content) > 20000 else ""}
-
-COMPREHENSIVE VALIDATION REQUIREMENTS:
-
-🔍 CRITICAL ANALYSIS AREAS:
-1. SYNTAX & COMPILATION: Check all code files for syntax errors, compilation issues
-2. DEPENDENCIES: Verify package.json, requirements.txt, imports, missing libraries
-3. API CONSISTENCY: Frontend-backend route matching, parameter alignment, data formats
-4. DATABASE INTEGRITY: Models, migrations, connections, schema consistency
-5. CONFIGURATION: Environment variables, config files, deployment readiness
-6. SECURITY: Authentication, authorization, input validation, XSS/CSRF protection
-7. PERFORMANCE: Inefficient queries, memory leaks, optimization opportunities
-8. FUNCTIONALITY: Core business logic implementation, edge cases, error handling
-9. FILE STRUCTURE: Proper organization, naming conventions, best practices
-10. TESTING: Test coverage, test quality, missing test cases
-
-📋 VALIDATION CHECKLIST:
-✓ All imports resolve correctly
-✓ No undefined variables or functions
-✓ API endpoints match between frontend and backend
-✓ Database models are properly defined and used
-✓ Environment configuration is complete
-✓ Error handling is implemented
-✓ Security best practices are followed
-✓ Code follows language-specific conventions
-✓ Dependencies are properly declared
-✓ File structure is logical and maintainable
-
-RESPONSE FORMAT:
-If ANY issues found (even minor ones), respond with:
-"🔧 VALIDATION RESULTS - ISSUES FOUND:
-
-CRITICAL ISSUES:
-1. [Issue] in [file:line] - Impact: [severity] - Fix: [solution]
-
-MODERATE ISSUES:
-2. [Issue] in [file:line] - Impact: [severity] - Fix: [solution]
-
-MINOR IMPROVEMENTS:
-3. [Issue] in [file:line] - Impact: [severity] - Fix: [solution]
-
-SUMMARY: [total issues] issues found requiring automatic correction."
-
-If NO issues found, respond with:
-"✅ VALIDATION COMPLETE - NO ISSUES FOUND
-All code meets quality standards and requirements."
-
-IMPORTANT:
-- Be extremely thorough - check EVERY aspect
-- Provide specific file names and line references when possible
-- Focus on issues that could cause runtime failures or security problems
-- Suggest specific, actionable fixes
-- Don't ignore small issues - they should all be fixed automatically
-
-Begin comprehensive validation:"""
+        # Load validation prompt template
+        validation_prompt = get_agent_prompt(
+            'advanced_validation_agent',
+            'advanced_validation_prompt',
+            target_directory=target_directory,
+            user_prompt=user_prompt or 'Not specified',
+            reformulated_prompt=reformulated_prompt or 'Not specified',
+            total_files=project_structure.get('total_files', 0),
+            total_size=project_structure.get('total_size', 0),
+            file_types=str(project_structure.get('file_types', {})),
+            directories_count=len(project_structure.get('directories', [])),
+            repomix_output=codebase_content[:20000] + ("..." if len(codebase_content) > 20000 else "")
+        )
         
         # Utiliser l'IA pour valider
+        system_prompt = get_agent_prompt('advanced_validation_agent', 'advanced_validation_system_prompt')
         messages = [
-            {"role": "system", "content": "You are an expert code reviewer and validator with deep knowledge of software development best practices, security, and architecture. Perform the most thorough code analysis possible."},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": validation_prompt}
         ]
         
@@ -210,45 +154,18 @@ def apply_advanced_fixes(target_directory, validation_result, codebase_content, 
             "✅" in validation_result and ("NO ISSUES" in validation_result.upper() or "NO PROBLEMS" in validation_result.upper())):
             logging.info("Skipping advanced fix application - validation indicates no issues found")
             return 0
-        
-        # Créer un prompt spécialisé pour générer des corrections automatiques
-        fix_prompt = f"""AUTOMATIC CODE CORRECTION SYSTEM
-
-VALIDATION RESULTS:
-{validation_result}
-
-COMPLETE CODEBASE CONTEXT:
-{codebase_content[:15000]}{"..." if len(codebase_content) > 15000 else ""}
-
-TASK: Generate specific file corrections for ALL issues identified in the validation results.
-
-CORRECTION RULES:
-1. Fix ALL syntax errors, import problems, dependency issues
-2. Ensure API consistency between frontend and backend
-3. Implement proper error handling and security measures
-4. Optimize performance and follow best practices
-5. Maintain existing functionality while fixing issues
-6. Generate complete file contents, not just snippets
-
-RESPONSE FORMAT:
-For each file needing corrections, provide:
-
-=== FIX_FILE: [relative_file_path] ===
-[complete corrected file content with all issues fixed]
-=== END_FIX ===
-
-CRITICAL REQUIREMENTS:
-- Provide COMPLETE file content, not partial fixes
-- Fix ALL issues mentioned in the validation results
-- Ensure the fixes don't break existing functionality
-- Follow language-specific best practices and conventions
-- Include proper imports, dependencies, and configurations
-
-Begin generating comprehensive fixes:"""
+          # Créer un prompt spécialisé pour générer des corrections automatiques
+        fix_prompt = get_agent_prompt(
+            'advanced_validation_agent',
+            'auto_correction_prompt',
+            validation_results=validation_result,
+            codebase_content=codebase_content[:15000] + ("..." if len(codebase_content) > 15000 else "")
+        )
         
         # Obtenir les corrections de l'IA
+        auto_correction_system_prompt = get_agent_prompt('advanced_validation_agent', 'auto_correction_system_prompt')
         messages = [
-            {"role": "system", "content": "You are an expert code fixer capable of automatically correcting any software issues. Generate complete, working file contents that fix all identified problems."},
+            {"role": "system", "content": auto_correction_system_prompt},
             {"role": "user", "content": fix_prompt}
         ]
         

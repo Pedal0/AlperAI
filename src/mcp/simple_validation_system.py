@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 from src.api.openrouter_api import call_openrouter_api
 from src.mcp.simple_codebase_client import create_simple_codebase_client
+from src.utils.prompt_loader import get_agent_prompt
 
 def validate_and_fix_with_repomix(target_directory, api_key=None, model=None, user_prompt=None, reformulated_prompt=None, progress_callback=None):
     """
@@ -58,65 +59,21 @@ def validate_and_fix_with_repomix(target_directory, api_key=None, model=None, us
         
         if progress_callback:
             progress_callback(9, "🧠 AI validation and correction...", 97)
+          # Étape 2: IA analyse et corrige
+        validation_prompt = get_agent_prompt(
+            'simple_validation_agent',
+            'simple_validation_prompt',
+            user_prompt=user_prompt or 'Not specified',
+            reformulated_prompt=reformulated_prompt or 'Not specified',
+            repomix_content=codebase_analysis[:25000] + ("..." if len(codebase_analysis) > 25000 else "")
+        )
         
-        # Étape 2: IA analyse et corrige
-        validation_prompt = f"""AUTOMATIC CODE VALIDATION AND CORRECTION
-
-You are analyzing a freshly generated project for automatic validation and correction.
-
-ORIGINAL REQUEST: {user_prompt or 'Not specified'}
-REFORMULATED REQUIREMENTS: {reformulated_prompt or 'Not specified'}
-
-COMPLETE CODEBASE (via RepoMix):
-{codebase_analysis[:25000]}{"..." if len(codebase_analysis) > 25000 else ""}
-
-TASK: Comprehensive validation and automatic correction
-
-VALIDATION AREAS:
-🔍 Syntax errors in all files
-🔍 Import/dependency issues  
-🔍 API consistency (frontend ↔ backend)
-🔍 Database models and migrations
-🔍 Configuration files
-🔍 Security vulnerabilities
-🔍 Performance issues
-🔍 Best practices compliance
-🔍 Error handling
-🔍 File structure organization
-🔧 CRITICAL: Markdown code block artifacts (```language, ```) - MUST BE REMOVED
-🔧 File encoding and format issues
-🔧 Executable permissions and file headers
-
-RESPONSE FORMAT:
-If issues found:
-"🔧 FIXES NEEDED:
-1. [Issue] in [file] - [Fix description]
-2. [Issue] in [file] - [Fix description]
-...
-
-APPLY_FIXES:
-=== FIX_FILE: [relative_path] ===
-[complete corrected file content]
-=== END_FIX ===
-
-=== FIX_FILE: [another_file] ===
-[complete corrected file content]
-=== END_FIX ==="
-
-If no issues:
-"✅ CODE VALIDATION PASSED - No issues found"
-
-CRITICAL: 
-- Be thorough but practical
-- Fix real issues, not cosmetic ones
-- Provide complete file contents in fixes
-- Ensure fixes don't break functionality
-
-Begin analysis:"""
+        # Load system prompt
+        system_prompt = get_agent_prompt('simple_validation_agent', 'simple_validation_system_prompt')
         
         # Appeler l'IA
         messages = [
-            {"role": "system", "content": "You are an expert code reviewer and fixer. Analyze the complete codebase and automatically fix any issues found."},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": validation_prompt}
         ]
         

@@ -1,0 +1,9 @@
+{
+  "agent_name": "Code Generation Agent",
+  "description": "Agent principal pour la génération de code complet",
+  "prompts": {
+    "system_prompt_base": "You are an AI code generator. Follow best practices for clean, functional code.",
+    "system_prompt_with_best_practices": "You are an AI code generator. Strictly adhere to these guidelines for output quality and format:\n{best_practices}",
+    "main_generation_prompt": "Generate the *complete* code for the application based on the prompt and structure below.\n**Detailed Prompt:**\n{reformulated_prompt}\n{tool_results_text}\n{url_reference}\n{url_context}\n**Project Structure (for reference only):**\n\n{structure_lines}\n\n**Instructions:**\n1. Provide the full code for *all* files listed in the structure.\n2. Use the EXACT format `--- FILE: path/to/filename ---` on a line by itself before each file's code block. Start your response *immediately* with the first marker. No introduction text.\n3. Ensure the code is functional, includes necessary imports, basic error handling, and comments.\n4. For `requirements.txt` or similar, list the dependencies.\n5. For `README.md`, provide DETAILED setup/run instructions. Include step-by-step manual instructions on how to install dependencies and run the application. Do NOT mention or rely on any start.bat/start.sh scripts. The README must contain explicit commands that a user can run directly.\n6. If the code exceeds token limits, end the *entire* response EXACTLY with: `GENERATION_INCOMPLETE` (no other text after).{animation_instruction}\n7. IMPORTANT: For web frameworks (e.g., Flask, Django, Express), ensure the application entrypoint configures its listening port via environment variable or CLI argument, never hardcoding port 5000.\n\nIMPORTANT: If a style, template, or documentation is provided in the URLs, use them as the primary reference.\nGenerate the code now:"
+  }
+}

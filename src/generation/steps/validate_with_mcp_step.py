@@ -10,6 +10,7 @@ from src.api.openrouter_api import call_openrouter_api
 from src.mcp.codebase_client import CodebaseMCPClient
 from src.mcp.setup_codebase_mcp import is_codebase_mcp_available
 from src.mcp.advanced_validation_system import validate_with_advanced_analysis
+from src.utils.prompt_loader import get_agent_prompt
 
 def validate_with_mcp_step(target_directory, api_key=None, model=None, user_prompt=None, reformulated_prompt=None, progress_callback=None):
     """Validate and auto-correct generated code using codebase-mcp for advanced analysis."""
@@ -128,58 +129,22 @@ def validate_with_direct_analysis(target_directory, api_key, model, user_prompt,
         
         if not project_files:
             return False, "No code files found in the project directory"
-        
-        # Create a comprehensive validation context
-        project_context = f"""AUTOMATED CODE VALIDATION AND CORRECTION TASK
-
-You are performing automatic validation on a freshly generated project located at: {target_directory}
-
-ORIGINAL USER REQUEST: {user_prompt or 'Not specified'}
-
-REFORMULATED REQUIREMENTS: {reformulated_prompt or 'Not specified'}
-
-PROJECT FILES ANALYSIS:
-{file_contents[:15000]}{"..." if len(file_contents) > 15000 else ""}
-
-YOUR TASK:
-Perform comprehensive validation and identify ALL issues that need to be fixed automatically.
-
-CRITICAL VALIDATION CHECKLIST:
-✓ SYNTAX ERRORS: Check Python, JavaScript, TypeScript, HTML, CSS syntax
-✓ IMPORTS: Verify all import statements are valid and modules exist
-✓ DEPENDENCIES: Check package.json, requirements.txt match actual usage
-✓ API CONSISTENCY: Frontend calls match backend routes exactly
-✓ FILE STRUCTURE: Proper file organization and naming
-✓ FUNCTIONALITY: Basic logic flows work correctly
-✓ DATABASE: Models, migrations, connections are properly configured
-✓ ENVIRONMENT: Configuration files and variables are set up
-✓ SECURITY: No obvious security vulnerabilities
-✓ PERFORMANCE: No obvious performance issues
-
-RESPONSE FORMAT:
-If ANY issues found (even minor ones), respond with:
-"🔧 ISSUES FOUND AND FIXES NEEDED:
-1. [Issue description] in [filename:line] - Fix: [specific solution]
-2. [Issue description] in [filename:line] - Fix: [specific solution]
-..."
-
-If NO issues found, respond with:
-"✅ All code validated - no issues found"
-
-IMPORTANT: 
-- Be thorough and check EVERYTHING
-- Focus on issues that could cause runtime errors or broken functionality
-- Be specific about file names and exact problems
-- Don't ignore small issues - fix them all automatically
-
-Begin comprehensive validation now:"""
+          # Create a comprehensive validation context using prompt loader
+        project_context = get_agent_prompt(
+            'validation_mcp_agent',
+            'direct_validation_prompt',
+            target_directory=target_directory,
+            user_prompt=user_prompt or 'Not specified',
+            reformulated_prompt=reformulated_prompt or 'Not specified',
+            project_files=file_contents[:15000] + ("..." if len(file_contents) > 15000 else "")
+        )
         
         if progress_callback:
             progress_callback(9, "🧪 Analyzing project files with AI...", 98)
-        
-        # Use AI to validate the code
+          # Use AI to validate the code
+        system_prompt = get_agent_prompt('validation_mcp_agent', 'code_review_system_prompt')
         messages = [
-            {"role": "system", "content": "You are an expert code reviewer and validator. Analyze the provided code carefully and identify any issues that need to be fixed."},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": project_context}
         ]
         
@@ -239,39 +204,18 @@ def apply_automatic_fixes(target_directory, validation_result, project_files, ap
             "✅" in validation_result and ("NO ISSUES" in validation_result.upper() or "NO PROBLEMS" in validation_result.upper())):
             logging.info("Skipping fix application - validation indicates no issues found")
             return 0
-        
-        # Create a more focused prompt for generating specific fixes
-        fix_request = f"""AUTOMATIC CODE FIXING TASK
-
-VALIDATION RESULTS:
-{validation_result}
-
-PROJECT FILES TO FIX:
-{chr(10).join([f"=== {filename} ==={chr(10)}{content[:1000]}{'...' if len(content) > 1000 else ''}{chr(10)}" for filename, content in project_files.items()])}
-
-YOUR TASK:
-Generate SPECIFIC file fixes based on the validation results above. For each issue found, provide the EXACT corrected file content.
-
-RESPONSE FORMAT:
-For each file that needs fixing, respond with:
-
-=== FIX_FILE: filename ===
-[complete corrected file content]
-=== END_FIX ===
-
-RULES:
-- Only include files that actually need changes
-- Provide complete file content, not just snippets
-- Ensure all syntax errors are fixed
-- Fix imports and dependencies
-- Maintain existing functionality while fixing issues
-- Keep the same file structure and naming
-
-Begin generating fixes now:"""
+          # Create a more focused prompt for generating specific fixes
+        fix_request = get_agent_prompt(
+            'validation_mcp_agent',
+            'automatic_fixes_prompt',
+            validation_result=validation_result,
+            project_files=chr(10).join([f"=== {filename} ==={chr(10)}{content[:1000]}{'...' if len(content) > 1000 else ''}{chr(10)}" for filename, content in project_files.items()])
+        )
         
         # Get specific fixes from AI
+        system_prompt = get_agent_prompt('validation_mcp_agent', 'code_fixer_system_prompt')
         messages = [
-            {"role": "system", "content": "You are an expert code fixer. Generate complete corrected file contents based on the validation results."},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": fix_request}
         ]
         
@@ -343,49 +287,18 @@ def apply_codebase_fixes(target_directory, analysis_result, codebase_context, ap
         
         if progress_callback:
             progress_callback(9, "🛠️ Generating intelligent fixes with codebase context...", 98)
-        
-        # Create an enhanced fix request using the full codebase context
-        fix_request = f"""ADVANCED AUTOMATIC CODE FIXING WITH CODEBASE CONTEXT
-
-VALIDATION ANALYSIS RESULTS:
-{analysis_result}
-
-COMPLETE CODEBASE CONTEXT (from RepoMix):
-{codebase_context[:25000]}{"..." if len(codebase_context) > 25000 else ""}
-
-YOUR TASK:
-Using the comprehensive codebase analysis provided by RepoMix, generate SPECIFIC and INTELLIGENT file fixes that take into account the entire project structure and dependencies.
-
-ADVANTAGES WITH CODEBASE CONTEXT:
-- You understand the complete project architecture
-- You can see all file relationships and dependencies
-- You can maintain consistency across the entire codebase
-- You can make informed decisions about imports and references
-
-RESPONSE FORMAT:
-For each file that needs fixing, respond with:
-
-=== FIX_FILE: filename ===
-[complete corrected file content with intelligent improvements]
-=== END_FIX ===
-
-ENHANCED FIXING RULES:
-- Fix ALL issues identified in the analysis
-- Maintain architectural consistency across the project
-- Ensure all imports and dependencies are correctly resolved
-- Apply best practices and patterns observed in the codebase
-- Preserve existing functionality while fixing issues
-- Use the same coding style and conventions found in the project
-- Consider the project's overall structure when making changes
-
-Begin generating intelligent fixes now:"""
+          # Create an enhanced fix request using the full codebase context
+        fix_request = get_agent_prompt(
+            'validation_mcp_agent',
+            'codebase_fix_prompt',
+            analysis_result=analysis_result,
+            codebase_context=codebase_context[:25000] + ("..." if len(codebase_context) > 25000 else "")
+        )
         
         # Get specific fixes from AI with enhanced context
+        system_prompt = get_agent_prompt('validation_mcp_agent', 'repomix_analysis_system_prompt')
         messages = [
-            {
-                "role": "system", 
-                "content": "You are an expert code architect and fixer. Use the complete codebase context provided by RepoMix to generate intelligent, architecturally consistent fixes."
-            },
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": fix_request}
         ]
         

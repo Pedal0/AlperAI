@@ -22,6 +22,7 @@ from pathlib import Path
 from src.api.openrouter_api import call_openrouter_api
 from src.utils.model_utils import is_free_model
 from src.config.constants import RATE_LIMIT_DELAY_SECONDS
+from src.utils.prompt_loader import get_system_prompt_with_best_practices, get_agent_prompt
 import time
 
 def reformulate_prompt(api_key, selected_model, user_prompt, url_context, additional_context, progress_callback=None, current_app=None, process_state=None):
@@ -44,45 +45,22 @@ def reformulate_prompt(api_key, selected_model, user_prompt, url_context, additi
             update_progress(1, f"⏳ Modèle gratuit détecté. Attente de {wait_time:.1f} secondes (limite de taux)...", 20)
             time.sleep(wait_time)
 
-    # Load and prepare best system prompts as a system message
-    config_file = Path(__file__).parents[2] / 'config' / 'best_system_prompts.json'
-    try:
-        with open(config_file, 'r', encoding='utf-8') as f:
-            best_prompts_list = json.load(f)
-        system_prompt = 'You are an AI assistant for code generation. Follow these best practices strictly:\n' + ''.join(f'- {item}\n' for item in best_prompts_list)
-    except Exception:
-        system_prompt = 'You are an AI assistant for code generation. Follow best practices for clear, maintainable, and secure code.'
+    # Load system prompt with best practices using the new utility
+    system_prompt = get_system_prompt_with_best_practices('prompt_reformulation_agent')
 
-    prompt_reformulation = f"""
-    Analyze the user's request below. Your task is to:
-    1. Reformulate the request in a detailed and precise way to guide code generation.
-    2. Structure your reformulation into the following sections:
-       - Main features required
-       - Technologies/frameworks to use (or avoid)
-       - Specific constraints or preferences
-       - Example use cases or user flows
-    3. If the request is vague, make reasonable assumptions to fill in missing information.
-    4. If the user provided URLs, carefully read their content and follow any instructions or use examples as inspiration.
-    5. Your output MUST be EXACTLY in the following format:
-    ### REFORMULATED PROMPT ###
-    Features:
-    - ...
-    Technologies:
-    - ...
-    Constraints:
-    - ...
-    Example use cases:
-    - ...
-
-    User request:
-    "{user_prompt}"
-    {url_context if url_context else ""}
-    {additional_context if additional_context else ""}
-    """
+    # Load reformulation prompt template
+    reformulation_template = get_agent_prompt(
+        'prompt_reformulation_agent', 
+        'reformulation_prompt',
+        user_prompt=user_prompt,
+        url_context=url_context if url_context else "",
+        additional_context=additional_context if additional_context else ""
+    )
+    
     # Prepare messages with system prompt and user content
     messages_reformulation = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": prompt_reformulation}
+        {"role": "user", "content": reformulation_template}
     ]
     response_reformulation = call_openrouter_api(api_key, selected_model, messages_reformulation, temperature=0.6, max_retries=2)
     if process_state is not None:

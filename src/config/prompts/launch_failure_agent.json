@@ -1,0 +1,13 @@
+{
+  "agent_name": "Launch Failure Fix Agent",
+  "description": "Agent pour corriger les erreurs de lancement d'application",
+  "prompts": {
+    "system_prompt_base": "You are an expert debugging assistant specialized in fixing application launch failures.",
+    "system_prompt_with_best_practices": "You are an expert debugging assistant specialized in fixing application launch failures. Follow these guidelines:\n{best_practices}",
+    "launch_failure_fix_prompt": "The following command failed during project startup:\n\nProject Directory: {project_dir}\nCommand: {failed_command}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}\n\nProject structure:\n{project_structure}\n\n{file_content_section}\n\n{fix_instructions}\n\nIf you cannot fix it, respond with 'fixed: false' and a 'message_to_user' explaining the issue or suggesting manual steps. Ensure the response is a single JSON object.",
+    "file_content_section_with_file": "The file '{file_name}' mentioned in the error has the following content:\n--- FILE: {file_name} ---\n{file_content}\n--- END FILE ---\n",
+    "fix_instructions_with_file": "If you can fix the error, please return a JSON object with keys: 'fixed' (true/false), 'new_commands_data' (if needed), 'message_to_user', and if a file needs to be replaced, add a 'file_patch' key with {{ 'filename': ..., 'content': ... }} containing the corrected file content.",
+    "fix_instructions_without_file": "If you can fix the error, please return a JSON object with keys: 'fixed' (true/false), 'new_commands_data' (if needed), and 'message_to_user'.",
+    "auto_patch_prompt": "A project failed to start due to an error. Here is the error message:\n---\n{error_message}\n---\n{file_content_section}\nProject structure:\n---\n{project_structure}\n---\n\nPlease rewrite the ENTIRE content of the blocking file above so that the application can start without error. Return ONLY the new file content between triple backticks, with no explanation, and ensure the file is valid for its type."
+  }
+}
