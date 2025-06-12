@@ -14,6 +14,9 @@ MorphAIus is an intelligent application generator that uses AI to create complet
 ## 📋 Prerequisites
 
 - **Python 3.8+**
+- **Node.js 16+** and **npm** - Required for RepoMix codebase analysis
+  - Download from [Node.js official website](https://nodejs.org/)
+  - Verify installation: `node --version` and `npm --version`
 - **OpenRouter API Key** - Get one at [OpenRouter](https://openrouter.ai/)
 - **Git** (optional, for cloning)
 
