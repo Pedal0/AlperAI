@@ -17,10 +17,27 @@ MorphAIus is an intelligent application generator that uses AI to create complet
 - **Node.js 16+** and **npm** - Required for RepoMix codebase analysis
   - Download from [Node.js official website](https://nodejs.org/)
   - Verify installation: `node --version` and `npm --version`
+- **RepoMix** (required for codebase analysis)
+  - Install globally: `npm install -g repomix`
+  - Verify installation: `repomix --help`
 - **OpenRouter API Key** - Get one at [OpenRouter](https://openrouter.ai/)
 - **Git** (optional, for cloning)
 
 ## 🛠️ Installation
+
+### 0. Install RepoMix (required for codebase analysis)
+
+Before running the project, make sure RepoMix is installed globally:
+
+```bash
+npm install -g repomix
+```
+
+You can verify the installation with:
+
+```bash
+repomix --help
+```
 
 ### Option 1: Using Pipenv (Recommended)
 

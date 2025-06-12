@@ -14,7 +14,15 @@ class SimpleCodebaseClient:
     """Client simplifié pour analyser les codebases avec RepoMix."""
     
     def __init__(self):
-        self.repomix_available = self._check_repomix()
+        # Use the robust check before any install attempt
+        if self.check_repomix_thoroughly():
+            self.repomix_available = True
+        else:
+            # Only attempt automatic install if not present, but do not block or prompt interactively
+            logging.warning("RepoMix not detected. Please install it globally with 'npm install -g repomix' as described in the README.")
+            self.repomix_available = self._check_repomix()
+            if not self.repomix_available:
+                logging.error("RepoMix is not available. Codebase analysis will be skipped. See README for installation instructions.")
     
     def _check_repomix(self):
         """Vérifie si RepoMix est disponible."""
@@ -209,6 +217,46 @@ class SimpleCodebaseClient:
         except Exception as e:
             logging.error(f"Error analyzing project structure: {e}")
             return {"error": str(e)}
+
+    @staticmethod
+    def check_repomix_thoroughly():
+        """
+        Robustly checks if RepoMix is available in the PATH.
+        Returns True if the command works, False otherwise.
+        """
+        import shutil
+        import subprocess
+        repomix_path = shutil.which("repomix")
+        if not repomix_path:
+            logging.warning("RepoMix is not in the PATH.")
+            return False
+        try:
+            result = subprocess.run(
+                [repomix_path, "--help"],
+                capture_output=True,
+                text=True,
+                shell=False,
+                timeout=20
+            )
+            if result.returncode == 0 and ("Usage" in result.stdout or "repomix" in result.stdout.lower()):
+                logging.info("RepoMix detected and functional.")
+                return True
+            else:
+                logging.warning(f"RepoMix found but did not respond as expected: {result.stdout} {result.stderr}")
+                return False
+        except Exception as e:
+            logging.error(f"Error during explicit RepoMix check: {e}")
+            return False
+
+    @staticmethod
+    def prompt_user_to_install_repomix():
+        """
+        Prompt the user to manually install RepoMix if not available.
+        """
+        print("\n[RepoMix not detected]")
+        print("Please install RepoMix globally by running:")
+        print("    npm install -g repomix\n")
+        input("Once installed, press Enter to continue...")
 
 def create_simple_codebase_client():
     """Factory function pour créer un client codebase simplifié."""
