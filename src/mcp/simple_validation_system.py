@@ -36,7 +36,7 @@ def validate_and_fix_with_repomix(target_directory, api_key=None, model=None, us
         if not codebase_client.repomix_available:
             # Fallback: installer RepoMix automatiquement
             if progress_callback:
-                progress_callback(9, "📦 Installing RepoMix...", 90)
+                progress_callback(9, "📦 Installing RepoMix - this will take longer the first time...", 90)
             
             install_success = codebase_client._install_repomix()
             if not install_success:
