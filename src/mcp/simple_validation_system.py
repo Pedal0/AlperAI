@@ -298,6 +298,56 @@ def clean_markdown_artifacts(target_directory):
                     content = re.sub(r'^###\s*END.*$', '', content, flags=re.MULTILINE)
                     content = re.sub(r'^\s*-{3,}\s*END\s*-{3,}.*$', '', content, flags=re.MULTILINE | re.IGNORECASE)
                     
+                    # NEW: Remove AI-generated explanatory text and instructions
+                    # Remove lines starting with **Note:** or **Setup Instructions:**
+                    content = re.sub(r'^\*\*Note:\*\*.*$', '', content, flags=re.MULTILINE | re.IGNORECASE)
+                    content = re.sub(r'^\*\*Setup Instructions.*$', '', content, flags=re.MULTILINE | re.IGNORECASE)
+                    content = re.sub(r'^\*\*.*Instructions.*\*\*.*$', '', content, flags=re.MULTILINE | re.IGNORECASE)
+                    content = re.sub(r'^\*\*End of.*\*\*.*$', '', content, flags=re.MULTILINE | re.IGNORECASE)
+                    
+                    # Remove markdown headers that shouldn't be in code files
+                    content = re.sub(r'^#+\s+.*$', '', content, flags=re.MULTILINE)
+                    
+                    # Remove markdown bold text patterns that are explanations
+                    content = re.sub(r'^\*\*.*\*\*\s*$', '', content, flags=re.MULTILINE)
+                    
+                    # Remove lines that look like documentation/instructions
+                    content = re.sub(r'^-\s+.*download.*clone.*repository.*$', '', content, flags=re.MULTILINE | re.IGNORECASE)
+                    content = re.sub(r'^-\s+.*browser.*chrome.*firefox.*$', '', content, flags=re.MULTILINE | re.IGNORECASE)
+                    content = re.sub(r'^-\s+.*open.*index\.html.*$', '', content, flags=re.MULTILINE | re.IGNORECASE)
+                    content = re.sub(r'^\d+\.\s+.*$', '', content, flags=re.MULTILINE)  # Numbered lists
+                    
+                    # Remove common instruction phrases
+                    content = re.sub(r'^.*setup.*run.*instructions.*$', '', content, flags=re.MULTILINE | re.IGNORECASE)
+                    content = re.sub(r'^.*features.*$', '', content, flags=re.MULTILINE | re.IGNORECASE)
+                    content = re.sub(r'^.*usage.*$', '', content, flags=re.MULTILINE | re.IGNORECASE)
+                    content = re.sub(r'^.*development.*$', '', content, flags=re.MULTILINE | re.IGNORECASE)
+                    content = re.sub(r'^.*notes.*$', '', content, flags=re.MULTILINE | re.IGNORECASE)
+                    
+                    # Remove explanatory text blocks that start after code
+                    content = re.sub(r'\n\n\*\*.*?\*\*.*$', '', content, flags=re.DOTALL)
+                    content = re.sub(r'\n\n#.*$', '', content, flags=re.DOTALL)
+                    
+                    # NEW: Enhanced cleanup for AI-generated explanatory text at end of files
+                    # Remove everything after "**Note:**" or similar explanatory markers
+                    content = re.sub(r'\n\n\*\*Note:\*\*.*$', '', content, flags=re.DOTALL | re.IGNORECASE)
+                    content = re.sub(r'\n\n\*\*Setup Instructions.*$', '', content, flags=re.DOTALL | re.IGNORECASE)
+                    content = re.sub(r'\n\n\*\*End of code.*$', '', content, flags=re.DOTALL | re.IGNORECASE)
+                    content = re.sub(r'\n\n## Features.*$', '', content, flags=re.DOTALL | re.IGNORECASE)
+                    content = re.sub(r'\n\n## Setup and Run.*$', '', content, flags=re.DOTALL | re.IGNORECASE)
+                    content = re.sub(r'\n\n## Usage.*$', '', content, flags=re.DOTALL | re.IGNORECASE)
+                    content = re.sub(r'\n\n## Notes.*$', '', content, flags=re.DOTALL | re.IGNORECASE)
+                    content = re.sub(r'\n\n## Development.*$', '', content, flags=re.DOTALL | re.IGNORECASE)
+                    
+                    # Remove specific instruction patterns that appear after code
+                    content = re.sub(r'\n\n- The code is structured.*$', '', content, flags=re.DOTALL | re.IGNORECASE)
+                    content = re.sub(r'\n\n- Download or clone.*$', '', content, flags=re.DOTALL | re.IGNORECASE)
+                    content = re.sub(r'\n\n1\. Download.*$', '', content, flags=re.DOTALL | re.IGNORECASE)
+                    content = re.sub(r'\n\n# To-Do List.*$', '', content, flags=re.DOTALL | re.IGNORECASE)
+                    
+                    # Clean up multiple empty lines
+                    content = re.sub(r'\n{3,}', '\n\n', content)
+                    
                     # Nettoyer les espaces excessifs en début/fin
                     content = content.strip()
                     
