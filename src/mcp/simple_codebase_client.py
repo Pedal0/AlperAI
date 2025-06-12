@@ -18,11 +18,14 @@ class SimpleCodebaseClient:
         if self.check_repomix_thoroughly():
             self.repomix_available = True
         else:
-            # Only attempt automatic install if not present, but do not block or prompt interactively
-            logging.warning("RepoMix not detected. Please install it globally with 'npm install -g repomix' as described in the README.")
-            self.repomix_available = self._check_repomix()
-            if not self.repomix_available:
-                logging.error("RepoMix is not available. Codebase analysis will be skipped. See README for installation instructions.")
+            logging.warning("RepoMix is not detected. Attempting automatic installation via 'npm install -g repomix'...")
+            install_success = self._install_repomix()
+            if install_success and self.check_repomix_thoroughly():
+                logging.info("RepoMix installed successfully via npm.")
+                self.repomix_available = True
+            else:
+                logging.error("Automatic RepoMix installation failed. Please install it manually with 'npm install -g repomix' and try again. Codebase analysis will be skipped.")
+                self.repomix_available = False
     
     def _check_repomix(self):
         """Vérifie si RepoMix est disponible."""
