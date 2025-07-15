@@ -218,7 +218,7 @@ def open_app():
     debug_log("Ouverture de la fenêtre webview...")
     try:
         window = webview.create_window(
-            'MorphAIus',
+            'AlperAI',
             'http://127.0.0.1:5000',
             width=1200, 
             height=800,

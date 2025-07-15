@@ -53,7 +53,7 @@ def call_openrouter_api(api_key, model, messages, temperature=0.7, stream=False,
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
         "HTTP-Referer": "https://morpaius.com", 
-        "X-Title": "MorphAIus" 
+        "X-Title": "AlperAI" 
     }
     payload: Dict[str, Any] = {
         "model": model,
@@ -254,8 +254,8 @@ def generate_code_with_openrouter(
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://morphaius.com",  # Added for OpenRouter tracking
-        "X-Title": "MorphAIus"  # Added for OpenRouter tracking
+        "HTTP-Referer": "https://AlperAI.com",  # Added for OpenRouter tracking
+        "X-Title": "AlperAI"  # Added for OpenRouter tracking
     }
     
     # Tenter l'appel API avec des réessais
