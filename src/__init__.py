@@ -1,5 +1,5 @@
 """
-MorphAIus application source code.
+AlperAI application source code.
 Module structure:
 - src/api: API integration modules
 - src/config: Configuration and constants

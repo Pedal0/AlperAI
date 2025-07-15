@@ -1,6 +1,6 @@
-# 🚀 MorphAIus - AI Application Generator
+# 🚀 AlperAI - AI Application Generator
 
-MorphAIus is an intelligent application generator that uses AI to create complete, functional applications based on your descriptions. It leverages the OpenRouter API to access multiple AI models (GPT-4, Claude, Llama, etc.) and generates applications with a modern Flask web interface.
+AlperAI is an intelligent application generator that uses AI to create complete, functional applications based on your descriptions. It leverages the OpenRouter API to access multiple AI models (GPT-4, Claude, Llama, etc.) and generates applications with a modern Flask web interface.
 
 ## ✨ Features
 
@@ -43,8 +43,8 @@ repomix --help
 
 1. **Clone and setup**:
    ```bash
-   git clone https://github.com/Pedal0/MorphAIus.git
-   cd MorphAIus
+   git clone https://github.com/Pedal0/AlperAI.git
+   cd AlperAI
    pip install pipenv  # If you don't have pipenv
    pipenv install
    ```
@@ -59,8 +59,8 @@ repomix --help
 
 1. **Clone and setup**:
    ```bash
-   git clone https://github.com/Pedal0/MorphAIus.git
-   cd MorphAIus
+   git clone https://github.com/Pedal0/AlperAI.git
+   cd AlperAI
    python -m venv venv
    
    # Windows
@@ -112,7 +112,7 @@ python run.py
 
 ## 🎯 Supported Application Types
 
-MorphAIus can generate various types of applications:
+AlperAI can generate various types of applications:
 
 - **Static Websites**: Portfolios, landing pages, business sites, blogs
 - **Web Applications**: CRUD apps, dashboards, e-commerce, social platforms
@@ -174,7 +174,7 @@ pipenv shell
 pyinstaller launcher.spec
 ```
 
-The executable will be in `dist/MorphAIus.exe`
+The executable will be in `dist/AlperAI.exe`
 
 ## 📄 License
 
