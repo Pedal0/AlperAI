@@ -20,7 +20,7 @@ AlperAI is an intelligent application generator that uses AI to create complete,
 - **RepoMix** (required for codebase analysis)
   - Install globally: `npm install -g repomix`
   - Verify installation: `repomix --help`
-- **OpenRouter API Key** - Get one at [OpenRouter](https://openrouter.ai/)
+- **OpenRouter API Key** - Get one at [OpenRouter](https://openrouter.ai/) (put 5€ on it and you'll see it changes everything) 
 - **Git** (optional, for cloning)
 
 ## 🛠️ Installation
