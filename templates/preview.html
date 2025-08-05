@@ -182,7 +182,8 @@ content %}
   window.URL_PREVIEW_REFRESH = "{{ url_for('preview.refresh_preview') }}";
   window.URL_CONTINUE_ITERATION = "{{ url_for('generation.continue_iteration') }}";
   window.URL_GENERATION_PROGRESS = "{{ url_for('generation.generation_progress') }}";
-  window.API_KEY = "{{ session.get('api_key','') }}";
+  // SÉCURITÉ: Ne plus exposer l'API key côté client - elle sera récupérée côté serveur
+  window.API_KEY = "";  // Utiliser un endpoint sécurisé pour les appels nécessitant l'API key
   window.MODEL = "{{ session.get('model','') }}";
 </script>
 <script src="{{ url_for('static', filename='js/preview.js') }}"></script>
