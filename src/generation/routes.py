@@ -26,6 +26,8 @@ from src.generation.generation_flow import generate_application
 from src.utils.model_utils import is_free_model
 from src.api.openrouter_api import extract_files_from_response, generate_code_with_openrouter
 from src.utils.prompt_loader import get_agent_prompt
+from src.utils.session_utils import clean_generation_result_for_session, clean_session_after_generation, estimate_session_size
+from src.utils.server_storage import store_generation_data, get_generation_data, delete_generation_data
 
 # Blueprint for generation
 bp_generation = Blueprint('generation', __name__)
@@ -292,10 +294,23 @@ def generate():
                 errors.append(f"Unable to create directory '{target_dir}': {str(e)}")
         if errors:
             return jsonify({"status": "error", "errors": errors})
+            
+        # Nettoie la session des données volumineuses précédentes avant de commencer une nouvelle génération
+        old_session_size = estimate_session_size(session)
+        if old_session_size > 3000:  # Si la session est déjà grande
+            current_app.logger.info(f"Cleaning large session before new generation (was {old_session_size} bytes)")
+            # Garde seulement les données essentielles
+            essential_data = {
+                'model': session.get('model'),
+                'target_dir': session.get('target_dir')
+            }
+            session.clear()
+            session.update(essential_data)
+            
         session['prompt'] = prompt
         session['target_dir'] = target_dir
         session['model'] = model
-        session['api_key'] = api_key  # Store API key in session
+        session['api_key'] = api_key  # Store API key in session (will be cleaned after generation)
         session['use_mcp'] = use_mcp
         session['frontend_framework'] = frontend_framework
         session['include_animations'] = include_animations
@@ -340,7 +355,47 @@ def generation_progress():
         })
     task = generation_tasks[task_id]
     if task['status'] == 'completed' and task['result']:
-        session['generation_result'] = task['result']
+        # SOLUTION: Stocker les données volumineuses côté serveur au lieu de la session
+        full_result = task['result']
+        
+        # Créer un ID unique pour cette génération basé sur session Flask et timestamp
+        generation_id = f"{session.get('_id', 'anonymous')}_{task_id}"
+        
+        # Stocker les données complètes côté serveur
+        store_generation_data(generation_id, {
+            'full_result': full_result,
+            'api_key': session.get('api_key'),  # Stocker l'API key côté serveur
+            'target_dir': session.get('target_dir'),
+            'prompt': session.get('prompt'),
+            'model': session.get('model'),
+            'reformulated_prompt': full_result.get('reformulated_prompt', ''),
+            'used_tools': full_result.get('used_tools', [])
+        })
+        
+        # Ne garder qu'un minimum dans la session pour éviter le cookie trop large
+        minimal_result = {
+            'success': full_result.get('success', False),
+            'target_directory': full_result.get('target_directory', ''),
+            'timestamp': full_result.get('timestamp', ''),
+            'files_created': full_result.get('files_created', 0),
+            'generation_id': generation_id,  # Référence pour récupérer les données complètes
+            # Garder seulement les 5 premiers fichiers pour l'affichage
+            'file_list_preview': full_result.get('file_list', [])[:5],
+            'total_files': len(full_result.get('file_list', [])),
+            'iteration': full_result.get('iteration', False)
+        }
+        
+        session['generation_result'] = minimal_result
+        
+        # Nettoie l'API key et autres données temporaires de la session après génération réussie
+        clean_session_after_generation(session)
+        
+        # Log de la taille de la session pour debugging
+        session_size = estimate_session_size(session)
+        current_app.logger.info(f"Session size after cleaning and server storage: {session_size} bytes")
+        if session_size > 4000:  # Proche de la limite de 4093 bytes
+            current_app.logger.warning(f"Session size is still getting large: {session_size} bytes")
+            
     # Added: ordered list of steps
     use_mcp = session.get('use_mcp', False)
     steps = [
@@ -375,12 +430,36 @@ def result():
     if 'generation_result' not in session:
         flash("No generation result found. Please generate an application first.", "warning")
         return redirect(url_for('ui.index'))
-    generation_result = session['generation_result']
-    used_tools = generation_result.get('used_tools', [])
+    
+    minimal_result = session['generation_result']
+    
+    # Récupérer les données complètes depuis le stockage serveur
+    generation_id = minimal_result.get('generation_id')
+    if generation_id:
+        server_data = get_generation_data(generation_id)
+        if server_data:
+            # Fusionner les données minimales et complètes pour l'affichage
+            generation_result = server_data['full_result']
+            used_tools = generation_result.get('used_tools', [])
+            prompt = server_data.get('prompt', '')
+            target_dir = server_data.get('target_dir', '')
+        else:
+            # Fallback si les données serveur ne sont plus disponibles
+            generation_result = minimal_result
+            used_tools = []
+            prompt = session.get('prompt', '')
+            target_dir = session.get('target_dir', '')
+    else:
+        # Compatibilité avec l'ancien système
+        generation_result = minimal_result
+        used_tools = generation_result.get('used_tools', [])
+        prompt = session.get('prompt', '')
+        target_dir = session.get('target_dir', '')
+    
     return render_template('result.html',
                           result=generation_result,
-                          prompt=session.get('prompt', ''),
-                          target_dir=session.get('target_dir', ''),
+                          prompt=prompt,
+                          target_dir=target_dir,
                           used_tools=used_tools)
 
 @bp_generation.route('/iterate', methods=['POST'])
@@ -393,8 +472,28 @@ def iterate_generation():
         api_key = data.get('api_key', '')
         model = data.get('model', session.get('model', 'google/gemini-2.5-pro-exp-03-25:free'))
         feedback = data.get('feedback', '')
-        target_dir = session.get('target_dir', '')
-        reformulated_prompt = session['generation_result'].get('reformulated_prompt', '')
+        
+        # Récupérer les données depuis le stockage serveur
+        minimal_result = session['generation_result']
+        generation_id = minimal_result.get('generation_id')
+        target_dir = None
+        reformulated_prompt = ''
+        
+        if generation_id:
+            server_data = get_generation_data(generation_id)
+            if server_data:
+                target_dir = server_data.get('target_dir', '')
+                reformulated_prompt = server_data.get('reformulated_prompt', '')
+                # Utiliser l'API key stockée côté serveur si pas fournie
+                if not api_key:
+                    api_key = server_data.get('api_key', '')
+        
+        # Fallback vers les données de session si pas de stockage serveur
+        if not target_dir:
+            target_dir = session.get('target_dir', '')
+        if not reformulated_prompt:
+            reformulated_prompt = minimal_result.get('reformulated_prompt', '')
+
         if not api_key:
             flash("API key required", "danger")
             return redirect(url_for('generation.result'))
