@@ -1,27 +1,22 @@
-{% extends "layout.html" %} {% block title %}AlperAI - Preview{% endblock %} {% block
-content %}
+{% extends "layout.html" %}
+{% block title %}AlperAI — Preview{% endblock %}
+{% block content %}
+
 <div class="row justify-content-center">
   <div class="col-lg-11">
+
     <div class="preview-header mb-4">
       <div class="row align-items-center">
         <div class="col-md-8">
-          <h1 class="gradient-text">Application Preview</h1>
-          <p class="lead">Your application is now ready for testing.</p>
-          <p class="text-muted">
-            <i class="fas fa-folder-open me-1"></i> Directory:
-            <code id="project-path">{{ target_dir }}</code>
-          </p>
+          <h1>Application Preview</h1>
+          <p class="lead">Your application is ready for testing.</p>
+          <p class="text-muted mb-0"><code id="project-path">{{ target_dir }}</code></p>
         </div>
-        <div class="col-md-4 text-md-end">
-          <a
-            href="{{ url_for('generation.result') }}"
-            class="btn btn-outline-primary me-2"
-          >
-            <i class="fas fa-arrow-left me-1"></i> Back to Results
+        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+          <a href="{{ url_for('generation.result') }}" class="btn btn-outline-secondary me-2">
+            <i class="fas fa-arrow-left me-1"></i> Results
           </a>
-          <a href="{{ url_for('ui.index') }}" class="btn btn-primary">
-            <i class="fas fa-home me-1"></i> Home
-          </a>
+          <a href="{{ url_for('ui.index') }}" class="btn btn-outline-primary">Home</a>
         </div>
       </div>
     </div>
@@ -30,97 +25,68 @@ content %}
       <div class="card-header">
         <ul class="nav nav-tabs card-header-tabs" id="previewTabs">
           <li class="nav-item">
-            <a class="nav-link active" id="launch-tab" data-bs-toggle="tab" href="#launch">
-              <i class="fas fa-play-circle me-1"></i> Launch
-            </a>
+            <a class="nav-link active" id="launch-tab" data-bs-toggle="tab" href="#launch">Launch</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" id="interaction-tab" data-bs-toggle="tab" href="#interaction">
-              <i class="fas fa-comment-dots me-1"></i> Iterate
-            </a>
+            <a class="nav-link" id="interaction-tab" data-bs-toggle="tab" href="#interaction">Iterate</a>
           </li>
         </ul>
       </div>
       <div class="card-body p-0">
         <div class="tab-content">
+
           <!-- Launch Tab -->
           <div class="tab-pane fade show active p-4" id="launch">
-            <!-- Patch IA Alert -->
             <div id="ai-patch-alert" class="alert alert-warning d-none" role="alert">
               <strong>AI Patch Applied:</strong> <span id="ai-patch-file"></span><br>
               <pre class="mb-0" id="ai-patch-excerpt" style="max-height:150px;overflow:auto;"></pre>
             </div>
-            <!-- /Patch IA Alert -->
 
-            <!-- Launch Progress Bar -->
-            <div id="launch-progress-container" class="mt-3 mb-3" style="display: none;">
-              <p id="launch-progress-message" class="mb-1">Starting application...</p>
-              <div class="progress" style="height: 1rem;">
+            <div id="launch-progress-container" class="mb-3" style="display: none;">
+              <p id="launch-progress-message" class="mb-1 text-muted">Starting application...</p>
+              <div class="progress">
                 <div id="launch-progress-bar"
                      class="progress-bar progress-bar-striped progress-bar-animated"
                      role="progressbar"
                      style="width: 0%;"
-                     aria-valuenow="0"
-                     aria-valuemin="0"
-                     aria-valuemax="100">
+                     aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
                 </div>
               </div>
             </div>
-            <!-- /Launch Progress Bar -->
 
-            <div
-              class="d-flex justify-content-between align-items-center p-3 preview-toolbar"
-            >
-              <div>
-                <span class="badge bg-secondary me-2" id="app-status-badge"
-                  >Not Started</span
-                >
-                <span class="app-url" id="app-url">Address not available</span>
-                <!-- Champ de correction d'URL -->
-                <span id="manual-url-group" class="d-none ms-2">
-                  <input
-                    type="text"
-                    id="manual-url-input"
-                    class="form-control form-control-sm d-inline-block"
-                    style="width:260px;max-width:60%"
-                    placeholder="Enter app URL (e.g. http://localhost:3000)"
-                  />
-                  <button
-                    class="btn btn-sm btn-outline-success ms-1"
-                    id="manual-url-apply"
-                  >
-                    Apply
-                  </button>
+            <div class="d-flex justify-content-between align-items-center preview-toolbar">
+              <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-secondary" id="app-status-badge">Not Started</span>
+                <span class="app-url" id="app-url">—</span>
+                <span id="manual-url-group" class="d-none">
+                  <input type="text" id="manual-url-input" class="form-control form-control-sm d-inline-block" style="width:240px" placeholder="http://localhost:3000" />
+                  <button class="btn btn-sm btn-outline-success ms-1" id="manual-url-apply">Apply</button>
                 </span>
               </div>
-              <div>
-                <button
-                  class="btn btn-sm btn-outline-secondary me-2"
-                  id="refreshPreviewBtn"
-                >
+              <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-secondary" id="refreshPreviewBtn">
                   <i class="fas fa-sync-alt me-1"></i> Refresh
                 </button>
-                <button
-                  class="btn btn-sm btn-outline-primary"
-                  id="openInNewTab"
-                  disabled
-                >
-                  <i class="fas fa-external-link-alt me-1"></i> Open in New Tab
+                <button class="btn btn-sm btn-outline-primary" id="openInNewTab" disabled>
+                  <i class="fas fa-external-link-alt me-1"></i> Open
                 </button>
               </div>
             </div>
             <div class="p-3">
-              <p>Use the controls below to launch your application in a new window.</p>
+              <p class="text-muted mb-0">Use the controls below to launch your application.</p>
             </div>
           </div>
 
-          <!-- Interaction Tab -->
+          <!-- Iteration Tab -->
           <div class="tab-pane fade p-4" id="interaction">
-            <h5>Feedback</h5>
+            <h5 class="mb-3">Feedback</h5>
             <textarea class="form-control" id="interactionInput" rows="6" placeholder="Ask questions or provide feedback here..."></textarea>
-            <button class="btn btn-primary mt-3" id="iteratePreviewBtn"><i class="fas fa-sync-alt me-1"></i> Iterate</button>
+            <button class="btn btn-primary mt-3" id="iteratePreviewBtn">
+              <i class="fas fa-sync-alt me-1"></i> Iterate
+            </button>
             <div id="iterationStatus" class="mt-2"></div>
           </div>
+
         </div>
       </div>
     </div>
@@ -128,31 +94,25 @@ content %}
     <!-- Control Panel -->
     <div class="card mt-4 mb-4">
       <div class="card-header">
-        <h4 class="mb-0"><i class="fas fa-tools me-2"></i>Control Panel</h4>
+        <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-3)">Control Panel</span>
       </div>
       <div class="card-body">
         <div class="row">
-          <div class="col-md-6">
-            <h5 class="mb-3">Development Tools</h5>
-            <div class="d-flex flex-wrap">
-              <button
-                class="btn btn-outline-primary me-2 mb-2"
-                id="openFolderBtn"
-              >
+          <div class="col-md-6 mb-3 mb-md-0">
+            <p class="form-label">Development Tools</p>
+            <div class="d-flex flex-wrap gap-2">
+              <button class="btn btn-outline-secondary" id="openFolderBtn">
                 <i class="fas fa-folder-open me-1"></i> Open Folder
               </button>
-              <button class="btn btn-outline-info me-2 mb-2" id="copyPathBtn">
+              <button class="btn btn-outline-secondary" id="copyPathBtn">
                 <i class="fas fa-copy me-1"></i> Copy Path
               </button>
             </div>
           </div>
           <div class="col-md-6">
-            <h5 class="mb-3">Actions</h5>
-            <div class="d-flex flex-wrap">
-              <button
-                class="btn btn-outline-secondary me-2 mb-2"
-                id="improveWithAIBtn"
-              >
+            <p class="form-label">Actions</p>
+            <div class="d-flex flex-wrap gap-2">
+              <button class="btn btn-outline-secondary" id="improveWithAIBtn">
                 <i class="fas fa-magic me-1"></i> Improve with AI
               </button>
             </div>
@@ -160,31 +120,31 @@ content %}
         </div>
       </div>
     </div>
+
   </div>
 </div>
 
-<!-- Preview Session ID (hidden) -->
 <input type="hidden" id="preview-session-id" value="{{ preview_session_id }}" />
 <script>
-  // Sauvegarde l'ID de session de preview dans sessionStorage pour la page result
   if (window.sessionStorage) {
     sessionStorage.setItem('preview_session_id', '{{ preview_session_id }}');
   }
 </script>
-{% endblock %} {% block extra_js %}
+
+{% endblock %}
+{% block extra_js %}
 <script>
-  window.URL_PREVIEW_START = "{{ url_for('preview.start_preview_route') }}";
-  window.URL_PREVIEW_STATUS = "{{ url_for('preview.preview_status') }}";
-  window.URL_PREVIEW_STOP = "{{ url_for('preview.stop_preview_route') }}";
-  window.URL_PREVIEW_RESTART = "{{ url_for('preview.restart_preview_route') }}";
-  window.URL_PREVIEW_LIST_FILES = "{{ url_for('preview.list_files_route') }}";
+  window.URL_PREVIEW_START        = "{{ url_for('preview.start_preview_route') }}";
+  window.URL_PREVIEW_STATUS       = "{{ url_for('preview.preview_status') }}";
+  window.URL_PREVIEW_STOP         = "{{ url_for('preview.stop_preview_route') }}";
+  window.URL_PREVIEW_RESTART      = "{{ url_for('preview.restart_preview_route') }}";
+  window.URL_PREVIEW_LIST_FILES   = "{{ url_for('preview.list_files_route') }}";
   window.URL_PREVIEW_STOP_ON_EXIT = "{{ url_for('preview.stop_preview_on_exit') }}";
-  window.URL_PREVIEW_REFRESH = "{{ url_for('preview.refresh_preview') }}";
-  window.URL_CONTINUE_ITERATION = "{{ url_for('generation.continue_iteration') }}";
-  window.URL_GENERATION_PROGRESS = "{{ url_for('generation.generation_progress') }}";
-  // SÉCURITÉ: Ne plus exposer l'API key côté client - elle sera récupérée côté serveur
-  window.API_KEY = "";  // Utiliser un endpoint sécurisé pour les appels nécessitant l'API key
-  window.MODEL = "{{ session.get('model','') }}";
+  window.URL_PREVIEW_REFRESH      = "{{ url_for('preview.refresh_preview') }}";
+  window.URL_CONTINUE_ITERATION   = "{{ url_for('generation.continue_iteration') }}";
+  window.URL_GENERATION_PROGRESS  = "{{ url_for('generation.generation_progress') }}";
+  window.API_KEY = "";
+  window.MODEL   = "{{ session.get('model','') }}";
 </script>
 <script src="{{ url_for('static', filename='js/preview.js') }}"></script>
 {% endblock %}
